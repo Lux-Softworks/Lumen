@@ -33,4 +33,12 @@ final class AegisTests: XCTestCase {
         }
     }
 
+    func testBrowserEngineRequestCachePolicy() {
+        let url = URL(string: "https://example.com")!
+        let request = BrowserEngine.makeRequest(url: url)
+
+        XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy, "Cache policy should be .useProtocolCachePolicy")
+        XCTAssertEqual(request.timeoutInterval, 30, "Timeout interval should be 30 seconds")
+    }
+
 }
