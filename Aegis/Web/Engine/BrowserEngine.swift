@@ -19,7 +19,7 @@ enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
-        config.websiteDataStore = .nonPersistent()
+        config.websiteDataStore = WKWebsiteDataStore.default()
 
         let contentController = WKUserContentController()
         
