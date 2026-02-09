@@ -34,6 +34,13 @@ final class AegisTests: XCTestCase {
         }
     }
 
+    func testBrowserEngineRequestCachePolicy() {
+        let url = URL(string: "https://example.com")!
+        let request = BrowserEngine.makeRequest(url: url)
+
+        XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy, "Cache policy should be .useProtocolCachePolicy")
+        XCTAssertEqual(request.timeoutInterval, 30, "Timeout interval should be 30 seconds")
+      
     func testURLStringComparisonPerformance() throws {
         guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
               let url2 = URL(string: "https://www.example.com/path/to/resource"),

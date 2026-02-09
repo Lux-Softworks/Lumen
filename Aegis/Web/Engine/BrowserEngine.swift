@@ -62,6 +62,12 @@ enum BrowserEngine {
 
         return webView
     }
+
+    static func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy)
+        request.timeoutInterval = 30
+        return request
+    }
 }
 
 private enum _WKWebViewAssociatedKeys {
@@ -174,9 +180,8 @@ struct HardenedWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        if webView.url != url {
-            var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
-            request.timeoutInterval = 30
+        if webView.url == nil || webView.url?.absoluteString != url.absoluteString {
+            let request = BrowserEngine.makeRequest(url: url)
             webView.load(request)
         }
     }
