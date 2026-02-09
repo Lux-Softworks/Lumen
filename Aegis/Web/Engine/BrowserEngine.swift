@@ -103,7 +103,7 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
             return
         }
         
-        if let scheme = url.scheme?.lowercased(), scheme == "http" {
+        if url.scheme?.caseInsensitiveCompare("http") == .orderedSame {
             if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
                 comps.scheme = "https"
                 if let httpsURL = comps.url {
