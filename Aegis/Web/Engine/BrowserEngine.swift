@@ -8,6 +8,7 @@ struct PrivacyPolicy {
     var allowsInlineMediaPlayback: Bool = false
     var allowsPictureInPictureMediaPlayback: Bool = false
     var allowsAirPlayForMediaPlayback: Bool = false
+    var allowsMediaAutoPlay: Bool = false
     var javaScriptCanOpenWindowsAutomatically: Bool = false
     var suppressesIncrementalRendering: Bool = true
     var limitsNavigationToHTTPS: Bool = true
@@ -26,12 +27,7 @@ enum BrowserEngine {
         config.userContentController = contentController
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
-        
-        if #available(iOS 16.0, *) {
-            config.mediaTypesRequiringUserActionForPlayback = []
-        } else {
-            config.requiresUserActionForMediaPlayback = true
-        }
+        config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
 
         if #available(iOS 14.0, *) {
             config.defaultWebpagePreferences.allowsContentJavaScript = policy.allowsJavaScript
