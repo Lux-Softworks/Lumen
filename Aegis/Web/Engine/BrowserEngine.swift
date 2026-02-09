@@ -103,7 +103,17 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
             return
         }
         
-        if let scheme = url.scheme?.lowercased(), scheme == "http" {
+        guard let scheme = url.scheme else {
+            decisionHandler(.cancel)
+            return
+        }
+
+        if scheme.caseInsensitiveCompare("https") == .orderedSame {
+            decisionHandler(.allow)
+            return
+        }
+
+        if scheme.caseInsensitiveCompare("http") == .orderedSame {
             if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
                 comps.scheme = "https"
                 if let httpsURL = comps.url {
@@ -113,7 +123,8 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
-        decisionHandler(.allow)
+
+        decisionHandler(.cancel)
     }
 }
 
