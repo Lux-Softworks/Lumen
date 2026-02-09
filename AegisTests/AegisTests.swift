@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import WebKit
 @testable import Aegis
 
 final class AegisTests: XCTestCase {
@@ -31,6 +32,19 @@ final class AegisTests: XCTestCase {
         self.measure {
             // Put the code you want to measure the time of here.
         }
+    }
+
+    func testBrowserEngineConfiguration_mediaTypesRequiringUserActionForPlayback() {
+        // Case 1: Auto-play disabled (default)
+        var policy = PrivacyPolicy()
+        policy.allowsMediaAutoPlay = false
+        var config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, .all, "Auto-play should be disabled (require user action for all) when allowsMediaAutoPlay is false")
+
+        // Case 2: Auto-play enabled
+        policy.allowsMediaAutoPlay = true
+        config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, [], "Auto-play should be enabled (require user action for none) when allowsMediaAutoPlay is true")
     }
 
 }

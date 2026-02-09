@@ -8,13 +8,13 @@ struct PrivacyPolicy {
     var allowsInlineMediaPlayback: Bool = false
     var allowsPictureInPictureMediaPlayback: Bool = false
     var allowsAirPlayForMediaPlayback: Bool = false
+    var allowsMediaAutoPlay: Bool = false
     var javaScriptCanOpenWindowsAutomatically: Bool = false
     var suppressesIncrementalRendering: Bool = true
     var limitsNavigationToHTTPS: Bool = true
     var customUserAgent: String? = nil
 }
 
-// MARK: - build hardened instances
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -26,12 +26,7 @@ enum BrowserEngine {
         config.userContentController = contentController
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
-        
-        if #available(iOS 16.0, *) {
-            config.mediaTypesRequiringUserActionForPlayback = []
-        } else {
-            config.requiresUserActionForMediaPlayback = true
-        }
+        config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
 
         if #available(iOS 14.0, *) {
             config.defaultWebpagePreferences.allowsContentJavaScript = policy.allowsJavaScript
@@ -89,6 +84,29 @@ private extension WKWebView {
     }
 }
 
+enum HTTPSUpgradeAction: Equatable {
+    case allow
+    case cancel
+    case upgrade(URL)
+}
+
+struct HTTPSUpgradeLogic {
+    static func decidePolicy(for url: URL, httpsOnly: Bool) -> HTTPSUpgradeAction {
+        guard httpsOnly else { return .allow }
+
+        if let scheme = url.scheme?.lowercased(), scheme == "http" {
+            if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                comps.scheme = "https"
+                if let httpsURL = comps.url {
+                    return .upgrade(httpsURL)
+                }
+            }
+            return .cancel
+        }
+        return .allow
+    }
+}
+
 final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
     enum NavigationDecision: Equatable {
         case allow
@@ -112,8 +130,10 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
         switch Self.policyDecision(for: url, isHTTPSOnly: httpsOnly) {
         case .allow:
             decisionHandler(.allow)
+          
         case .cancel:
             decisionHandler(.cancel)
+          
         case .upgradeToHTTPS(let httpsURL):
             webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
