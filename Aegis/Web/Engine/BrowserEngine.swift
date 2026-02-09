@@ -52,7 +52,7 @@ enum BrowserEngine {
             webView.allowsLinkPreview = false
         }
 
-        if #available(iOS 15.0, *) {
+        if #available(iOS 16.4, *) {
             webView.isInspectable = false
         }
 
