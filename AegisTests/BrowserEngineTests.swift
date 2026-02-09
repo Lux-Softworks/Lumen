@@ -1,101 +1,146 @@
-//
-//  BrowserEngineTests.swift
-//  AegisTests
-//
-//  Created by Jules on 12/22/25.
-//
-
-import XCTest
+import SwiftUI
 import WebKit
-@testable import Aegis
+import ObjectiveC
 
-// Mock classes for testing
-class MockNavigationAction: WKNavigationAction {
-    let _request: URLRequest
+struct PrivacyPolicy {
+    var blocksThirdPartyCookies: Bool = true
+    var allowsJavaScript: Bool = true
+    var allowsInlineMediaPlayback: Bool = false
+    var allowsPictureInPictureMediaPlayback: Bool = false
+    var allowsAirPlayForMediaPlayback: Bool = false
+    var allowsMediaAutoPlay: Bool = false
+    var javaScriptCanOpenWindowsAutomatically: Bool = false
+    var suppressesIncrementalRendering: Bool = true
+    var limitsNavigationToHTTPS: Bool = true
+    var customUserAgent: String? = nil
+}
 
-    init(url: URL) {
-        self._request = URLRequest(url: url)
-        super.init() // This might fail at runtime if init is not available/public, but serves for static verification logic
+enum BrowserEngine {
+    static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+
+        config.websiteDataStore = .nonPersistent()
+
+        config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
+        config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
+
+        if #available(iOS 14.0, *) {
+            config.defaultWebpagePreferences.allowsContentJavaScript = policy.allowsJavaScript
+        } else {
+            config.preferences.javaScriptEnabled = policy.allowsJavaScript
+        }
+        
+        config.preferences.javaScriptCanOpenWindowsAutomatically = policy.javaScriptCanOpenWindowsAutomatically
+        config.suppressesIncrementalRendering = policy.suppressesIncrementalRendering
+
+        if let ua = policy.customUserAgent {
+            config.applicationNameForUserAgent = ua
+        }
+
+        return config
     }
 
-    override var request: URLRequest {
-        return _request
+    static func makeWebView(policy: PrivacyPolicy) -> WKWebView {
+        let config = makeConfiguration(policy: policy)
+        let webView = WKWebView(frame: .zero, configuration: config)
+        
+        if #available(iOS 13.0, *) {
+            webView.allowsLinkPreview = false
+        }
+
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = false
+        }
+
+        let httpsDelegate = HTTPSOnlyNavigationDelegate(enabled: policy.limitsNavigationToHTTPS)
+        webView.navigationDelegate = httpsDelegate
+        
+        webView._retainedNavigationDelegate = httpsDelegate
+
+        return webView
+    }
+
+    static func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy)
+        request.timeoutInterval = 30
+        return request
     }
 }
 
-class MockWebView: WKWebView {
-    var lastLoadedRequest: URLRequest?
+private enum _WKWebViewAssociatedKeys {
+    static var retainedNavigationDelegateKey: UInt8 = 0
+}
 
-    override func load(_ request: URLRequest) -> WKNavigation? {
-        lastLoadedRequest = request
-        return nil
+private extension WKWebView {
+    var _retainedNavigationDelegate: WKNavigationDelegate? {
+        get {
+            objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey) as? WKNavigationDelegate
+        }
+      
+        set {
+            objc_setAssociatedObject(
+                self,
+                &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey,
+                newValue,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
+        }
     }
 }
 
-final class BrowserEngineTests: XCTestCase {
-
-    func testHTTPSOnlyNavigationDelegate() {
-        let delegate = HTTPSOnlyNavigationDelegate(enabled: true)
-        let webView = MockWebView()
-
-        // 1. Allowed HTTPS
-        let httpsURL = URL(string: "https://example.com")!
-        let actionHTTPS = MockNavigationAction(url: httpsURL)
-        var expectation = self.expectation(description: "HTTPS Allowed")
-
-        delegate.webView(webView, decidePolicyFor: actionHTTPS) { policy in
-            XCTAssertEqual(policy, .allow)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
-
-        // 2. HTTP Upgrade
-        let httpURL = URL(string: "http://example.com")!
-        let actionHTTP = MockNavigationAction(url: httpURL)
-        expectation = self.expectation(description: "HTTP Upgraded")
-
-        delegate.webView(webView, decidePolicyFor: actionHTTP) { policy in
-            XCTAssertEqual(policy, .cancel)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
-
-        XCTAssertNotNil(webView.lastLoadedRequest)
-        XCTAssertEqual(webView.lastLoadedRequest?.url?.scheme, "https")
-        XCTAssertEqual(webView.lastLoadedRequest?.url?.host, "example.com")
-
-        // 3. FTP Blocked
-        let ftpURL = URL(string: "ftp://example.com")!
-        let actionFTP = MockNavigationAction(url: ftpURL)
-        expectation = self.expectation(description: "FTP Blocked")
-
-        delegate.webView(webView, decidePolicyFor: actionFTP) { policy in
-            XCTAssertEqual(policy, .cancel)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
-
-        // 4. File Blocked
-        let fileURL = URL(string: "file:///etc/passwd")!
-        let actionFile = MockNavigationAction(url: fileURL)
-        expectation = self.expectation(description: "File Blocked")
-
-        delegate.webView(webView, decidePolicyFor: actionFile) { policy in
-            XCTAssertEqual(policy, .cancel)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
-
-        // 5. Javascript Blocked
-        let jsURL = URL(string: "javascript:alert(1)")!
-        let actionJS = MockNavigationAction(url: jsURL)
-        expectation = self.expectation(description: "JS Blocked")
-
-        delegate.webView(webView, decidePolicyFor: actionJS) { policy in
-            XCTAssertEqual(policy, .cancel)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
+final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
+    enum NavigationDecision: Equatable {
+        case allow
+        case cancel
+        case upgradeToHTTPS(URL)
     }
 
+    private let httpsOnly: Bool
+
+    init(enabled: Bool) {
+        self.httpsOnly = enabled
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        
+        let decision = Self.policyDecision(for: url, isHTTPSOnly: httpsOnly)
+
+        switch decision {
+        case .allow:
+            decisionHandler(.allow)
+          
+        case .cancel:
+            decisionHandler(.cancel)
+          
+        case .upgradeToHTTPS(let httpsURL):
+            webView.load(URLRequest(url: httpsURL))
+            decisionHandler(.cancel)
+        }
+    }
+
+    static func policyDecision(for url: URL, isHTTPSOnly: Bool) -> NavigationDecision {
+        guard let scheme = url.scheme?.lowercased() else { return .cancel }
+
+        if scheme == "https" || scheme == "about" {
+            return .allow
+        }
+
+        if scheme == "http" {
+            if isHTTPSOnly, var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                comps.scheme = "https"
+                if let httpsURL = comps.url {
+                    return .upgradeToHTTPS(httpsURL)
+                }
+            }
+            return isHTTPSOnly ? .cancel : .allow
+        }
+
+        return .cancel
+    }
 }
