@@ -21,10 +21,6 @@ enum BrowserEngine {
 
         config.websiteDataStore = WKWebsiteDataStore.default()
 
-        let contentController = WKUserContentController()
-        
-        config.userContentController = contentController
-
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
         config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
 
