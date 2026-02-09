@@ -15,7 +15,6 @@ struct PrivacyPolicy {
     var customUserAgent: String? = nil
 }
 
-// MARK: - build hardened instances
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -109,6 +108,12 @@ struct HTTPSUpgradeLogic {
 }
 
 final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
+    enum NavigationDecision: Equatable {
+        case allow
+        case cancel
+        case upgradeToHTTPS(URL)
+    }
+
     private let httpsOnly: Bool
 
     init(enabled: Bool) {
@@ -121,17 +126,40 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
             decisionHandler(.allow)
             return
         }
-        
-        let decision = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
-        switch decision {
+        switch Self.policyDecision(for: url, isHTTPSOnly: httpsOnly) {
         case .allow:
             decisionHandler(.allow)
+          
         case .cancel:
             decisionHandler(.cancel)
-        case .upgrade(let newURL):
-            webView.load(URLRequest(url: newURL))
+          
+        case .upgradeToHTTPS(let httpsURL):
+            webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
+        }
+    }
+
+    static func policyDecision(for url: URL, isHTTPSOnly: Bool) -> NavigationDecision {
+        guard isHTTPSOnly else { return .allow }
+
+        guard let scheme = url.scheme?.lowercased() else {
+            return .cancel
+        }
+
+        switch scheme {
+        case "https", "about":
+            return .allow
+        case "http":
+            if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                comps.scheme = "https"
+                if let httpsURL = comps.url {
+                    return .upgradeToHTTPS(httpsURL)
+                }
+            }
+            return .cancel
+        default:
+            return .cancel
         }
     }
 }
