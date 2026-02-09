@@ -21,10 +21,6 @@ enum BrowserEngine {
 
         config.websiteDataStore = .nonPersistent()
 
-        let contentController = WKUserContentController()
-        
-        config.userContentController = contentController
-
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
         
         if #available(iOS 16.0, *) {
