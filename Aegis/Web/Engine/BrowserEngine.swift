@@ -127,7 +127,7 @@ struct HardenedWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        if webView.url == nil || webView.url?.absoluteString != url.absoluteString {
+        if webView.url != url {
             var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
             request.timeoutInterval = 30
             webView.load(request)

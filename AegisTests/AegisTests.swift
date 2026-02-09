@@ -33,4 +33,42 @@ final class AegisTests: XCTestCase {
         }
     }
 
+    func testURLStringComparisonPerformance() throws {
+        guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
+              let url2 = URL(string: "https://www.example.com/path/to/resource"),
+              let url3 = URL(string: "https://www.example.com/other/path") else {
+            XCTFail("Failed to create URLs")
+            return
+        }
+
+        // Measure baseline: String comparison
+        self.measure {
+            for _ in 0..<100_000 {
+                // Simulate the comparison logic: webView.url?.absoluteString != url.absoluteString
+                // Assuming webView.url is url1 and target is url2 (equal case)
+                let _ = url1.absoluteString != url2.absoluteString
+                // Assuming webView.url is url1 and target is url3 (unequal case)
+                let _ = url1.absoluteString != url3.absoluteString
+            }
+        }
+    }
+
+    func testURLObjectComparisonPerformance() throws {
+        guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
+              let url2 = URL(string: "https://www.example.com/path/to/resource"),
+              let url3 = URL(string: "https://www.example.com/other/path") else {
+            XCTFail("Failed to create URLs")
+            return
+        }
+
+        // Measure optimization: Direct URL comparison
+        self.measure {
+            for _ in 0..<100_000 {
+                // Simulate the comparison logic: webView.url != url
+                let _ = url1 != url2
+                let _ = url1 != url3
+            }
+        }
+    }
+
 }
