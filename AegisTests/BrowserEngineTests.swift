@@ -1,5 +1,59 @@
 final class BrowserEngineTests: XCTestCase {
-    
+    func testMakeConfiguration_DefaultPolicy() {
+        let policy = PrivacyPolicy()
+
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertFalse(config.websiteDataStore.isPersistent, "WebsiteDataStore should be non-persistent")
+
+        XCTAssertNotNil(config.userContentController, "UserContentController should be set")
+
+        XCTAssertEqual(config.allowsInlineMediaPlayback, policy.allowsInlineMediaPlayback, "allowsInlineMediaPlayback should match policy")
+
+        if #available(iOS 16.0, *) {
+            XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, [], "mediaTypesRequiringUserActionForPlayback should be empty on iOS 16+")
+        } else {
+            XCTAssertTrue(config.requiresUserActionForMediaPlayback, "requiresUserActionForMediaPlayback should be true on < iOS 16")
+        }
+
+        if #available(iOS 14.0, *) {
+            XCTAssertEqual(config.defaultWebpagePreferences.allowsContentJavaScript, policy.allowsJavaScript, "allowsContentJavaScript should match policy on iOS 14+")
+        } else {
+            XCTAssertEqual(config.preferences.javaScriptEnabled, policy.allowsJavaScript, "javaScriptEnabled should match policy on < iOS 14")
+        }
+
+        XCTAssertEqual(config.preferences.javaScriptCanOpenWindowsAutomatically, policy.javaScriptCanOpenWindowsAutomatically, "javaScriptCanOpenWindowsAutomatically should match policy")
+        XCTAssertEqual(config.suppressesIncrementalRendering, policy.suppressesIncrementalRendering, "suppressesIncrementalRendering should match policy")
+
+        XCTAssertNil(config.applicationNameForUserAgent, "applicationNameForUserAgent should be nil by default")
+    }
+
+    func testMakeConfiguration_CustomPolicy() {
+        var policy = PrivacyPolicy()
+      
+        // set to opposites
+        policy.allowsJavaScript = false
+        policy.allowsInlineMediaPlayback = true
+        policy.javaScriptCanOpenWindowsAutomatically = true
+        policy.suppressesIncrementalRendering = false
+        policy.customUserAgent = "CustomUserAgentString"
+
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertTrue(config.allowsInlineMediaPlayback, "allowsInlineMediaPlayback should be true")
+
+        if #available(iOS 14.0, *) {
+            XCTAssertFalse(config.defaultWebpagePreferences.allowsContentJavaScript, "allowsContentJavaScript should be false")
+        } else {
+            XCTAssertFalse(config.preferences.javaScriptEnabled, "javaScriptEnabled should be false")
+        }
+
+        XCTAssertTrue(config.preferences.javaScriptCanOpenWindowsAutomatically, "javaScriptCanOpenWindowsAutomatically should be true")
+        XCTAssertFalse(config.suppressesIncrementalRendering, "suppressesIncrementalRendering should be false")
+
+        XCTAssertEqual(config.applicationNameForUserAgent, "CustomUserAgentString", "applicationNameForUserAgent should match custom user agent")
+    }
+  
     func testCustomUserAgentApplication() {
         var policy = PrivacyPolicy()
         let customUA = "CustomUserAgent/1.0"
