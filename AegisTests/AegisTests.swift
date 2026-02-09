@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import WebKit
 @testable import Aegis
 
 final class AegisTests: XCTestCase {
@@ -41,13 +42,9 @@ final class AegisTests: XCTestCase {
             return
         }
 
-        // Measure baseline: String comparison
         self.measure {
             for _ in 0..<100_000 {
-                // Simulate the comparison logic: webView.url?.absoluteString != url.absoluteString
-                // Assuming webView.url is url1 and target is url2 (equal case)
                 let _ = url1.absoluteString != url2.absoluteString
-                // Assuming webView.url is url1 and target is url3 (unequal case)
                 let _ = url1.absoluteString != url3.absoluteString
             }
         }
@@ -61,14 +58,24 @@ final class AegisTests: XCTestCase {
             return
         }
 
-        // Measure optimization: Direct URL comparison
+        // direct url comparison
         self.measure {
             for _ in 0..<100_000 {
-                // Simulate the comparison logic: webView.url != url
                 let _ = url1 != url2
                 let _ = url1 != url3
             }
         }
+      
+    func testBrowserEngineConfiguration_mediaTypesRequiringUserActionForPlayback() {
+        var policy = PrivacyPolicy()
+        policy.allowsMediaAutoPlay = false
+      
+        var config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, .all, "Auto-play should be disabled (require user action for all) when allowsMediaAutoPlay is false")
+
+        policy.allowsMediaAutoPlay = true
+        config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, [], "Auto-play should be enabled (require user action for none) when allowsMediaAutoPlay is true")
     }
 
 }
