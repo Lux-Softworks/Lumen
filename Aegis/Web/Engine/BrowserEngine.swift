@@ -89,6 +89,29 @@ private extension WKWebView {
     }
 }
 
+enum HTTPSUpgradeAction: Equatable {
+    case allow
+    case cancel
+    case upgrade(URL)
+}
+
+struct HTTPSUpgradeLogic {
+    static func decidePolicy(for url: URL, httpsOnly: Bool) -> HTTPSUpgradeAction {
+        guard httpsOnly else { return .allow }
+
+        if let scheme = url.scheme?.lowercased(), scheme == "http" {
+            if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                comps.scheme = "https"
+                if let httpsURL = comps.url {
+                    return .upgrade(httpsURL)
+                }
+            }
+            return .cancel
+        }
+        return .allow
+    }
+}
+
 final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
     private let httpsOnly: Bool
 
@@ -98,22 +121,22 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard httpsOnly, let url = navigationAction.request.url else {
+        guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
             return
         }
         
-        if let scheme = url.scheme?.lowercased(), scheme == "http" {
-            if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                comps.scheme = "https"
-                if let httpsURL = comps.url {
-                    webView.load(URLRequest(url: httpsURL))
-                }
-            }
+        let decision = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
+
+        switch decision {
+        case .allow:
+            decisionHandler(.allow)
+        case .cancel:
             decisionHandler(.cancel)
-            return
+        case .upgrade(let newURL):
+            webView.load(URLRequest(url: newURL))
+            decisionHandler(.cancel)
         }
-        decisionHandler(.allow)
     }
 }
 
