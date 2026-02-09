@@ -19,10 +19,16 @@ enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
+        // incognito
         config.websiteDataStore = .nonPersistent()
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
-        config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
+        
+        if #available(iOS 10.0, *) {
+            config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
+        } else {
+            config.requiresUserActionForMediaPlayback = !policy.allowsMediaAutoPlay
+        }
 
         if #available(iOS 14.0, *) {
             config.defaultWebpagePreferences.allowsContentJavaScript = policy.allowsJavaScript
@@ -54,7 +60,6 @@ enum BrowserEngine {
 
         let httpsDelegate = HTTPSOnlyNavigationDelegate(enabled: policy.limitsNavigationToHTTPS)
         webView.navigationDelegate = httpsDelegate
-        
         webView._retainedNavigationDelegate = httpsDelegate
 
         return webView
@@ -76,7 +81,6 @@ private extension WKWebView {
         get {
             objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey) as? WKNavigationDelegate
         }
-      
         set {
             objc_setAssociatedObject(
                 self,
@@ -96,10 +100,7 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
     }
 
     private let httpsOnly: Bool
-
-    init(enabled: Bool) {
-        self.httpsOnly = enabled
-    }
+    init(enabled: Bool) { self.httpsOnly = enabled }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -134,10 +135,12 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
         if scheme == "http" {
             if isHTTPSOnly, var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
                 comps.scheme = "https"
+              
                 if let httpsURL = comps.url {
                     return .upgradeToHTTPS(httpsURL)
                 }
             }
+          
             return isHTTPSOnly ? .cancel : .allow
         }
 

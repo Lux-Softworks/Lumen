@@ -1,47 +1,41 @@
-final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
-    enum NavigationDecision: Equatable {
-        case allow, cancel, upgradeToHTTPS(URL)
+private extension WKWebView {
+    var retainedDelegate: WKNavigationDelegate? {
+        get { objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey) as? WKNavigationDelegate }
+        set { objc_setAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
     }
+}
 
+final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
     private let httpsOnly: Bool
     init(enabled: Bool) { self.httpsOnly = enabled }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, 
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+
+        if url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "about" {
             decisionHandler(.allow)
             return
         }
-        
-        let decision = Self.policyDecision(for: url, isHTTPSOnly: httpsOnly)
-        
-        switch decision {
-        case .allow:
-            decisionHandler(.allow)
-          
-        case .cancel:
+
+        if httpsOnly && url.scheme?.lowercased() == "http" {
+            if let httpsURL = upgradeToHTTPS(url) {
+                webView.load(URLRequest(url: httpsURL))
+                decisionHandler(.cancel)
+                return
+            }
             decisionHandler(.cancel)
-          
-        case .upgradeToHTTPS(let httpsURL):
-            webView.load(URLRequest(url: httpsURL))
-            decisionHandler(.cancel)
+            return
         }
+        
+        decisionHandler(.allow)
     }
 
-    static func policyDecision(for url: URL, isHTTPSOnly: Bool) -> NavigationDecision {
-        guard let scheme = url.scheme?.lowercased() else { return .cancel }
-        
-        if scheme == "https" || scheme == "about" { return .allow }
-        
-        if scheme == "http" {
-            if isHTTPSOnly, var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                comps.scheme = "https"
-                if let httpsURL = comps.url { return .upgradeToHTTPS(httpsURL) }
-            }
-            return isHTTPSOnly ? .cancel : .allow
-        }
-        
-        return .cancel
+    private func upgradeToHTTPS(_ url: URL) -> URL? {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url
     }
 }
