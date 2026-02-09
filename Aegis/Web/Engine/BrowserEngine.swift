@@ -28,7 +28,7 @@ enum BrowserEngine {
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
         
         if #available(iOS 16.0, *) {
-            config.mediaTypesRequiringUserActionForPlayback = []
+            config.mediaTypesRequiringUserActionForPlayback = .all
         } else {
             config.requiresUserActionForMediaPlayback = true
         }
