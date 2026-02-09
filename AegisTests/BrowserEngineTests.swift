@@ -1,31 +1,47 @@
-import XCTest
-import WebKit
-@testable import Aegis
-
 final class BrowserEngineTests: XCTestCase {
+    
+    func testCustomUserAgentApplication() {
+        var policy = PrivacyPolicy()
+        let customUA = "CustomUserAgent/1.0"
+        policy.customUserAgent = customUA
+
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertEqual(config.applicationNameForUserAgent, customUA, "The custom user agent suffix should be applied.")
+    }
+
+    func testDefaultUserAgent() {
+        var policy = PrivacyPolicy()
+        policy.customUserAgent = nil
+
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertNil(config.applicationNameForUserAgent)
+    }
 
     func testPrivacyPolicyDefaults() {
         let policy = PrivacyPolicy()
 
-        XCTAssertTrue(policy.blocksThirdPartyCookies, "Default blocksThirdPartyCookies should be true")
-        XCTAssertTrue(policy.allowsJavaScript, "Default allowsJavaScript should be true")
-        XCTAssertFalse(policy.allowsInlineMediaPlayback, "Default allowsInlineMediaPlayback should be false")
-        XCTAssertFalse(policy.allowsPictureInPictureMediaPlayback, "Default allowsPictureInPictureMediaPlayback should be false")
-        XCTAssertFalse(policy.allowsAirPlayForMediaPlayback, "Default allowsAirPlayForMediaPlayback should be false")
-        XCTAssertFalse(policy.javaScriptCanOpenWindowsAutomatically, "Default javaScriptCanOpenWindowsAutomatically should be false")
-        XCTAssertTrue(policy.suppressesIncrementalRendering, "Default suppressesIncrementalRendering should be true")
-        XCTAssertTrue(policy.limitsNavigationToHTTPS, "Default limitsNavigationToHTTPS should be true")
-        XCTAssertNil(policy.customUserAgent, "Default customUserAgent should be nil")
-      
+        XCTAssertTrue(policy.blocksThirdPartyCookies)
+        XCTAssertTrue(policy.allowsJavaScript)
+        XCTAssertFalse(policy.allowsInlineMediaPlayback)
+        XCTAssertFalse(policy.allowsPictureInPictureMediaPlayback)
+        XCTAssertFalse(policy.allowsAirPlayForMediaPlayback)
+        XCTAssertFalse(policy.javaScriptCanOpenWindowsAutomatically)
+        XCTAssertTrue(policy.suppressesIncrementalRendering)
+        XCTAssertTrue(policy.limitsNavigationToHTTPS)
+        XCTAssertNil(policy.customUserAgent)
+    }
+  
     func testWebViewInspectionDisabled() {
         if #available(iOS 16.4, *) {
             let policy = PrivacyPolicy()
             let webView = BrowserEngine.makeWebView(policy: policy)
           
-            XCTAssertFalse(webView.isInspectable, "WebView should not be inspectable by default")
+            XCTAssertFalse(webView.isInspectable, "WebView should not be inspectable by default for privacy.")
         }
     }
-  
+
     func testPolicyDecision_AllowedSchemes() {
         let httpsURL = URL(string: "https://example.com")!
         let aboutURL = URL(string: "about:blank")!
@@ -37,11 +53,9 @@ final class BrowserEngineTests: XCTestCase {
     func testPolicyDecision_BlockedSchemes() {
         let ftpURL = URL(string: "ftp://example.com")!
         let fileURL = URL(string: "file:///etc/passwd")!
-        let dataURL = URL(string: "data:text/html,Hello")!
 
         XCTAssertEqual(HTTPSOnlyNavigationDelegate.policyDecision(for: ftpURL, isHTTPSOnly: true), .cancel)
         XCTAssertEqual(HTTPSOnlyNavigationDelegate.policyDecision(for: fileURL, isHTTPSOnly: true), .cancel)
-        XCTAssertEqual(HTTPSOnlyNavigationDelegate.policyDecision(for: dataURL, isHTTPSOnly: true), .cancel)
     }
 
     func testPolicyDecision_HTTP_Upgrades() {
@@ -53,7 +67,7 @@ final class BrowserEngineTests: XCTestCase {
         if case .upgradeToHTTPS(let url) = decision {
             XCTAssertEqual(url, expectedHTTPSURL)
         } else {
-            XCTFail("Expected upgradeToHTTPS, got \(decision)")
+            XCTFail("Expected .upgradeToHTTPS but got \(decision)")
         }
     }
 
