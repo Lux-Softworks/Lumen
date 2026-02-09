@@ -8,13 +8,48 @@ struct PrivacyPolicy {
     var allowsInlineMediaPlayback: Bool = false
     var allowsPictureInPictureMediaPlayback: Bool = false
     var allowsAirPlayForMediaPlayback: Bool = false
+    var allowsMediaAutoPlay: Bool = false
     var javaScriptCanOpenWindowsAutomatically: Bool = false
     var suppressesIncrementalRendering: Bool = true
     var limitsNavigationToHTTPS: Bool = true
     var customUserAgent: String? = nil
 }
 
-// MARK: - build hardened instances
+enum HTTPSUpgradeLogic {
+    enum PolicyAction: Equatable {
+        case allow
+        case upgrade(URL)
+        case cancel
+    }
+
+    static func decidePolicy(for url: URL, httpsOnly: Bool) -> PolicyAction {
+        guard let scheme = url.scheme?.lowercased() else {
+            return .allow
+        }
+
+        switch scheme {
+        case "https", "about", "file":
+            return .allow
+        case "http":
+            if httpsOnly {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                components?.scheme = "https"
+
+                if let httpsURL = components?.url {
+                    return .upgrade(httpsURL)
+                }
+
+                return .cancel
+            }
+
+            return .allow
+        default:
+            return .allow
+        }
+    }
+}
+
+
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -22,11 +57,11 @@ enum BrowserEngine {
         config.websiteDataStore = .nonPersistent()
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
-        
-        if #available(iOS 16.0, *) {
-            config.mediaTypesRequiringUserActionForPlayback = []
+
+        if #available(iOS 10.0, *) {
+            config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
         } else {
-            config.requiresUserActionForMediaPlayback = true
+            config.requiresUserActionForMediaPlayback = !policy.allowsMediaAutoPlay
         }
 
         if #available(iOS 14.0, *) {
@@ -34,7 +69,7 @@ enum BrowserEngine {
         } else {
             config.preferences.javaScriptEnabled = policy.allowsJavaScript
         }
-        
+
         config.preferences.javaScriptCanOpenWindowsAutomatically = policy.javaScriptCanOpenWindowsAutomatically
         config.suppressesIncrementalRendering = policy.suppressesIncrementalRendering
 
@@ -48,20 +83,26 @@ enum BrowserEngine {
     static func makeWebView(policy: PrivacyPolicy) -> WKWebView {
         let config = makeConfiguration(policy: policy)
         let webView = WKWebView(frame: .zero, configuration: config)
-        
+
         if #available(iOS 13.0, *) {
             webView.allowsLinkPreview = false
         }
 
-        if #available(iOS 15.0, *) {
+        if #available(iOS 16.4, *) {
             webView.isInspectable = false
         }
 
         let httpsDelegate = HTTPSOnlyNavigationDelegate(enabled: policy.limitsNavigationToHTTPS)
         webView.navigationDelegate = httpsDelegate
-        webView._retainedNavigationDelegate = httpsDelegate
+        webView.retainedDelegate = httpsDelegate
 
         return webView
+    }
+
+    static func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy)
+        request.timeoutInterval = 30
+        return request
     }
 }
 
@@ -70,7 +111,7 @@ private enum _WKWebViewAssociatedKeys {
 }
 
 private extension WKWebView {
-    var _retainedNavigationDelegate: WKNavigationDelegate? {
+    var retainedDelegate: WKNavigationDelegate? {
         get {
             objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey) as? WKNavigationDelegate
         }
@@ -92,42 +133,40 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
         self.httpsOnly = enabled
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard httpsOnly, let url = navigationAction.request.url else {
-            decisionHandler(.allow)
-            return
-        }
-        
-        if let scheme = url.scheme?.lowercased(), scheme == "http" {
-            if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                comps.scheme = "https"
-                if let httpsURL = comps.url {
-                    webView.load(URLRequest(url: httpsURL))
-                }
-            }
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return
         }
+
+        let scheme = url.scheme?.lowercased()
+
+        if scheme == "https" || scheme == "about" {
+            decisionHandler(.allow)
+            return
+        }
+
+        if scheme == "http" {
+            if httpsOnly {
+                if let httpsURL = upgradeToHTTPS(url) {
+                    webView.load(URLRequest(url: httpsURL))
+                    decisionHandler(.cancel)
+                    return
+                }
+                decisionHandler(.cancel)
+                return
+            } else {
+                decisionHandler(.allow)
+                return
+            }
+        }
+
         decisionHandler(.allow)
     }
-}
 
-// wrapper for immediate use
-struct HardenedWebView: UIViewRepresentable {
-    let url: URL
-    var policy: PrivacyPolicy = PrivacyPolicy()
-
-    func makeUIView(context: Context) -> WKWebView {
-        BrowserEngine.makeWebView(policy: policy)
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        if webView.url == nil || webView.url?.absoluteString != url.absoluteString {
-            var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
-            request.timeoutInterval = 30
-            webView.load(request)
-        }
+    private func upgradeToHTTPS(_ url: URL) -> URL? {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url
     }
 }
-
