@@ -90,6 +90,12 @@ private extension WKWebView {
 }
 
 final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
+    enum NavigationDecision: Equatable {
+        case allow
+        case cancel
+        case upgradeToHTTPS(URL)
+    }
+
     private let httpsOnly: Bool
 
     init(enabled: Bool) {
@@ -98,22 +104,43 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard httpsOnly, let url = navigationAction.request.url else {
+        guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
             return
         }
-        
-        if let scheme = url.scheme?.lowercased(), scheme == "http" {
+
+        switch Self.policyDecision(for: url, isHTTPSOnly: httpsOnly) {
+        case .allow:
+            decisionHandler(.allow)
+        case .cancel:
+            decisionHandler(.cancel)
+        case .upgradeToHTTPS(let httpsURL):
+            webView.load(URLRequest(url: httpsURL))
+            decisionHandler(.cancel)
+        }
+    }
+
+    static func policyDecision(for url: URL, isHTTPSOnly: Bool) -> NavigationDecision {
+        guard isHTTPSOnly else { return .allow }
+
+        guard let scheme = url.scheme?.lowercased() else {
+            return .cancel
+        }
+
+        switch scheme {
+        case "https", "about":
+            return .allow
+        case "http":
             if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
                 comps.scheme = "https"
                 if let httpsURL = comps.url {
-                    webView.load(URLRequest(url: httpsURL))
+                    return .upgradeToHTTPS(httpsURL)
                 }
             }
-            decisionHandler(.cancel)
-            return
+            return .cancel
+        default:
+            return .cancel
         }
-        decisionHandler(.allow)
     }
 }
 
