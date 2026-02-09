@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import WebKit
 @testable import Aegis
 
 final class AegisTests: XCTestCase {
@@ -31,6 +32,57 @@ final class AegisTests: XCTestCase {
         self.measure {
             // Put the code you want to measure the time of here.
         }
+    }
+
+    func testBrowserEngineRequestCachePolicy() {
+        let url = URL(string: "https://example.com")!
+        let request = BrowserEngine.makeRequest(url: url)
+
+        XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy, "Cache policy should be .useProtocolCachePolicy")
+        XCTAssertEqual(request.timeoutInterval, 30, "Timeout interval should be 30 seconds")
+      
+    func testURLStringComparisonPerformance() throws {
+        guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
+              let url2 = URL(string: "https://www.example.com/path/to/resource"),
+              let url3 = URL(string: "https://www.example.com/other/path") else {
+            XCTFail("Failed to create URLs")
+            return
+        }
+
+        self.measure {
+            for _ in 0..<100_000 {
+                let _ = url1.absoluteString != url2.absoluteString
+                let _ = url1.absoluteString != url3.absoluteString
+            }
+        }
+    }
+
+    func testURLObjectComparisonPerformance() throws {
+        guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
+              let url2 = URL(string: "https://www.example.com/path/to/resource"),
+              let url3 = URL(string: "https://www.example.com/other/path") else {
+            XCTFail("Failed to create URLs")
+            return
+        }
+
+        // direct url comparison
+        self.measure {
+            for _ in 0..<100_000 {
+                let _ = url1 != url2
+                let _ = url1 != url3
+            }
+        }
+      
+    func testBrowserEngineConfiguration_mediaTypesRequiringUserActionForPlayback() {
+        var policy = PrivacyPolicy()
+        policy.allowsMediaAutoPlay = false
+      
+        var config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, .all, "Auto-play should be disabled (require user action for all) when allowsMediaAutoPlay is false")
+
+        policy.allowsMediaAutoPlay = true
+        config = BrowserEngine.makeConfiguration(policy: policy)
+        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, [], "Auto-play should be enabled (require user action for none) when allowsMediaAutoPlay is true")
     }
 
 }
