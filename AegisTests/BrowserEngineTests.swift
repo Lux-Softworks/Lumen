@@ -101,6 +101,15 @@ final class BrowserEngineTests: XCTestCase {
         XCTAssertFalse(webView.allowsLinkPreview)
     }
 
+    func testMakeWebView_IsInspectableDisabled() {
+        if #available(iOS 16.4, *) {
+            let policy = PrivacyPolicy()
+            let webView = BrowserEngine.makeWebView(policy: policy)
+
+            XCTAssertFalse(webView.isInspectable)
+        }
+    }
+
     func testDefaultPolicy_IsPrivacyFocused() {
         let policy = PrivacyPolicy()
 
