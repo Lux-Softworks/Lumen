@@ -58,6 +58,9 @@ enum BrowserEngine {
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
 
+        config.preferences.allowFileAccessFromFileURLs = false
+        config.preferences.allowUniversalAccessFromFileURLs = false
+
         if #available(iOS 10.0, *) {
             config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
         } else {
