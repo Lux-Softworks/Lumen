@@ -47,6 +47,50 @@ final class BrowserEngineTests: XCTestCase {
         XCTAssertTrue(config.allowsInlineMediaPlayback)
     }
 
+    func testMakeConfiguration_AirPlayForMediaPlayback_Disabled() {
+        var policy = PrivacyPolicy()
+        policy.allowsAirPlayForMediaPlayback = false
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertFalse(config.allowsAirPlayForMediaPlayback)
+    }
+
+    func testMakeConfiguration_AirPlayForMediaPlayback_Enabled() {
+        var policy = PrivacyPolicy()
+        policy.allowsAirPlayForMediaPlayback = true
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertTrue(config.allowsAirPlayForMediaPlayback)
+    }
+
+    func testMakeConfiguration_PictureInPictureMediaPlayback_Disabled() {
+        var policy = PrivacyPolicy()
+        policy.allowsPictureInPictureMediaPlayback = false
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertFalse(config.allowsPictureInPictureMediaPlayback)
+    }
+
+    func testMakeConfiguration_PictureInPictureMediaPlayback_Enabled() {
+        var policy = PrivacyPolicy()
+        policy.allowsPictureInPictureMediaPlayback = true
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertTrue(config.allowsPictureInPictureMediaPlayback)
+    }
+
+    func testMakeConfiguration_FileAccess_Disabled() {
+        let policy = PrivacyPolicy()
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        // Using KVC to check the value as it's not a direct property in some versions
+        let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
+        let universalAccess = config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
+
+        XCTAssertEqual(fileAccess, false)
+        XCTAssertEqual(universalAccess, false)
+    }
+
     func testMakeConfiguration_AutoPlayDisabled() {
         var policy = PrivacyPolicy()
         policy.allowsMediaAutoPlay = false
