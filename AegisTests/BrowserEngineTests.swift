@@ -115,6 +115,14 @@ final class BrowserEngineTests: XCTestCase {
         XCTAssertTrue(config.suppressesIncrementalRendering)
     }
 
+    func testMakeConfiguration_FileAccessRestrictions() {
+        let policy = PrivacyPolicy()
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        XCTAssertFalse(config.preferences.allowFileAccessFromFileURLs)
+        XCTAssertFalse(config.preferences.allowUniversalAccessFromFileURLs)
+    }
+
     func testMakeConfiguration_JavaScriptCanOpenWindowsAutomatically_Disabled() {
         var policy = PrivacyPolicy()
         policy.javaScriptCanOpenWindowsAutomatically = false

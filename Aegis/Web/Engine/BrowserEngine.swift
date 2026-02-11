@@ -63,6 +63,9 @@ enum BrowserEngine {
         config.preferences.setValue(false, forKey: "allowFileAccessFromFileURLs")
         config.preferences.setValue(false, forKey: "allowUniversalAccessFromFileURLs")
 
+        config.preferences.allowFileAccessFromFileURLs = false
+        config.preferences.allowUniversalAccessFromFileURLs = false
+
         if #available(iOS 10.0, *) {
             config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
         } else {
