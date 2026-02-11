@@ -28,7 +28,7 @@ enum HTTPSUpgradeLogic {
         }
 
         switch scheme {
-        case "https", "about", "file":
+        case "https", "about":
             return .allow
         case "http":
             if httpsOnly {
@@ -44,7 +44,7 @@ enum HTTPSUpgradeLogic {
 
             return .allow
         default:
-            return .allow
+            return httpsOnly ? .cancel : .allow
         }
     }
 }
@@ -57,6 +57,11 @@ enum BrowserEngine {
         config.websiteDataStore = .nonPersistent()
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
+        config.allowsAirPlayForMediaPlayback = policy.allowsAirPlayForMediaPlayback
+        config.allowsPictureInPictureMediaPlayback = policy.allowsPictureInPictureMediaPlayback
+
+        config.preferences.setValue(false, forKey: "allowFileAccessFromFileURLs")
+        config.preferences.setValue(false, forKey: "allowUniversalAccessFromFileURLs")
 
         if #available(iOS 10.0, *) {
             config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
@@ -139,34 +144,16 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
             return
         }
 
-        let scheme = url.scheme?.lowercased()
+        let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
-        if scheme == "https" || scheme == "about" {
+        switch action {
+        case .allow:
             decisionHandler(.allow)
-            return
+        case .upgrade(let httpsURL):
+            webView.load(BrowserEngine.makeRequest(url: httpsURL))
+            decisionHandler(.cancel)
+        case .cancel:
+            decisionHandler(.cancel)
         }
-
-        if scheme == "http" {
-            if httpsOnly {
-                if let httpsURL = upgradeToHTTPS(url) {
-                    webView.load(URLRequest(url: httpsURL))
-                    decisionHandler(.cancel)
-                    return
-                }
-                decisionHandler(.cancel)
-                return
-            } else {
-                decisionHandler(.allow)
-                return
-            }
-        }
-
-        decisionHandler(.allow)
-    }
-
-    private func upgradeToHTTPS(_ url: URL) -> URL? {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.scheme = "https"
-        return components?.url
     }
 }

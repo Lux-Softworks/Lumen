@@ -37,11 +37,19 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
     }
 
     func testHTTPSOnlyEnabled_AllowsOtherSchemes() {
-        let fileURL = URL(string: "file:///path/to/file")!
-        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: fileURL, httpsOnly: true), .allow)
-
         let aboutURL = URL(string: "about:blank")!
         XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: aboutURL, httpsOnly: true), .allow)
+    }
+
+    func testHTTPSOnlyEnabled_BlocksUnsafeSchemes() {
+        let fileURL = URL(string: "file:///path/to/file")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: fileURL, httpsOnly: true), .cancel)
+
+        let ftpURL = URL(string: "ftp://example.com/file")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: ftpURL, httpsOnly: true), .cancel)
+
+        let javascriptURL = URL(string: "javascript:alert(1)")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: javascriptURL, httpsOnly: true), .cancel)
     }
 
     func testUpgradePreservesPathAndQuery() {
