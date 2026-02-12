@@ -60,12 +60,6 @@ enum BrowserEngine {
         config.allowsAirPlayForMediaPlayback = policy.allowsAirPlayForMediaPlayback
         config.allowsPictureInPictureMediaPlayback = policy.allowsPictureInPictureMediaPlayback
 
-        config.preferences.setValue(false, forKey: "allowFileAccessFromFileURLs")
-        config.preferences.setValue(false, forKey: "allowUniversalAccessFromFileURLs")
-
-        config.preferences.allowFileAccessFromFileURLs = false
-        config.preferences.allowUniversalAccessFromFileURLs = false
-
         if #available(iOS 10.0, *) {
             config.mediaTypesRequiringUserActionForPlayback = policy.allowsMediaAutoPlay ? [] : .all
         } else {
@@ -100,9 +94,12 @@ enum BrowserEngine {
             webView.isInspectable = false
         }
 
-        let httpsDelegate = HTTPSOnlyNavigationDelegate(enabled: policy.limitsNavigationToHTTPS)
-        webView.navigationDelegate = httpsDelegate
-        webView.retainedDelegate = httpsDelegate
+        let detector = ThreatDetector()
+        detector.loadTrackerDatabase(TrackerDatabase.shared.allEntries())
+
+        let interceptor = NetworkInterceptor(detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
+        webView.navigationDelegate = interceptor
+        webView.retainedDelegate = interceptor
 
         return webView
     }
