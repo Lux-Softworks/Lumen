@@ -6,6 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C348ACAD2F3EBE6E0035C0C0 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACAC2F3EBE6E0035C0C0 /* MLX */; };
+		C348ACAF2F3EBE6E0035C0C0 /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACAE2F3EBE6E0035C0C0 /* MLXFFT */; };
+		C348ACB12F3EBE6E0035C0C0 /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACB02F3EBE6E0035C0C0 /* MLXFast */; };
+		C348ACB32F3EBE6E0035C0C0 /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACB22F3EBE6E0035C0C0 /* MLXLinalg */; };
+		C348ACB52F3EBE6E0035C0C0 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACB42F3EBE6E0035C0C0 /* MLXNN */; };
+		C348ACB72F3EBE6E0035C0C0 /* MLXOptimizers in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACB62F3EBE6E0035C0C0 /* MLXOptimizers */; };
+		C348ACB92F3EBE6E0035C0C0 /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACB82F3EBE6E0035C0C0 /* MLXRandom */; };
+		C348ACC32F3F51410035C0C0 /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC22F3F51410035C0C0 /* MLXEmbedders */; };
+		C348ACC52F3F51410035C0C0 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC42F3F51410035C0C0 /* MLXLLM */; };
+		C348ACC72F3F51410035C0C0 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC62F3F51410035C0C0 /* MLXLMCommon */; };
+		C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC82F3F51410035C0C0 /* MLXVLM */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		C367F5482EFA58DB0076A657 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +66,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C348ACC72F3F51410035C0C0 /* MLXLMCommon in Frameworks */,
+				C348ACC52F3F51410035C0C0 /* MLXLLM in Frameworks */,
+				C348ACC32F3F51410035C0C0 /* MLXEmbedders in Frameworks */,
+				C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */,
+				C348ACB72F3EBE6E0035C0C0 /* MLXOptimizers in Frameworks */,
+				C348ACB12F3EBE6E0035C0C0 /* MLXFast in Frameworks */,
+				C348ACB32F3EBE6E0035C0C0 /* MLXLinalg in Frameworks */,
+				C348ACAD2F3EBE6E0035C0C0 /* MLX in Frameworks */,
+				C348ACB52F3EBE6E0035C0C0 /* MLXNN in Frameworks */,
+				C348ACAF2F3EBE6E0035C0C0 /* MLXFFT in Frameworks */,
+				C348ACB92F3EBE6E0035C0C0 /* MLXRandom in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +137,17 @@
 			);
 			name = Aegis;
 			packageProductDependencies = (
+				C348ACAC2F3EBE6E0035C0C0 /* MLX */,
+				C348ACAE2F3EBE6E0035C0C0 /* MLXFFT */,
+				C348ACB02F3EBE6E0035C0C0 /* MLXFast */,
+				C348ACB22F3EBE6E0035C0C0 /* MLXLinalg */,
+				C348ACB42F3EBE6E0035C0C0 /* MLXNN */,
+				C348ACB62F3EBE6E0035C0C0 /* MLXOptimizers */,
+				C348ACB82F3EBE6E0035C0C0 /* MLXRandom */,
+				C348ACC22F3F51410035C0C0 /* MLXEmbedders */,
+				C348ACC42F3F51410035C0C0 /* MLXLLM */,
+				C348ACC62F3F51410035C0C0 /* MLXLMCommon */,
+				C348ACC82F3F51410035C0C0 /* MLXVLM */,
 			);
 			productName = Aegis;
 			productReference = C367F53A2EFA58D90076A657 /* Aegis.app */;
@@ -195,6 +231,10 @@
 			);
 			mainGroup = C367F5312EFA58D90076A657;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C367F53B2EFA58D90076A657 /* Products */;
 			projectDirPath = "";
@@ -395,6 +435,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Aegis/Aegis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
@@ -429,6 +470,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Aegis/Aegis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
@@ -582,6 +624,83 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 0.30.6;
+			};
+		};
+		C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				kind = exactVersion;
+				version = 2.30.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C348ACAC2F3EBE6E0035C0C0 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		C348ACAE2F3EBE6E0035C0C0 /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		C348ACB02F3EBE6E0035C0C0 /* MLXFast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFast;
+		};
+		C348ACB22F3EBE6E0035C0C0 /* MLXLinalg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXLinalg;
+		};
+		C348ACB42F3EBE6E0035C0C0 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
+		C348ACB62F3EBE6E0035C0C0 /* MLXOptimizers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXOptimizers;
+		};
+		C348ACB82F3EBE6E0035C0C0 /* MLXRandom */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXRandom;
+		};
+		C348ACC22F3F51410035C0C0 /* MLXEmbedders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXEmbedders;
+		};
+		C348ACC42F3F51410035C0C0 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		C348ACC62F3F51410035C0C0 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+		C348ACC82F3F51410035C0C0 /* MLXVLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXVLM;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C367F5322EFA58D90076A657 /* Project object */;
 }

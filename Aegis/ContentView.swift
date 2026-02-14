@@ -54,7 +54,9 @@ struct ContentView: View {
                     .keyboardType(.URL)
                     .focused($isAddressBarFocused)
                     .onSubmit {
-                        viewModel.navigate(to: viewModel.urlString)
+                        Task {
+                            await viewModel.processUserInput(viewModel.urlString)
+                        }
                         isAddressBarFocused = false
                     }
 
@@ -84,6 +86,7 @@ struct ContentView: View {
         .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
+
 
     private var privacyBadge: some View {
         let count = viewModel.blockedTrackersCount

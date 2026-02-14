@@ -1,6 +1,6 @@
+import Combine
 import Foundation
 import WebKit
-import Combine
 import os.log
 
 final class BrowserViewModel: NSObject, ObservableObject {
@@ -25,15 +25,71 @@ final class BrowserViewModel: NSObject, ObservableObject {
     static let defaultURL = URL(string: "https://duckduckgo.com")!
     static let searchEngineTemplate = "https://duckduckgo.com/?q=%@"
 
+    private var brain: LocalBrain?
+
+    func initializeBrain() {
+        if brain == nil {
+            brain = LocalBrain()
+
+            Task {
+                try? await brain?.loadModel()
+            }
+        }
+    }
+
+    func processUserInput(_ input: String) async {
+        initializeBrain()
+        guard let brain = brain else { return }
+
+        if input.starts(with: "/debug") {
+            let prompt = String(input.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            logger.info("Debug Command Received: \(prompt)")
+
+            guard let initialized: Optional<Bool> = (brain != nil) else {
+                logger.error("Brain not initialized")
+                return
+            }
+
+            Task {
+                let response = await brain.debugRun(
+                    prompt: prompt.isEmpty ? "Hello, system check." : prompt)
+                await MainActor.run {
+                    self.pageTitle = "AI: \(response)"
+                    logger.info("AI Response: \(response)")
+                }
+            }
+            return
+        }
+
+        let intent = await brain.route(input)
+
+        await MainActor.run {
+            switch intent {
+            case .action:
+                logger.info("Agent Action Detected for: \(input)")
+
+            case .context:
+                logger.info("Context Request Detected for: \(input)")
+
+            case .knowledge:
+                logger.info("Knowledge Query aka Standard Navigation: \(input)")
+
+                navigate(to: input)
+            }
+        }
+    }
+
     func attachWebView(_ webView: WKWebView) {
         observations.removeAll()
         self.webView = webView
 
         if let nav = webView.navigationDelegate as? NetworkInterceptor {
             self.interceptor = nav
+
             nav.onThreatDetected = { [weak self] event in
                 self?.threatEvents.append(event)
-                self?.blockedTrackersCount = self?.threatEvents.filter { $0.type == .tracker }.count ?? 0
+                self?.blockedTrackersCount =
+                    self?.threatEvents.filter { $0.type == .tracker }.count ?? 0
             }
         }
 
@@ -47,12 +103,15 @@ final class BrowserViewModel: NSObject, ObservableObject {
         let url: URL
 
         if let parsed = URL(string: trimmed), parsed.scheme != nil,
-           parsed.host != nil || parsed.scheme == "about" {
+            parsed.host != nil || parsed.scheme == "about"
+        {
             url = parsed
         } else if trimmed.contains(".") && !trimmed.contains(" ") {
             url = URL(string: "https://\(trimmed)") ?? Self.defaultURL
         } else {
-            let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+            let encoded =
+                trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+
             url = URL(string: String(format: Self.searchEngineTemplate, encoded)) ?? Self.defaultURL
         }
 
@@ -62,8 +121,10 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func loadURL(_ url: URL) {
         clearPageState()
         urlString = url.absoluteString
+
         let request = BrowserEngine.makeRequest(url: url)
         webView?.load(request)
+
         logger.info("Loading: \(url.absoluteString)")
     }
 
@@ -87,8 +148,6 @@ final class BrowserViewModel: NSObject, ObservableObject {
         loadURL(Self.defaultURL)
     }
 
-    // MARK: - State Helpers
-
     func clearPageState() {
         threatEvents.removeAll()
         blockedTrackersCount = 0
@@ -102,7 +161,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         var parts: [String] = []
         if trackers > 0 { parts.append("\(trackers) tracker\(trackers == 1 ? "" : "s")") }
-        if fingerprinters > 0 { parts.append("\(fingerprinters) fingerprinter\(fingerprinters == 1 ? "" : "s")") }
+
+        if fingerprinters > 0 {
+            parts.append("\(fingerprinters) fingerprinter\(fingerprinters == 1 ? "" : "s")")
+        }
+
         if miners > 0 { parts.append("\(miners) miner\(miners == 1 ? "" : "s")") }
 
         return parts.isEmpty ? "No threats detected" : parts.joined(separator: ", ")
@@ -113,12 +176,14 @@ final class BrowserViewModel: NSObject, ObservableObject {
         guard !trimmed.isEmpty else { return defaultURL }
 
         if let parsed = URL(string: trimmed), parsed.scheme != nil,
-           parsed.host != nil || parsed.scheme == "about" {
+            parsed.host != nil || parsed.scheme == "about"
+        {
             return parsed
         } else if trimmed.contains(".") && !trimmed.contains(" ") {
             return URL(string: "https://\(trimmed)") ?? defaultURL
         } else {
-            let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+            let encoded =
+                trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
             return URL(string: String(format: searchEngineTemplate, encoded)) ?? defaultURL
         }
     }
@@ -128,6 +193,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
             webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
                 MainActor.assumeIsolated {
                     self?.currentURL = webView.url
+
                     if let url = webView.url {
                         self?.urlString = url.absoluteString
                         self?.isSecure = url.scheme == "https"
