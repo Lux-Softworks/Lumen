@@ -1,6 +1,7 @@
-import XCTest
 import WebKit
-@testable import Aegis
+import XCTest
+
+@testable import Kratos
 
 final class NetworkInterceptorTests: XCTestCase {
 
@@ -73,7 +74,7 @@ final class NetworkInterceptorTests: XCTestCase {
         let urls = [
             "https://ad.doubleclick.net/pixel",
             "https://connect.facebook.net/sdk.js",
-            "https://cdn.hotjar.com/track.js"
+            "https://cdn.hotjar.com/track.js",
         ]
 
         for urlString in urls {

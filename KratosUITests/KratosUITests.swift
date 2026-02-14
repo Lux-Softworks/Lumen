@@ -1,13 +1,13 @@
 //
-//  AegisUITests.swift
-//  AegisUITests
+//  KratosUITests.swift
+//  KratosUITests
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
 
 import XCTest
 
-final class AegisUITests: XCTestCase {
+final class KratosUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

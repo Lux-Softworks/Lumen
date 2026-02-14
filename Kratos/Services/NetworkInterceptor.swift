@@ -6,7 +6,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     private let detector: ThreatDetector
     private let httpsOnly: Bool
-    private let logger = Logger(subsystem: "com.aegis.browser", category: "NetworkInterceptor")
+    private let logger = Logger(subsystem: "com.Kratos.browser", category: "NetworkInterceptor")
 
     private(set) var currentPageURL: URL?
     private(set) var requestLog: [InterceptedRequest] = []
@@ -27,7 +27,10 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         currentPageURL = nil
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
         guard let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return
@@ -35,9 +38,11 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         let scheme = url.scheme?.lowercased()
 
-        if navigationAction.navigationType == .linkActivated ||
-           navigationAction.navigationType == .formSubmitted ||
-           navigationAction.navigationType == .other && navigationAction.targetFrame?.isMainFrame == true {
+        if navigationAction.navigationType == .linkActivated
+            || navigationAction.navigationType == .formSubmitted
+            || navigationAction.navigationType == .other
+                && navigationAction.targetFrame?.isMainFrame == true
+        {
             if scheme == "http" || scheme == "https" {
                 currentPageURL = url
             }
@@ -84,9 +89,13 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         decisionHandler(.allow)
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
         if let response = navigationResponse.response as? HTTPURLResponse,
-           let url = response.url {
+            let url = response.url
+        {
             let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? ""
 
             if navigationResponse.isForMainFrame {
@@ -126,7 +135,9 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             currentPageURL = url
             let threatCount = detectedThreats.count
             let requestCount = requestLog.count
-            logger.info("Page loaded: \(url.host ?? "unknown") | \(requestCount) requests | \(threatCount) threats detected")
+            logger.info(
+                "Page loaded: \(url.host ?? "unknown") | \(requestCount) requests | \(threatCount) threats detected"
+            )
 
             if !detectedThreats.isEmpty {
                 logThreatSummary()
@@ -134,7 +145,10 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
     }
 
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    func webView(
+        _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
         logger.error("Navigation failed: \(error.localizedDescription)")
     }
 
@@ -155,30 +169,31 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         let ext = url.pathExtension.lowercased()
 
         switch ext {
-            case "js":
-                return .script
+        case "js":
+            return .script
 
-            case "css":
-                return .stylesheet
+        case "css":
+            return .stylesheet
 
-            case "png", "jpg", "jpeg", "gif", "webp", "svg", "ico":
-                return .image
+        case "png", "jpg", "jpeg", "gif", "webp", "svg", "ico":
+            return .image
 
-            case "woff", "woff2", "ttf", "otf", "eot":
-                return .font
+        case "woff", "woff2", "ttf", "otf", "eot":
+            return .font
 
-            case "mp4", "webm", "m3u8", "mp3":
-                return .media
+        case "mp4", "webm", "m3u8", "mp3":
+            return .media
 
-            default:
-                break
+        default:
+            break
         }
 
         let urlString = url.absoluteString.lowercased()
 
-        if urlString.contains("/api/") || urlString.contains("/collect") ||
-           urlString.contains("/pixel") || urlString.contains("/beacon") ||
-           urlString.contains("/track") || urlString.contains("/event") {
+        if urlString.contains("/api/") || urlString.contains("/collect")
+            || urlString.contains("/pixel") || urlString.contains("/beacon")
+            || urlString.contains("/track") || urlString.contains("/event")
+        {
             return .xhr
         }
 
@@ -211,10 +226,10 @@ extension NetworkInterceptor: ThreatDetectorDelegate {
 
         let severityLabel: String
         switch event.severity {
-            case .low: severityLabel = "LOW"
-            case .medium: severityLabel = "MED"
-            case .high: severityLabel = "HIGH"
-            case .critical: severityLabel = "CRIT"
+        case .low: severityLabel = "LOW"
+        case .medium: severityLabel = "MED"
+        case .high: severityLabel = "HIGH"
+        case .critical: severityLabel = "CRIT"
         }
 
         logger.warning(" [\(severityLabel)] \(event.details)")

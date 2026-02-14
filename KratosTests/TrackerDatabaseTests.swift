@@ -1,30 +1,31 @@
 import XCTest
-@testable import Aegis
+
+@testable import Kratos
 
 final class TrackerDatabaseTests: XCTestCase {
 
     func testParseDisconnectJSON_ValidData() {
         let db = TrackerDatabase.shared
         let json = """
-        {
-            "categories": {
-                "Advertising": [
-                    {
-                        "TestTracker": {
-                            "https://testtracker.com/": ["testtracker.com", "testtracker.net"]
+            {
+                "categories": {
+                    "Advertising": [
+                        {
+                            "TestTracker": {
+                                "https://testtracker.com/": ["testtracker.com", "testtracker.net"]
+                            }
                         }
-                    }
-                ],
-                "Analytics": [
-                    {
-                        "TestAnalytics": {
-                            "https://testanalytics.io/": ["testanalytics.io"]
+                    ],
+                    "Analytics": [
+                        {
+                            "TestAnalytics": {
+                                "https://testanalytics.io/": ["testanalytics.io"]
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        """.data(using: .utf8)!
+            """.data(using: .utf8)!
 
         db.parseDisconnectJSON(json)
 
@@ -49,18 +50,18 @@ final class TrackerDatabaseTests: XCTestCase {
     func testLookupSubdomain() {
         let db = TrackerDatabase.shared
         let json = """
-        {
-            "categories": {
-                "Advertising": [
-                    {
-                        "SubTest": {
-                            "https://subtest.com/": ["subtest.com"]
+            {
+                "categories": {
+                    "Advertising": [
+                        {
+                            "SubTest": {
+                                "https://subtest.com/": ["subtest.com"]
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        """.data(using: .utf8)!
+            """.data(using: .utf8)!
 
         db.parseDisconnectJSON(json)
 
@@ -96,18 +97,18 @@ final class TrackerDatabaseTests: XCTestCase {
     func testParseDisconnectJSON_CryptominingCategory() {
         let db = TrackerDatabase.shared
         let json = """
-        {
-            "categories": {
-                "Cryptomining": [
-                    {
-                        "TestMiner": {
-                            "https://testminer.com/": ["testminer.com", "testminer.io"]
+            {
+                "categories": {
+                    "Cryptomining": [
+                        {
+                            "TestMiner": {
+                                "https://testminer.com/": ["testminer.com", "testminer.io"]
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        """.data(using: .utf8)!
+            """.data(using: .utf8)!
 
         db.parseDisconnectJSON(json)
 
@@ -120,18 +121,18 @@ final class TrackerDatabaseTests: XCTestCase {
     func testParseDisconnectJSON_SocialCategory() {
         let db = TrackerDatabase.shared
         let json = """
-        {
-            "categories": {
-                "Social": [
-                    {
-                        "TestSocial": {
-                            "https://testsocial.com/": ["testsocial.com"]
+            {
+                "categories": {
+                    "Social": [
+                        {
+                            "TestSocial": {
+                                "https://testsocial.com/": ["testsocial.com"]
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        """.data(using: .utf8)!
+            """.data(using: .utf8)!
 
         db.parseDisconnectJSON(json)
 
@@ -154,18 +155,18 @@ final class TrackerDatabaseTests: XCTestCase {
     func testDomainCountUpdated() {
         let db = TrackerDatabase.shared
         let json = """
-        {
-            "categories": {
-                "Advertising": [
-                    {
-                        "CountTest": {
-                            "https://counttest.com/": ["counttest.com", "counttest.net", "counttest.org"]
+            {
+                "categories": {
+                    "Advertising": [
+                        {
+                            "CountTest": {
+                                "https://counttest.com/": ["counttest.com", "counttest.net", "counttest.org"]
+                            }
                         }
-                    }
-                ]
+                    ]
+                }
             }
-        }
-        """.data(using: .utf8)!
+            """.data(using: .utf8)!
 
         db.parseDisconnectJSON(json)
 

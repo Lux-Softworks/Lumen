@@ -1,5 +1,6 @@
 import XCTest
-@testable import Aegis
+
+@testable import Kratos
 
 final class HTTPSUpgradeLogicTests: XCTestCase {
 
@@ -76,9 +77,9 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
 
     func testURLWithoutScheme_Allows() {
         if let url = URL(string: "example.com") {
-             // scheme is nil
-             let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: true)
-             XCTAssertEqual(action, .allow)
+            // scheme is nil
+            let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: true)
+            XCTAssertEqual(action, .allow)
         }
     }
 }

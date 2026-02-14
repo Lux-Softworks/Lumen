@@ -1,6 +1,7 @@
-import XCTest
 import WebKit
-@testable import Aegis
+import XCTest
+
+@testable import Kratos
 
 final class BrowserEngineTests: XCTestCase {
     func testMakeRequest_CachePolicy() {
@@ -85,7 +86,8 @@ final class BrowserEngineTests: XCTestCase {
 
         // Using KVC to check the value as it's not a direct property in some versions
         let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
-        let universalAccess = config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
+        let universalAccess =
+            config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
 
         XCTAssertEqual(fileAccess, false)
         XCTAssertEqual(universalAccess, false)
@@ -133,10 +135,10 @@ final class BrowserEngineTests: XCTestCase {
 
     func testMakeConfiguration_CustomUserAgent() {
         var policy = PrivacyPolicy()
-        policy.customUserAgent = "AegisBot/1.0"
+        policy.customUserAgent = "KratosBot/1.0"
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        XCTAssertEqual(config.applicationNameForUserAgent, "AegisBot/1.0")
+        XCTAssertEqual(config.applicationNameForUserAgent, "KratosBot/1.0")
     }
 
     func testMakeWebView_HasNavigationDelegate() {

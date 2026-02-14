@@ -1,6 +1,7 @@
-import XCTest
 import WebKit
-@testable import Aegis
+import XCTest
+
+@testable import Kratos
 
 final class BrowserViewModelTests: XCTestCase {
 

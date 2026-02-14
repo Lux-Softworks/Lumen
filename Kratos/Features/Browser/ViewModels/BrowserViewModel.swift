@@ -20,7 +20,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var interceptor: NetworkInterceptor?
 
     private var observations: [NSKeyValueObservation] = []
-    private let logger = Logger(subsystem: "com.aegis.browser", category: "BrowserViewModel")
+    private let logger = Logger(subsystem: "com.Kratos.browser", category: "BrowserViewModel")
 
     static let defaultURL = URL(string: "https://www.google.com")!
     static let searchEngineTemplate = "https://www.google.com/search?q=%@"

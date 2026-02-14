@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import Aegis
+@testable import Kratos
 
 final class LocalBrainTests: XCTestCase {
 

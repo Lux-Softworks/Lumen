@@ -27,6 +27,6 @@ ContentView → HardenedWebView → BrowserEngine → WKWebView
 
 ## Testing
 
-- Unit tests go in `AegisTests/`
-- Use `@testable import Aegis` for internal access
+- Unit tests go in `KratosTests/`
+- Use `@testable import Kratos` for internal access
 - Test policy logic via `HTTPSUpgradeLogic.decidePolicy(for:httpsOnly:)`

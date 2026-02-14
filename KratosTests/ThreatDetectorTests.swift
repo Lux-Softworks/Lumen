@@ -1,5 +1,6 @@
 import XCTest
-@testable import Aegis
+
+@testable import Kratos
 
 final class ThreatDetectorTests: XCTestCase {
 
@@ -7,7 +8,7 @@ final class ThreatDetectorTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        
+
         detector = ThreatDetector()
         detector.loadTrackerDatabase([
             "doubleclick.net": ThreatDetector.TrackerInfo(
@@ -24,7 +25,7 @@ final class ThreatDetectorTests: XCTestCase {
                 entityName: "Example Analytics",
                 category: .analytics,
                 domains: ["analytics.example.com"]
-            )
+            ),
         ])
     }
 
@@ -46,7 +47,9 @@ final class ThreatDetectorTests: XCTestCase {
     }
 
     func testExtractRegistrableDomain_Subdomain() {
-        XCTAssertEqual(detector.extractRegistrableDomain(from: "sub.tracker.doubleclick.net"), "doubleclick.net")
+        XCTAssertEqual(
+            detector.extractRegistrableDomain(from: "sub.tracker.doubleclick.net"),
+            "doubleclick.net")
     }
 
     func testExtractRegistrableDomain_BareDomain() {
@@ -132,7 +135,9 @@ final class ThreatDetectorTests: XCTestCase {
 
     func testDetectDataExfiltration_SuspiciousParams() {
         let request = InterceptedRequest(
-            url: URL(string: "https://tracker.ad.com/collect?email=test@mail.com&device_id=abc123&uid=xyz")!,
+            url: URL(
+                string:
+                    "https://tracker.ad.com/collect?email=test@mail.com&device_id=abc123&uid=xyz")!,
             pageURL: URL(string: "https://www.shop.com")!,
             headers: [:],
             isThirdParty: true,
@@ -210,7 +215,10 @@ final class ThreatDetectorTests: XCTestCase {
 
     func testMultipleThreatsFromSingleRequest() {
         let request = InterceptedRequest(
-            url: URL(string: "https://ad.doubleclick.net/collect?email=test@mail.com&uid=abc&partner_id=xyz&sync=1")!,
+            url: URL(
+                string:
+                    "https://ad.doubleclick.net/collect?email=test@mail.com&uid=abc&partner_id=xyz&sync=1"
+            )!,
             pageURL: URL(string: "https://www.nytimes.com")!,
             headers: [:],
             isThirdParty: true,

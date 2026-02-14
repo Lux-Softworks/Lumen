@@ -1,15 +1,16 @@
 //
-//  AegisTests.swift
-//  AegisTests
+//  KratosTests.swift
+//  KratosTests
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
 
-import XCTest
 import WebKit
-@testable import Aegis
+import XCTest
 
-final class AegisTests: XCTestCase {
+@testable import Kratos
+
+final class KratosTests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -38,14 +39,17 @@ final class AegisTests: XCTestCase {
         let url = URL(string: "https://example.com")!
         let request = BrowserEngine.makeRequest(url: url)
 
-        XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy, "Cache policy should be .useProtocolCachePolicy")
+        XCTAssertEqual(
+            request.cachePolicy, .useProtocolCachePolicy,
+            "Cache policy should be .useProtocolCachePolicy")
         XCTAssertEqual(request.timeoutInterval, 30, "Timeout interval should be 30 seconds")
     }
 
     func testURLStringComparisonPerformance() throws {
         guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
-              let url2 = URL(string: "https://www.example.com/path/to/resource"),
-              let url3 = URL(string: "https://www.example.com/other/path") else {
+            let url2 = URL(string: "https://www.example.com/path/to/resource"),
+            let url3 = URL(string: "https://www.example.com/other/path")
+        else {
             XCTFail("Failed to create URLs")
             return
         }
@@ -60,8 +64,9 @@ final class AegisTests: XCTestCase {
 
     func testURLObjectComparisonPerformance() throws {
         guard let url1 = URL(string: "https://www.example.com/path/to/resource"),
-              let url2 = URL(string: "https://www.example.com/path/to/resource"),
-              let url3 = URL(string: "https://www.example.com/other/path") else {
+            let url2 = URL(string: "https://www.example.com/path/to/resource"),
+            let url3 = URL(string: "https://www.example.com/other/path")
+        else {
             XCTFail("Failed to create URLs")
             return
         }
@@ -80,11 +85,17 @@ final class AegisTests: XCTestCase {
         policy.allowsMediaAutoPlay = false
 
         var config = BrowserEngine.makeConfiguration(policy: policy)
-        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, .all, "Auto-play should be disabled (require user action for all) when allowsMediaAutoPlay is false")
+        XCTAssertEqual(
+            config.mediaTypesRequiringUserActionForPlayback, .all,
+            "Auto-play should be disabled (require user action for all) when allowsMediaAutoPlay is false"
+        )
 
         policy.allowsMediaAutoPlay = true
         config = BrowserEngine.makeConfiguration(policy: policy)
-        XCTAssertEqual(config.mediaTypesRequiringUserActionForPlayback, [], "Auto-play should be enabled (require user action for none) when allowsMediaAutoPlay is true")
+        XCTAssertEqual(
+            config.mediaTypesRequiringUserActionForPlayback, [],
+            "Auto-play should be enabled (require user action for none) when allowsMediaAutoPlay is true"
+        )
     }
 
 }

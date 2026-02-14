@@ -1,13 +1,13 @@
 //
-//  AegisUITestsLaunchTests.swift
-//  AegisUITests
+//  KratosUITestsLaunchTests.swift
+//  KratosUITests
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
 
 import XCTest
 
-final class AegisUITestsLaunchTests: XCTestCase {
+final class KratosUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
