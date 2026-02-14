@@ -1,21 +1,38 @@
 import SwiftUI
 
-struct ContentView: View {
+struct BrowserView: View {
     @StateObject private var viewModel = BrowserViewModel()
     @FocusState private var isAddressBarFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                toolbar
 
-            if viewModel.isLoading {
-                ProgressView(value: viewModel.estimatedProgress)
-                    .progressViewStyle(.linear)
-                    .tint(.blue)
+                if viewModel.isLoading {
+                    ProgressView(value: viewModel.estimatedProgress)
+                        .progressViewStyle(.linear)
+                        .tint(.blue)
+                }
+
+                HardenedWebView(viewModel: viewModel)
+                    .ignoresSafeArea(edges: .bottom)
+                    .safeAreaInset(edge: .bottom) {
+                        Color.clear.frame(height: 80)
+                    }
             }
 
-            HardenedWebView(viewModel: viewModel)
-                .ignoresSafeArea(edges: .bottom)
+            BottomBarView(
+                onTabsPressed: {
+                    print("Tabs pressed")
+                },
+                onSettingsPressed: {
+                    print("Settings pressed")
+                },
+                onSearchPressed: {
+                    isAddressBarFocused = true
+                }
+            )
         }
         .onAppear {
             viewModel.loadHomePage()
@@ -87,7 +104,6 @@ struct ContentView: View {
         .background(Color(.systemBackground))
     }
 
-
     private var privacyBadge: some View {
         let count = viewModel.blockedTrackersCount
 
@@ -109,5 +125,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    BrowserView()
 }

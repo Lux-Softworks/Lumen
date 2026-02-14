@@ -22,8 +22,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(subsystem: "com.aegis.browser", category: "BrowserViewModel")
 
-    static let defaultURL = URL(string: "https://google.com")!
-    static let searchEngineTemplate = "https://google.com/?q=%@"
+    static let defaultURL = URL(string: "https://www.google.com")!
+    static let searchEngineTemplate = "https://www.google.com/search?q=%@"
 
     private var brain: LocalBrain?
 
@@ -45,7 +45,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
             let prompt = String(input.dropFirst(6)).trimmingCharacters(in: .whitespaces)
             logger.info("Debug Command Received: \(prompt)")
 
-            guard let initialized: Optional<Bool> = (brain != nil) else {
+            guard let initialized: Bool? = (brain != nil) else {
                 logger.error("Brain not initialized")
                 return
             }
