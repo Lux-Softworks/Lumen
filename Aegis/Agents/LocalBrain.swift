@@ -17,6 +17,11 @@ actor LocalBrain {
     func loadModel() async throws {
         if modelContainer != nil { return }
 
+        #if targetEnvironment(simulator)
+        print("MLX model loading is disabled on Simulator to prevent crashes.")
+        return
+        #endif
+
         if let existingTask = loadingTask {
             self.modelContainer = try await existingTask.value
             return
