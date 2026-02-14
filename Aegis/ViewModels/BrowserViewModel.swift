@@ -22,8 +22,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(subsystem: "com.aegis.browser", category: "BrowserViewModel")
 
-    static let defaultURL = URL(string: "https://duckduckgo.com")!
-    static let searchEngineTemplate = "https://duckduckgo.com/?q=%@"
+    static let defaultURL = URL(string: "https://google.com")!
+    static let searchEngineTemplate = "https://google.com/?q=%@"
 
     private var brain: LocalBrain?
 

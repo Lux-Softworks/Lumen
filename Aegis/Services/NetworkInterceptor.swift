@@ -209,15 +209,6 @@ extension NetworkInterceptor: ThreatDetectorDelegate {
     func threatDetector(_ detector: ThreatDetector, didDetect event: ThreatEvent) {
         detectedThreats.append(event)
 
-        let icon: String
-        switch event.type {
-        case .tracker: icon = "🕵️"
-        case .fingerprinter: icon = "🖐️"
-        case .dataExfiltration: icon = "📤"
-        case .cookieAbuse: icon = "🍪"
-        case .cryptominer: icon = "⛏️"
-        }
-
         let severityLabel: String
         switch event.severity {
             case .low: severityLabel = "LOW"
@@ -226,7 +217,7 @@ extension NetworkInterceptor: ThreatDetectorDelegate {
             case .critical: severityLabel = "CRIT"
         }
 
-        logger.warning("\(icon) [\(severityLabel)] \(event.details)")
+        logger.warning(" [\(severityLabel)] \(event.details)")
 
         onThreatDetected?(event)
     }
