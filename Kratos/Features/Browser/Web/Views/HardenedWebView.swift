@@ -6,6 +6,7 @@ struct HardenedWebView: UIViewRepresentable {
     var policy: PrivacyPolicy = PrivacyPolicy()
 
     class Coordinator: NSObject {
+        
         var parent: HardenedWebView
         var hasAttached = false
 
@@ -22,7 +23,7 @@ struct HardenedWebView: UIViewRepresentable {
         let webView = BrowserEngine.makeWebView(policy: policy)
         viewModel.attachWebView(webView)
         context.coordinator.hasAttached = true
-        
+
         return webView
     }
 

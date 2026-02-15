@@ -16,7 +16,6 @@ struct BottomBarView: View {
         VStack {
             Spacer()
 
-            // Main Content Container
             VStack(spacing: 0) {
                 if isExpanded {
                     expandedContent
@@ -24,38 +23,32 @@ struct BottomBarView: View {
                     collapsedContent
                 }
             }
-            // 1. Define the Frame for the CONTENT (not the background)
             .frame(maxWidth: .infinity)
-            .frame(height: isExpanded ? UIScreen.main.bounds.height * 0.65 : 60, alignment: .top)
+            .frame(height: isExpanded ? UIScreen.main.bounds.height * 0.65 : 70, alignment: .top)
 
-            // 2. Apply the Background here
             .background(
                 ZStack {
                     Rectangle()
-                        .fill(.ultraThinMaterial)
+                        .fill(.thinMaterial)
                         .opacity(0.9)
-                        // 3. This is the Magic Line:
-                        // It tells ONLY the background to extend past the safe area to the screen edge
                         .ignoresSafeArea(.container, edges: .bottom)
-                        // Apply corners only to the top, so the bottom stays flush
                         .cornerRadius(isExpanded ? 30 : 0, corners: [.topLeft, .topRight])
                         .shadow(color: Color.black.opacity(0.1), radius: 10, y: -5)
                 }
             )
         }
-        // 4. Ensure the main container doesn't block the keyboard interactions
         .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
-    // MARK: - Expanded Content
     var expandedContent: some View {
         VStack(spacing: 0) {
-            // Search Bar Row
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.secondary)
                     .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                    .border(Color(.systemBackground), width: 1)
 
                 TextField("Search or enter URL", text: $text)
                     .font(.system(size: 17))
@@ -74,7 +67,7 @@ struct BottomBarView: View {
                 }
 
                 Button("Cancel") {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    withAnimation(.smooth(duration: 0.35)) {
                         isExpanded = false
                         isFocused = false
                     }
@@ -88,13 +81,12 @@ struct BottomBarView: View {
                     .clipShape(Capsule())
                     .matchedGeometryEffect(id: "searchBackground", in: animation)
             )
-            .padding(.top, 16) // Padding inside the expanded view
+            .padding(.top, 16)
 
             Spacer()
         }
     }
 
-    // MARK: - Collapsed Content
     var collapsedContent: some View {
         HStack(spacing: 0) {
             Button(action: onTabsPressed) {
@@ -104,13 +96,17 @@ struct BottomBarView: View {
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                    )
             }
             .padding(.leading, 24)
 
             Spacer()
 
             Button(action: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                withAnimation(.smooth(duration: 0.35)) {
                     isExpanded = true
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -120,6 +116,10 @@ struct BottomBarView: View {
                 ZStack {
                     Color.primary.opacity(0.05)
                         .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                        )
                         .matchedGeometryEffect(id: "searchBackground", in: animation)
                         .frame(width: 80, height: 44)
 
@@ -139,14 +139,17 @@ struct BottomBarView: View {
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(0.05))
                     .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                    )
             }
             .padding(.trailing, 24)
         }
-        .frame(height: 60) // Content height only (excluding safe area)
+        .frame(height: 60)
     }
 }
 
-// MARK: - Helper for Corners
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
