@@ -28,54 +28,18 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var brain: LocalBrain?
 
     func initializeBrain() {
-        if brain == nil {
+        /* if brain == nil {
             brain = LocalBrain()
 
             Task {
                 try? await brain?.loadModel()
             }
-        }
+        } */
     }
 
     func processUserInput(_ input: String) async {
-        initializeBrain()
-        guard let brain = brain else { return }
-
-        if input.starts(with: "/debug") {
-            let prompt = String(input.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            logger.info("Debug Command Received: \(prompt)")
-
-            guard let initialized: Bool? = (brain != nil) else {
-                logger.error("Brain not initialized")
-                return
-            }
-
-            Task {
-                let response = await brain.debugRun(
-                    prompt: prompt.isEmpty ? "Hello, system check." : prompt)
-                await MainActor.run {
-                    self.pageTitle = "AI: \(response)"
-                    logger.info("AI Response: \(response)")
-                }
-            }
-            return
-        }
-
-        let intent = await brain.route(input)
-
         await MainActor.run {
-            switch intent {
-            case .action:
-                logger.info("Agent Action Detected for: \(input)")
-
-            case .context:
-                logger.info("Context Request Detected for: \(input)")
-
-            case .knowledge:
-                logger.info("Knowledge Query aka Standard Navigation: \(input)")
-
-                navigate(to: input)
-            }
+            navigate(to: input)
         }
     }
 
