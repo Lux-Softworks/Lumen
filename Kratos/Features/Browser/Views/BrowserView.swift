@@ -9,24 +9,18 @@ struct BrowserView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                if viewModel.isLoading {
-                    ProgressView(value: viewModel.estimatedProgress)
-                        .progressViewStyle(.linear)
-                        .tint(.blue)
+            HardenedWebView(viewModel: viewModel)
+                .ignoresSafeArea(edges: .bottom)
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: 60)
                 }
-
-                HardenedWebView(viewModel: viewModel)
-                    .ignoresSafeArea(edges: .bottom)
-                    .safeAreaInset(edge: .bottom) {
-                        Color.clear.frame(height: 60)
-                    }
-            }
 
             BottomBarView(
                 text: $viewModel.urlString,
                 isExpanded: $isBottomBarExpanded,
                 isFocused: $isAddressBarFocused,
+                isLoading: viewModel.isLoading,
+                progress: viewModel.estimatedProgress,
 
                 onTabsPressed: {
                     print("Tabs pressed")
