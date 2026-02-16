@@ -230,47 +230,45 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     private func updateThemeColorManually(_ webView: WKWebView) {
-        // More robust script to find the visual background color at the top of the page
         let script = """
-            (function() {
-                // 1. Check for theme-color meta tag
-                var meta = document.querySelector('meta[name="theme-color"]');
-                if (meta) {
-                    return meta.content;
-                }
-
-                // 2. Helper to get background color of an element
-                function getBackgroundColor(element) {
-                    if (!element) return null;
-                    var style = window.getComputedStyle(element);
-                    var color = style.backgroundColor;
-
-                    // Check for transparency
-                    if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
-                        return null;
+                (function() {
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) {
+                        return meta.content;
                     }
-                    return color;
-                }
 
-                // 3. Check fixed/sticky elements at the top (likely headers)
-                var elements = document.elementsFromPoint(window.innerWidth / 2, 5);
-                for (var i = 0; i < elements.length; i++) {
-                    var el = elements[i];
-                    var bg = getBackgroundColor(el);
-                    if (bg) return bg;
-                }
+                    // 2. Helper to get background color of an element
+                    function getBackgroundColor(element) {
+                        if (!element) return null;
+                        var style = window.getComputedStyle(element);
+                        var color = style.backgroundColor;
 
-                // 4. Fallback: Check body and html
-                var bodyColor = getBackgroundColor(document.body);
-                if (bodyColor) return bodyColor;
+                        // Check for transparency
+                        if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
+                            return null;
+                        }
+                        return color;
+                    }
 
-                var htmlColor = getBackgroundColor(document.documentElement);
-                if (htmlColor) return htmlColor;
+                    // 3. Check fixed/sticky elements at the top (likely headers)
+                    var elements = document.elementsFromPoint(window.innerWidth / 2, 5);
+                    for (var i = 0; i < elements.length; i++) {
+                        var el = elements[i];
+                        var bg = getBackgroundColor(el);
+                        if (bg) return bg;
+                    }
 
-                // 5. Default
-                return "white";
-            })();
-        """
+                    // 4. Fallback: Check body and html
+                    var bodyColor = getBackgroundColor(document.body);
+                    if (bodyColor) return bodyColor;
+
+                    var htmlColor = getBackgroundColor(document.documentElement);
+                    if (htmlColor) return htmlColor;
+
+                    // 5. Default
+                    return "white";
+                })();
+            """
 
         webView.evaluateJavaScript(script) { [weak self] result, error in
             guard let colorString = result as? String else { return }

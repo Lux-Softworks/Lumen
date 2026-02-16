@@ -57,15 +57,15 @@ struct BrowserView: View {
 
                 HardenedWebView(viewModel: viewModel)
                     .ignoresSafeArea()
+                    .padding(.top, geometry.safeAreaInsets.top)
+                    .background(
+                        Color(uiColor: viewModel.themeColor ?? .clear)
+                            .ignoresSafeArea(edges: .top)
+                    )
                     .safeAreaInset(edge: .bottom) {
                         Color.clear.frame(height: 60)
                     }
                     .zIndex(1)
-
-                Color(uiColor: viewModel.themeColor ?? .systemBackground)
-                    .frame(height: geometry.safeAreaInsets.top)
-                    .ignoresSafeArea()
-                    .zIndex(2)
 
                 BottomBarView(
                     text: $viewModel.urlString,

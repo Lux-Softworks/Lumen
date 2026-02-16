@@ -21,11 +21,6 @@ struct HardenedWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = BrowserEngine.makeWebView(policy: policy)
-        // webView already has a retained interceptor from BrowserEngine
-
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
 
         viewModel.attachWebView(webView)
         context.coordinator.hasAttached = true
