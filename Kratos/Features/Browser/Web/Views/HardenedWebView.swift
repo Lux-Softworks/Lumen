@@ -21,6 +21,7 @@ struct HardenedWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = BrowserEngine.makeWebView(policy: policy)
+
         viewModel.attachWebView(webView)
         context.coordinator.hasAttached = true
 

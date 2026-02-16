@@ -13,82 +13,86 @@ struct BrowserView: View {
     let screenHeight = UIScreen.main.bounds.height
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            HardenedWebView(viewModel: viewModel)
-                .ignoresSafeArea(edges: .bottom)
-                .safeAreaInset(edge: .bottom) {
-                    Color.clear.frame(height: 60)
-                }
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                ZStack {
+                    LinearGradient(
+                        colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
 
-            BottomBarView(
-                text: $viewModel.urlString,
-                isExpanded: $isBottomBarExpanded,
-                isCollapsed: $isBottomBarCollapsed,
-                isFocused: $isAddressBarFocused,
-                isLoading: viewModel.isLoading,
-                progress: viewModel.estimatedProgress,
+                    Group {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: screenWidth * 0.8)
+                            .blur(radius: 80)
+                            .offset(x: -screenWidth * 0.2, y: -screenHeight * 0.1)
+                            .opacity(0.8)
 
-                onTabsPressed: {
-                    print("Tabs pressed")
-                },
+                        Circle()
+                            .fill(Color.yellow)
+                            .frame(width: screenWidth * 0.9)
+                            .blur(radius: 100)
+                            .offset(x: screenWidth * 0.3, y: screenHeight * 0.4)
+                            .opacity(0.8)
 
-                onSettingsPressed: {
-                    print("Settings pressed")
-                },
-
-                onSubmit: {
-                    Task {
-                        await viewModel.processUserInput(viewModel.urlString)
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: screenWidth * 0.6)
+                            .blur(radius: 90)
+                            .offset(x: -screenWidth * 0.1, y: screenHeight * 0.7)
+                            .opacity(0.5)
                     }
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        isBottomBarExpanded = false
-                        isAddressBarFocused = false
-                    }
+                    .opacity(0.5)
+
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 0)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                        )
                 }
-            )
-            .onChange(of: viewModel.scrollDelta) { delta in
-                updateScrollState(delta: delta)
+                .ignoresSafeArea()
+                .zIndex(0)
+
+                HardenedWebView(viewModel: viewModel)
+                    .ignoresSafeArea()
+                    .padding(.top, geometry.safeAreaInsets.top)
+                    .background(
+                        Color(uiColor: viewModel.themeColor ?? .clear)
+                            .ignoresSafeArea(edges: .top)
+                    )
+                    .safeAreaInset(edge: .bottom) {
+                        Color.clear.frame(height: 60)
+                    }
+                    .zIndex(1)
+
+                BottomBarView(
+                    text: $viewModel.urlString,
+                    isExpanded: $isBottomBarExpanded,
+                    isCollapsed: $isBottomBarCollapsed,
+                    isFocused: $isAddressBarFocused,
+                    isLoading: viewModel.isLoading,
+                    progress: viewModel.estimatedProgress,
+                    onTabsPressed: { print("Tabs pressed") },
+                    onSettingsPressed: { print("Settings pressed") },
+                    onSubmit: {
+                        Task { await viewModel.processUserInput(viewModel.urlString) }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isBottomBarExpanded = false
+                            isAddressBarFocused = false
+                        }
+                    }
+                )
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .onChange(of: viewModel.scrollDelta) { delta in
+                    updateScrollState(delta: delta)
+                }
+                .zIndex(3)
             }
         }
-        .background(
-            ZStack {
-                LinearGradient(colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .ignoresSafeArea()
-                Group {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: screenWidth * 0.8)
-                        .blur(radius: 80)
-                        .offset(x: -screenWidth * 0.2, y: -screenHeight * 0.1)
-                        .opacity(0.8)
-
-                    Circle()
-                        .fill(Color.yellow)
-                        .frame(width: screenWidth * 0.9)
-                        .blur(radius: 100)
-                        .offset(x: screenWidth * 0.3, y: screenHeight * 0.4)
-                        .opacity(0.8)
-
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: screenWidth * 0.6)
-                        .blur(radius: 90)
-                        .offset(x: -screenWidth * 0.1, y: screenHeight * 0.7)
-                        .opacity(0.5)
-                }
-                .opacity(0.5)
-
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 0)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                    )
-                    .ignoresSafeArea()
-            }
-        )
         .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.3), value: viewModel.themeColor)
     }
 
     @State private var scrollAccumulator: CGFloat = 0
