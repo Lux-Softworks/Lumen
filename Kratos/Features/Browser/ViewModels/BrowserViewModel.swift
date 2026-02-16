@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import UIKit
 import WebKit
 import os.log
 
@@ -20,7 +21,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var interceptor: NetworkInterceptor?
 
     private var observations: [NSKeyValueObservation] = []
-    private let logger = Logger(subsystem: "com.Kratos.browser", category: "BrowserViewModel")
+    private let logger = Logger(
+        subsystem: "com.kratossoftworks.Kratos", category: "BrowserViewModel")
 
     static let defaultURL = URL(string: "https://www.google.com")!
     static let searchEngineTemplate = "https://www.google.com/search?q=%@"
@@ -30,7 +32,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-
+        
             Task {
                 try? await brain?.loadModel()
             }
@@ -202,6 +204,33 @@ final class BrowserViewModel: NSObject, ObservableObject {
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
                 MainActor.assumeIsolated {
                     self?.estimatedProgress = webView.estimatedProgress
+                }
+            }
+        )
+
+        startScrollObservation(webView)
+    }
+
+    private var lastContentOffset: CGFloat = 0
+    @Published var scrollDelta: CGFloat = 0
+
+    private func startScrollObservation(_ webView: WKWebView) {
+        observations.append(
+            webView.scrollView.observe(\.contentOffset, options: [.new]) {
+                [weak self] scrollView, _ in
+                guard let self = self else { return }
+
+                MainActor.assumeIsolated {
+                    let currentOffset = scrollView.contentOffset.y
+
+                    let maxOffset = scrollView.contentSize.height - scrollView.frame.height
+                    if currentOffset < 0 || currentOffset > maxOffset {
+                        return
+                    }
+
+                    let delta = currentOffset - self.lastContentOffset
+                    self.scrollDelta = delta
+                    self.lastContentOffset = currentOffset
                 }
             }
         )

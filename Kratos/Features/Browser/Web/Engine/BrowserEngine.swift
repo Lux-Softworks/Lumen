@@ -1,6 +1,6 @@
+import ObjectiveC
 import SwiftUI
 import WebKit
-import ObjectiveC
 
 struct PrivacyPolicy {
     var blocksThirdPartyCookies: Bool = true
@@ -49,7 +49,6 @@ enum HTTPSUpgradeLogic {
     }
 }
 
-
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -72,7 +71,8 @@ enum BrowserEngine {
             config.preferences.javaScriptEnabled = policy.allowsJavaScript
         }
 
-        config.preferences.javaScriptCanOpenWindowsAutomatically = policy.javaScriptCanOpenWindowsAutomatically
+        config.preferences.javaScriptCanOpenWindowsAutomatically =
+            policy.javaScriptCanOpenWindowsAutomatically
         config.suppressesIncrementalRendering = policy.suppressesIncrementalRendering
 
         if let ua = policy.customUserAgent {
@@ -94,10 +94,15 @@ enum BrowserEngine {
             webView.isInspectable = false
         }
 
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+
         let detector = ThreatDetector()
         detector.loadTrackerDatabase(TrackerDatabase.shared.allEntries())
 
-        let interceptor = NetworkInterceptor(detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
+        let interceptor = NetworkInterceptor(
+            detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
 
@@ -115,10 +120,11 @@ private enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
 }
 
-private extension WKWebView {
-    var retainedDelegate: WKNavigationDelegate? {
+extension WKWebView {
+    fileprivate var retainedDelegate: WKNavigationDelegate? {
         get {
-            objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey) as? WKNavigationDelegate
+            objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey)
+                as? WKNavigationDelegate
         }
         set {
             objc_setAssociatedObject(
@@ -138,7 +144,10 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
         self.httpsOnly = enabled
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
         guard let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return

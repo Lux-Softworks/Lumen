@@ -1,11 +1,16 @@
 import SwiftUI
+import UIKit
 
 struct BrowserView: View {
     @StateObject private var viewModel = BrowserViewModel()
 
     @State private var isBottomBarExpanded = false
+    @State private var isBottomBarCollapsed = false
 
     @FocusState private var isAddressBarFocused: Bool
+
+    let screenWidth = UIScreen.main.bounds.width
+    let screenHeight = UIScreen.main.bounds.height
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -18,6 +23,7 @@ struct BrowserView: View {
             BottomBarView(
                 text: $viewModel.urlString,
                 isExpanded: $isBottomBarExpanded,
+                isCollapsed: $isBottomBarCollapsed,
                 isFocused: $isAddressBarFocused,
                 isLoading: viewModel.isLoading,
                 progress: viewModel.estimatedProgress,
@@ -40,9 +46,73 @@ struct BrowserView: View {
                     }
                 }
             )
+            .onChange(of: viewModel.scrollDelta) { delta in
+                updateScrollState(delta: delta)
+            }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(
+            ZStack {
+                LinearGradient(colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .ignoresSafeArea()
+                Group {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: screenWidth * 0.8)
+                        .blur(radius: 80)
+                        .offset(x: -screenWidth * 0.2, y: -screenHeight * 0.1)
+                        .opacity(0.8)
+
+                    Circle()
+                        .fill(Color.yellow)
+                        .frame(width: screenWidth * 0.9)
+                        .blur(radius: 100)
+                        .offset(x: screenWidth * 0.3, y: screenHeight * 0.4)
+                        .opacity(0.8)
+
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: screenWidth * 0.6)
+                        .blur(radius: 90)
+                        .offset(x: -screenWidth * 0.1, y: screenHeight * 0.7)
+                        .opacity(0.5)
+                }
+                .opacity(0.5)
+
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                    )
+                    .ignoresSafeArea()
+            }
+        )
         .ignoresSafeArea()
+    }
+
+    @State private var scrollAccumulator: CGFloat = 0
+
+    private func updateScrollState(delta: CGFloat) {
+        if delta > 0 {
+            if scrollAccumulator < 0 { scrollAccumulator = 0 }
+            scrollAccumulator += delta
+
+            if scrollAccumulator > 50 && !isBottomBarCollapsed && !isBottomBarExpanded {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isBottomBarCollapsed = true
+                }
+            }
+        } else {
+            if scrollAccumulator > 0 { scrollAccumulator = 0 }
+            scrollAccumulator += delta
+
+            if scrollAccumulator < -20 && isBottomBarCollapsed {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isBottomBarCollapsed = false
+                }
+            }
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 
 struct HardenedWebView: UIViewRepresentable {
@@ -6,7 +7,6 @@ struct HardenedWebView: UIViewRepresentable {
     var policy: PrivacyPolicy = PrivacyPolicy()
 
     class Coordinator: NSObject {
-        
         var parent: HardenedWebView
         var hasAttached = false
 

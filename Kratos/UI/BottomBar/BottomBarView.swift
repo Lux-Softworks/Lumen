@@ -4,6 +4,7 @@ import UIKit
 struct BottomBarView: View {
     @Binding var text: String
     @Binding var isExpanded: Bool
+    @Binding var isCollapsed: Bool
     @FocusState.Binding var isFocused: Bool
     var isLoading: Bool
     var progress: Double
@@ -17,19 +18,25 @@ struct BottomBarView: View {
     var body: some View {
         ResizableSheetContainer(
             isExpanded: $isExpanded,
+            isCollapsed: $isCollapsed,
             isLoading: isLoading,
             progress: progress,
             onDragStart: {
+                if isCollapsed {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                        isCollapsed = false
+                    }
+                }
                 isFocused = false
             }
         ) {
             VStack(spacing: 0) {
                 if isExpanded {
                     expandedContent
-                        .transition(.opacity)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.1)))
                 } else {
                     collapsedContent
-                        .transition(.opacity)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.15)))
                 }
             }
         }
@@ -81,6 +88,9 @@ struct BottomBarView: View {
 
             Spacer()
         }
+        .opacity(isCollapsed ? 0 : 1)
+        .padding(.bottom, isCollapsed ? -44 : 0)
+        .animation(.easeInOut(duration: 0.15), value: isCollapsed)
     }
 
     var collapsedContent: some View {
@@ -151,11 +161,14 @@ struct BottomBarView: View {
             .padding(.trailing, 8)
         }
         .frame(height: 80)
+        .opacity(isCollapsed ? 0 : 1)
+        .animation(.easeInOut(duration: 0.15), value: isCollapsed)
     }
 }
 
 struct ResizableSheetContainer<Content: View>: View {
     @Binding var isExpanded: Bool
+    @Binding var isCollapsed: Bool
     var isLoading: Bool
     var progress: Double
     var onDragStart: (() -> Void)?
@@ -166,16 +179,19 @@ struct ResizableSheetContainer<Content: View>: View {
 
     private let expandedHeightRatio: CGFloat = 0.65
     private let collapsedHeight: CGFloat = 80
+    private let sliverHeight: CGFloat = 20
     private let handleHeight: CGFloat = 60
 
     init(
         isExpanded: Binding<Bool>,
+        isCollapsed: Binding<Bool>,
         isLoading: Bool,
         progress: Double,
         onDragStart: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self._isExpanded = isExpanded
+        self._isCollapsed = isCollapsed
         self.isLoading = isLoading
         self.progress = progress
         self.onDragStart = onDragStart
@@ -201,9 +217,11 @@ struct ResizableSheetContainer<Content: View>: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 16)
                 .frame(
-                    height: max(handleHeight, currentHeight),
+                    height: currentHeight,
                     alignment: .top
                 )
+                .opacity(isCollapsed ? 0 : 1)
+                .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 .background(
                     ZStack(alignment: .top) {
                         Rectangle()
@@ -296,6 +314,9 @@ struct ResizableSheetContainer<Content: View>: View {
     }
 
     private var currentHeight: CGFloat {
+        if isCollapsed {
+            return sliverHeight
+        }
         let screenHeight = UIScreen.main.bounds.height
         let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
         return baseHeight - effectiveDrag
@@ -314,6 +335,8 @@ struct ResizableSheetContainer<Content: View>: View {
 
 struct PlasmaProgressView: View {
     var progress: Double
+
+    @State private var displayedProgress: Double = 0
     @State private var animateGradient = false
 
     var body: some View {
@@ -333,26 +356,29 @@ struct PlasmaProgressView: View {
                     endPoint: animateGradient ? .trailing : .leading
                 )
                 .animation(
-                    .linear(duration: 2.0).repeatForever(autoreverses: true),
+                    .linear(duration: 2.0).repeatForever(autoreverses: false),
                     value: animateGradient
                 )
                 .mask(
                     Rectangle()
-                        .frame(width: geometry.size.width * CGFloat(progress))
+                        .frame(width: geometry.size.width * CGFloat(displayedProgress))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .animation(.smooth(duration: 0.3), value: progress)
+                        .animation(
+                            .spring(response: 0.35, dampingFraction: 1.0, blendDuration: 0.1),
+                            value: displayedProgress
+                        )
                 )
             }
             .onAppear {
                 animateGradient = true
+                displayedProgress = progress
+            }
+            .onChange(of: progress) { newValue in
+                if newValue > displayedProgress {
+                    displayedProgress = newValue
+                }
             }
         }
-    }
-}
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
     }
 }
 
@@ -368,5 +394,11 @@ struct RoundedCorner: Shape {
         )
 
         return Path(path.cgPath)
+    }
+}
+
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
     }
 }
