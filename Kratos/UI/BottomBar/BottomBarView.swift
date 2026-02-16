@@ -30,7 +30,9 @@ struct BottomBarView: View {
                         isCollapsed = false
                     }
                 }
-                isFocused = false
+            },
+            onExpand: {
+                isFocused = true
             }
         ) {
             VStack(spacing: 0) {
@@ -61,7 +63,7 @@ struct BottomBarView: View {
 
                 TextField("Search...", text: $text)
                     .font(.system(size: 17))
-                    .fontWeight(.medium)
+                    .fontWeight(.bold)
                     .textFieldStyle(.plain)
                     .focused($isFocused)
                     .submitLabel(.go)
@@ -176,6 +178,7 @@ struct ResizableSheetContainer<Content: View>: View {
     var progress: Double
     var themeColor: UIColor?
     var onDragStart: (() -> Void)?
+    var onExpand: (() -> Void)?
     let content: () -> Content
 
     @GestureState private var activeDragTranslation: CGFloat = 0
@@ -193,6 +196,7 @@ struct ResizableSheetContainer<Content: View>: View {
         progress: Double,
         themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
+        onExpand: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self._isExpanded = isExpanded
@@ -201,6 +205,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self.progress = progress
         self.themeColor = themeColor
         self.onDragStart = onDragStart
+        self.onExpand = onExpand
         self.content = content
     }
 
@@ -230,26 +235,31 @@ struct ResizableSheetContainer<Content: View>: View {
                 .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 .background(
                     ZStack(alignment: .top) {
-                        if let themeColor = themeColor {
-                            Color(themeColor)
-                                .opacity(0.85)
+                        BlurView(style: .systemChromeMaterial)
+                            .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+                            .overlay(
+                                Group {
+                                    if let themeColor = themeColor {
+                                        Color(themeColor).opacity(0.7)
+                                    } else {
+                                        Color.black.opacity(0.35)
+                                    }
+                                }
                                 .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                                .shadow(color: Color.black.opacity(0.15), radius: 10, y: -5)
-                        } else {
-                            Rectangle()
-                                .fill(.ultraThickMaterial)
-                                .opacity(0.975)
-                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                                .shadow(color: Color.black.opacity(0.15), radius: 10, y: -5)
-                        }
+                            )
+                            .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                            .overlay(
+                                RoundedCorner(
+                                    radius: animatedCornerRadius,
+                                    corners: [.topLeft, .topRight]
+                                )
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                            )
+                            .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 
-                        if isLoading || progress > 0 && progress < 1.0 {
-                            PlasmaProgressView(progress: progress)
-                                .frame(height: 3)
-                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                        }
+                        PlasmaProgressView(progress: progress, isLoading: isLoading)
+                            .frame(height: 1.5)
+                            .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
                     }
                 )
                 .gesture(
@@ -311,6 +321,10 @@ struct ResizableSheetContainer<Content: View>: View {
                                 isExpanded = shouldExpand
                                 releaseOffset = 0
                             }
+
+                            if shouldExpand {
+                                onExpand?()
+                            }
                         }
                 )
                 .zIndex(1)
@@ -333,7 +347,9 @@ struct ResizableSheetContainer<Content: View>: View {
         }
         let screenHeight = UIScreen.main.bounds.height
         let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
-        return baseHeight - effectiveDrag
+        let calculatedHeight = baseHeight - effectiveDrag
+
+        return min(calculatedHeight, screenHeight * expandedHeightRatio)
     }
 
     private var animatedCornerRadius: CGFloat {
@@ -349,48 +365,69 @@ struct ResizableSheetContainer<Content: View>: View {
 
 struct PlasmaProgressView: View {
     var progress: Double
+    var isLoading: Bool
 
     @State private var displayedProgress: Double = 0
-    @State private var animateGradient = false
+    @State private var visible: Bool = false
+
+    @State private var isFinishing: Bool = false
+
+    private let gradient = LinearGradient(
+        colors: [
+            Color(red: 1.0, green: 0.85, blue: 0.1),
+            Color(red: 1.0, green: 0.55, blue: 0.1),
+            Color(red: 0.9, green: 0.25, blue: 0.4),
+            Color(red: 0.55, green: 0.1, blue: 0.65),
+            Color(red: 0.25, green: 0.05, blue: 0.7),
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Color.secondary.opacity(0.1)
+                gradient
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .mask(
+                        Rectangle()
+                            .frame(width: geometry.size.width * CGFloat(displayedProgress))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    )
+            }
+            .opacity(visible ? 1 : 0)
+        }
+        .onChange(of: isLoading) { loading in
+            if loading {
+                isFinishing = false
 
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.95, blue: 0.2),
-                        Color(red: 1.0, green: 0.65, blue: 0.1),
-                        Color(red: 0.9, green: 0.3, blue: 0.4),
-                        Color(red: 0.6, green: 0.1, blue: 0.6),
-                        Color(red: 0.2, green: 0.0, blue: 0.6),
-                    ],
-                    startPoint: animateGradient ? .leading : .trailing,
-                    endPoint: animateGradient ? .trailing : .leading
-                )
-                .animation(
-                    .linear(duration: 2.0).repeatForever(autoreverses: false),
-                    value: animateGradient
-                )
-                .mask(
-                    Rectangle()
-                        .frame(width: geometry.size.width * CGFloat(displayedProgress))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .animation(
-                            .spring(response: 0.35, dampingFraction: 1.0, blendDuration: 0.1),
-                            value: displayedProgress
-                        )
-                )
-            }
-            .onAppear {
-                animateGradient = true
-                displayedProgress = progress
-            }
-            .onChange(of: progress) { newValue in
-                if newValue > displayedProgress {
-                    displayedProgress = newValue
+                withAnimation(.smooth(duration: 0.2)) {
+                    visible = true
                 }
+            } else {
+                isFinishing = true
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    guard self.isFinishing else { return }
+
+                    withAnimation(.smooth(duration: 0.3)) {
+                        visible = false
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        guard self.isFinishing else { return }
+                        displayedProgress = 0
+                        isFinishing = false
+                    }
+                }
+            }
+        }
+        .onChange(of: progress) { newValue in
+            guard !isFinishing else { return }
+            guard visible else { return }
+
+            if newValue > displayedProgress {
+                displayedProgress = newValue
             }
         }
     }
@@ -414,5 +451,18 @@ struct RoundedCorner: Shape {
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style
+
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        let view = UIVisualEffectView(effect: UIBlurEffect(style: style))
+        return view
+    }
+
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
+        uiView.effect = UIBlurEffect(style: style)
     }
 }

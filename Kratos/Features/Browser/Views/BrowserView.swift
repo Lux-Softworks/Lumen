@@ -6,6 +6,7 @@ struct BrowserView: View {
 
     @State private var isBottomBarExpanded = false
     @State private var isBottomBarCollapsed = false
+    @State private var isReady = false
 
     @FocusState private var isAddressBarFocused: Bool
 
@@ -46,7 +47,7 @@ struct BrowserView: View {
                     .opacity(0.5)
 
                     Rectangle()
-                        .fill(.ultraThinMaterial)
+                        .fill(.ultraThinMaterial).opacity(0.96)
                         .overlay(
                             RoundedRectangle(cornerRadius: 0)
                                 .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
@@ -57,11 +58,6 @@ struct BrowserView: View {
 
                 HardenedWebView(viewModel: viewModel)
                     .ignoresSafeArea()
-                    .padding(.top, geometry.safeAreaInsets.top)
-                    .background(
-                        Color(uiColor: viewModel.themeColor ?? .clear)
-                            .ignoresSafeArea(edges: .top)
-                    )
                     .safeAreaInset(edge: .bottom) {
                         Color.clear.frame(height: 60)
                     }
@@ -89,10 +85,40 @@ struct BrowserView: View {
                     updateScrollState(delta: delta)
                 }
                 .zIndex(3)
+
+                if !isReady {
+                    ZStack {
+                        LinearGradient(
+                            colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                        Rectangle()
+                            .fill(.ultraThinMaterial).opacity(0.96)
+                    }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(200)
+                }
             }
         }
         .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.3), value: viewModel.themeColor)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    isReady = true
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        isBottomBarExpanded = true
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        isAddressBarFocused = true
+                    }
+                }
+            }
+        }
     }
 
     @State private var scrollAccumulator: CGFloat = 0

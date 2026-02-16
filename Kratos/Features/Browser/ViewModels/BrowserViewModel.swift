@@ -32,7 +32,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-        
+
             Task {
                 try? await brain?.loadModel()
             }
@@ -117,6 +117,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func clearPageState() {
         threatEvents.removeAll()
         blockedTrackersCount = 0
+        themeColor = nil
         interceptor?.clearSession()
     }
 
@@ -237,20 +238,17 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         return meta.content;
                     }
 
-                    // 2. Helper to get background color of an element
                     function getBackgroundColor(element) {
                         if (!element) return null;
                         var style = window.getComputedStyle(element);
                         var color = style.backgroundColor;
 
-                        // Check for transparency
                         if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
                             return null;
                         }
                         return color;
                     }
 
-                    // 3. Check fixed/sticky elements at the top (likely headers)
                     var elements = document.elementsFromPoint(window.innerWidth / 2, 5);
                     for (var i = 0; i < elements.length; i++) {
                         var el = elements[i];
@@ -258,14 +256,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         if (bg) return bg;
                     }
 
-                    // 4. Fallback: Check body and html
                     var bodyColor = getBackgroundColor(document.body);
                     if (bodyColor) return bodyColor;
 
                     var htmlColor = getBackgroundColor(document.documentElement);
                     if (htmlColor) return htmlColor;
 
-                    // 5. Default
                     return "white";
                 })();
             """
@@ -273,8 +269,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
         webView.evaluateJavaScript(script) { [weak self] result, error in
             guard let colorString = result as? String else { return }
 
-            DispatchQueue.main.async {
-                self?.themeColor = UIColor.fromAnyString(colorString)
+            Task { @MainActor in
+                guard let self = self else { return }
+                let color = UIColor.fromAnyString(colorString)
+                self.themeColor = color
+                webView.scrollView.backgroundColor = color ?? .systemBackground
             }
         }
     }
