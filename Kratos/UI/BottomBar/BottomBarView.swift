@@ -9,6 +9,8 @@ struct BottomBarView: View {
     var isLoading: Bool
     var progress: Double
 
+    var themeColor: UIColor?
+
     var onTabsPressed: () -> Void
     var onSettingsPressed: () -> Void
     var onSubmit: () -> Void
@@ -21,6 +23,7 @@ struct BottomBarView: View {
             isCollapsed: $isCollapsed,
             isLoading: isLoading,
             progress: progress,
+            themeColor: themeColor,
             onDragStart: {
                 if isCollapsed {
                     withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
@@ -171,6 +174,7 @@ struct ResizableSheetContainer<Content: View>: View {
     @Binding var isCollapsed: Bool
     var isLoading: Bool
     var progress: Double
+    var themeColor: UIColor?
     var onDragStart: (() -> Void)?
     let content: () -> Content
 
@@ -187,6 +191,7 @@ struct ResizableSheetContainer<Content: View>: View {
         isCollapsed: Binding<Bool>,
         isLoading: Bool,
         progress: Double,
+        themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
@@ -194,6 +199,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self._isCollapsed = isCollapsed
         self.isLoading = isLoading
         self.progress = progress
+        self.themeColor = themeColor
         self.onDragStart = onDragStart
         self.content = content
     }
@@ -224,12 +230,20 @@ struct ResizableSheetContainer<Content: View>: View {
                 .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 .background(
                     ZStack(alignment: .top) {
-                        Rectangle()
-                            .fill(.ultraThickMaterial)
-                            .opacity(0.975)
-                            .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                            .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                            .shadow(color: Color.black.opacity(0.15), radius: 10, y: -5)
+                        if let themeColor = themeColor {
+                            Color(themeColor)
+                                .opacity(0.85)
+                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                                .shadow(color: Color.black.opacity(0.15), radius: 10, y: -5)
+                        } else {
+                            Rectangle()
+                                .fill(.ultraThickMaterial)
+                                .opacity(0.975)
+                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                                .shadow(color: Color.black.opacity(0.15), radius: 10, y: -5)
+                        }
 
                         if isLoading || progress > 0 && progress < 1.0 {
                             PlasmaProgressView(progress: progress)
