@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 
+@MainActor
 struct BrowserView: View {
     @StateObject private var viewModel = BrowserViewModel()
 
@@ -9,9 +10,6 @@ struct BrowserView: View {
     @State private var isReady = false
 
     @FocusState private var isAddressBarFocused: Bool
-
-    let screenWidth = UIScreen.main.bounds.width
-    let screenHeight = UIScreen.main.bounds.height
 
     var body: some View {
         GeometryReader { geometry in
@@ -25,23 +23,23 @@ struct BrowserView: View {
                     Group {
                         Circle()
                             .fill(Color.orange)
-                            .frame(width: screenWidth * 0.8)
+                            .frame(width: geometry.size.width * 0.8)
                             .blur(radius: 80)
-                            .offset(x: -screenWidth * 0.2, y: -screenHeight * 0.1)
+                            .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.1)
                             .opacity(0.8)
 
                         Circle()
                             .fill(Color.yellow)
-                            .frame(width: screenWidth * 0.9)
+                            .frame(width: geometry.size.width * 0.9)
                             .blur(radius: 100)
-                            .offset(x: screenWidth * 0.3, y: screenHeight * 0.4)
+                            .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.4)
                             .opacity(0.8)
 
                         Circle()
                             .fill(Color.blue)
-                            .frame(width: screenWidth * 0.6)
+                            .frame(width: geometry.size.width * 0.6)
                             .blur(radius: 90)
-                            .offset(x: -screenWidth * 0.1, y: screenHeight * 0.7)
+                            .offset(x: -geometry.size.width * 0.1, y: geometry.size.height * 0.7)
                             .opacity(0.5)
                     }
                     .opacity(0.5)
@@ -56,12 +54,12 @@ struct BrowserView: View {
                 .ignoresSafeArea()
                 .zIndex(0)
 
-                HardenedWebView(viewModel: viewModel)
-                    .ignoresSafeArea()
-                    .safeAreaInset(edge: .bottom) {
-                        Color.clear.frame(height: 60)
-                    }
-                    .zIndex(1)
+                HardenedWebView(
+                    viewModel: viewModel,
+                    bottomInset: isBottomBarExpanded ? 0 : (isBottomBarCollapsed ? 20 : 80)
+                )
+                .ignoresSafeArea()
+                .zIndex(1)
 
                 BottomBarView(
                     text: $viewModel.urlString,
@@ -81,7 +79,7 @@ struct BrowserView: View {
                     }
                 )
                 .frame(maxHeight: .infinity, alignment: .bottom)
-                .onChange(of: viewModel.scrollDelta) { delta in
+                .onChange(of: viewModel.scrollDelta) { _, delta in
                     updateScrollState(delta: delta)
                 }
                 .zIndex(3)

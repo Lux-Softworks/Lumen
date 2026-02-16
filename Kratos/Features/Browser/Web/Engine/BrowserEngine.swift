@@ -80,6 +80,89 @@ enum BrowserEngine {
             config.applicationNameForUserAgent = ua
         }
 
+        let bottomInsetScript = WKUserScript(
+            source: """
+                (function() {
+                    var toolbarHeight = 80;
+                    document.documentElement.style.setProperty(
+                        '--toolbar-height', toolbarHeight + 'px');
+
+                    var style = document.createElement('style');
+                    style.textContent = '[data-bumped] { transition: bottom 0.2s ease-in-out !important; }';
+                    document.head.appendChild(style);
+
+                    var meta = document.querySelector('meta[name="viewport"]');
+
+                    if (meta) {
+                        var content = meta.getAttribute('content') || '';
+                        if (content.indexOf('viewport-fit') === -1) {
+                            meta.setAttribute('content', content + ', viewport-fit=cover');
+                        }
+                    } else {
+                        meta = document.createElement('meta');
+                        meta.name = 'viewport';
+                        meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+                        document.head.appendChild(meta);
+                    }
+
+                    function bumpBottomElements() {
+                        var all = document.querySelectorAll('*');
+                        for (var i = 0; i < all.length; i++) {
+                            var el = all[i];
+                            if (el.hasAttribute('data-bumped')) continue;
+
+                            var s = getComputedStyle(el);
+                            if (s.position !== 'fixed' && s.position !== 'sticky') continue;
+
+                            if (s.bottom === 'auto' || s.bottom === '') continue;
+
+                            var bottomVal = parseFloat(s.bottom);
+                            if (isNaN(bottomVal) || bottomVal > 100) continue;
+
+                            var rect = el.getBoundingClientRect();
+                            if (rect.top < window.innerHeight / 2) continue;
+
+                            el.setAttribute('data-original-bottom', String(bottomVal));
+                            el.style.setProperty('bottom',
+                                (bottomVal + toolbarHeight) + 'px', 'important');
+                            el.setAttribute('data-bumped', '1');
+                        }
+                    }
+
+                    // Global function called from Swift to update toolbar height
+                    window.__updateToolbarHeight = function(h) {
+                        toolbarHeight = h;
+                        document.documentElement.style.setProperty(
+                            '--toolbar-height', h + 'px');
+                        var bumped = document.querySelectorAll('[data-bumped]');
+                        for (var i = 0; i < bumped.length; i++) {
+                            var orig = parseFloat(bumped[i].getAttribute('data-original-bottom')) || 0;
+                            bumped[i].style.setProperty('bottom',
+                                (orig + h) + 'px', 'important');
+                        }
+                    };
+
+                    if (document.readyState === 'complete') {
+                        bumpBottomElements();
+                    } else {
+                        window.addEventListener('load', bumpBottomElements);
+                    }
+
+                    setTimeout(bumpBottomElements, 1000);
+                    setTimeout(bumpBottomElements, 3000);
+
+                    var observer = new MutationObserver(function() {
+                        requestAnimationFrame(bumpBottomElements);
+                    });
+                    observer.observe(document.documentElement,
+                        { childList: true, subtree: true });
+                })();
+                """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(bottomInsetScript)
+
         return config
     }
 

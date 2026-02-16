@@ -5,7 +5,6 @@ import WebKit
 import os.log
 
 final class BrowserViewModel: NSObject, ObservableObject {
-
     @Published var urlString: String = ""
     @Published var currentURL: URL?
     @Published var pageTitle: String = ""
@@ -32,7 +31,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-
+        
             Task {
                 try? await brain?.loadModel()
             }
@@ -158,7 +157,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private func observeWebView(_ webView: WKWebView) {
         observations.append(
             webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.currentURL = webView.url
 
                     if let url = webView.url {
@@ -171,7 +170,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.title, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.pageTitle = webView.title ?? ""
                 }
             }
@@ -179,7 +178,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.isLoading = webView.isLoading
 
                     if !webView.isLoading {
@@ -191,7 +190,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoBack, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.canGoBack = webView.canGoBack
                 }
             }
@@ -199,7 +198,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoForward, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.canGoForward = webView.canGoForward
                 }
             }
@@ -207,7 +206,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.estimatedProgress = webView.estimatedProgress
                 }
             }
@@ -216,7 +215,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         if #available(iOS 15.0, *) {
             observations.append(
                 webView.observe(\.themeColor, options: [.new]) { [weak self] webView, _ in
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         if let newColor = webView.themeColor {
                             self?.themeColor = newColor
                         } else {
@@ -269,7 +268,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         webView.evaluateJavaScript(script) { [weak self] result, error in
             guard let colorString = result as? String else { return }
 
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 let color = UIColor.fromAnyString(colorString)
                 self.themeColor = color
@@ -286,7 +285,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         observations.append(
             webView.scrollView.observe(\.contentOffset, options: [.new]) {
                 [weak self] scrollView, _ in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     guard let self = self else { return }
 
                     let currentOffset = scrollView.contentOffset.y

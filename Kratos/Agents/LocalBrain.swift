@@ -38,7 +38,7 @@ actor LocalBrain {
         self.modelContainer = try await task.value
         self.loadingTask = nil
 
-        _ = try? await self.debugRun(prompt: "test")
+        _ = await self.debugRun(prompt: "test")
     }
 
     func debugRun(prompt: String = "Hello, are you operational?") async -> String {

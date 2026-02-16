@@ -46,7 +46,7 @@ struct BottomBarView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .onChange(of: isExpanded) { expanded in
+        .onChange(of: isExpanded) { _, expanded in
             if !expanded {
                 isFocused = false
             }
@@ -210,127 +210,130 @@ struct ResizableSheetContainer<Content: View>: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.black.opacity(0.3)
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
-                        isExpanded = false
+        GeometryReader { outerGeometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.3)
+                    .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                            isExpanded = false
+                        }
                     }
-                }
-                .opacity(isExpanded ? 1 : 0)
-                .allowsHitTesting(isExpanded)
-                .zIndex(0)
+                    .opacity(isExpanded ? 1 : 0)
+                    .allowsHitTesting(isExpanded)
+                    .zIndex(0)
 
-            content()
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-                .frame(
-                    height: currentHeight,
-                    alignment: .top
-                )
-                .opacity(isCollapsed ? 0 : 1)
-                .animation(.easeInOut(duration: 0.2), value: isCollapsed)
-                .background(
-                    ZStack(alignment: .top) {
-                        BlurView(style: .systemChromeMaterial)
-                            .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                            .overlay(
-                                Group {
-                                    if let themeColor = themeColor {
-                                        Color(themeColor).opacity(0.7)
+                content()
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .frame(
+                        height: currentHeight(screenHeight: outerGeometry.size.height),
+                        alignment: .top
+                    )
+                    .opacity(isCollapsed ? 0 : 1)
+                    .animation(.easeInOut(duration: 0.2), value: isCollapsed)
+                    .background(
+                        ZStack(alignment: .top) {
+                            BlurView(style: .systemChromeMaterial)
+                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+                                .overlay(
+                                    Group {
+                                        if let themeColor = themeColor {
+                                            Color(themeColor).opacity(0.7)
+                                        } else {
+                                            Color.black.opacity(0.35)
+                                        }
+                                    }
+                                    .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+                                )
+                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                                .overlay(
+                                    RoundedCorner(
+                                        radius: animatedCornerRadius,
+                                        corners: [.topLeft, .topRight]
+                                    )
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
+
+                            PlasmaProgressView(progress: progress, isLoading: isLoading)
+                                .frame(height: 1.5)
+                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                        }
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                            .updating($activeDragTranslation) { value, state, _ in
+                                let translation = value.translation.height
+                                let rubberBanded: CGFloat
+
+                                if isExpanded {
+                                    if translation > 0 {
+                                        rubberBanded = translation
                                     } else {
-                                        Color.black.opacity(0.35)
+                                        rubberBanded = 0
+                                    }
+                                } else {
+                                    if translation < 0 {
+                                        rubberBanded = translation
+                                    } else {
+                                        rubberBanded = translation * 0.1
                                     }
                                 }
-                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                            )
-                            .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                            .overlay(
-                                RoundedCorner(
-                                    radius: animatedCornerRadius,
-                                    corners: [.topLeft, .topRight]
-                                )
-                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                            )
-                            .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
-
-                        PlasmaProgressView(progress: progress, isLoading: isLoading)
-                            .frame(height: 1.5)
-                            .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
-                    }
-                )
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                        .updating($activeDragTranslation) { value, state, _ in
-                            let translation = value.translation.height
-                            let rubberBanded: CGFloat
-
-                            if isExpanded {
-                                if translation > 0 {
-                                    rubberBanded = translation
-                                } else {
-                                    rubberBanded = 0
-                                }
-                            } else {
-                                if translation < 0 {
-                                    rubberBanded = translation
-                                } else {
-                                    rubberBanded = translation * 0.1
-                                }
+                                state = rubberBanded
                             }
-                            state = rubberBanded
-                        }
-                        .onChanged { _ in
-                            onDragStart?()
-                        }
-                        .onEnded { value in
-                            let translation = value.translation.height
-                            let velocity = value.velocity.height
-                            let finalOffset: CGFloat
+                            .onChanged { _ in
+                                onDragStart?()
+                            }
+                            .onEnded { value in
+                                let translation = value.translation.height
+                                let velocity = value.velocity.height
+                                let finalOffset: CGFloat
 
-                            if isExpanded {
-                                if translation > 0 {
-                                    finalOffset = translation
+                                if isExpanded {
+                                    if translation > 0 {
+                                        finalOffset = translation
+                                    } else {
+                                        finalOffset = 0
+                                    }
                                 } else {
-                                    finalOffset = 0
+                                    if translation < 0 {
+                                        finalOffset = translation
+                                    } else {
+                                        finalOffset = 0
+                                    }
                                 }
-                            } else {
-                                if translation < 0 {
-                                    finalOffset = translation
+
+                                releaseOffset = finalOffset
+
+                                let shouldExpand: Bool
+
+                                if isExpanded {
+                                    shouldExpand = translation < 100 && velocity < 500
                                 } else {
-                                    finalOffset = 0
+                                    shouldExpand = translation < -50 || velocity < -500
+                                }
+
+                                withAnimation(
+                                    .spring(
+                                        response: 0.35, dampingFraction: 1.0, blendDuration: 0.1)
+                                ) {
+                                    isExpanded = shouldExpand
+                                    releaseOffset = 0
+                                }
+
+                                if shouldExpand {
+                                    onExpand?()
                                 }
                             }
-
-                            releaseOffset = finalOffset
-
-                            let shouldExpand: Bool
-
-                            if isExpanded {
-                                shouldExpand = translation < 100 && velocity < 500
-                            } else {
-                                shouldExpand = translation < -50 || velocity < -500
-                            }
-
-                            withAnimation(
-                                .spring(response: 0.35, dampingFraction: 1.0, blendDuration: 0.1)
-                            ) {
-                                isExpanded = shouldExpand
-                                releaseOffset = 0
-                            }
-
-                            if shouldExpand {
-                                onExpand?()
-                            }
-                        }
-                )
-                .zIndex(1)
+                    )
+                    .zIndex(1)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
     }
 
     private var effectiveDrag: CGFloat {
@@ -341,11 +344,10 @@ struct ResizableSheetContainer<Content: View>: View {
         return releaseOffset
     }
 
-    private var currentHeight: CGFloat {
+    private func currentHeight(screenHeight: CGFloat) -> CGFloat {
         if isCollapsed {
             return sliverHeight
         }
-        let screenHeight = UIScreen.main.bounds.height
         let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
         let calculatedHeight = baseHeight - effectiveDrag
 
@@ -397,7 +399,7 @@ struct PlasmaProgressView: View {
             }
             .opacity(visible ? 1 : 0)
         }
-        .onChange(of: isLoading) { loading in
+        .onChange(of: isLoading) { _, loading in
             if loading {
                 isFinishing = false
 
@@ -422,7 +424,7 @@ struct PlasmaProgressView: View {
                 }
             }
         }
-        .onChange(of: progress) { newValue in
+        .onChange(of: progress) { _, newValue in
             guard !isFinishing else { return }
             guard visible else { return }
 
