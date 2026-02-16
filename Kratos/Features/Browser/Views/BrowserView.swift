@@ -63,8 +63,6 @@ struct BrowserView: View {
                     .zIndex(1)
 
                 Color(uiColor: viewModel.themeColor ?? .systemBackground)
-                    .opacity(0.8)
-                    .background(.ultraThinMaterial)
                     .frame(height: geometry.safeAreaInsets.top)
                     .ignoresSafeArea()
                     .zIndex(2)
