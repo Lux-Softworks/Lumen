@@ -1,5 +1,6 @@
 import ObjectiveC
 import SwiftUI
+import UIKit
 import WebKit
 
 struct PrivacyPolicy {
