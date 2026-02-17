@@ -58,7 +58,8 @@ struct BrowserView: View {
                     viewModel: viewModel,
                     bottomInset: isBottomBarExpanded ? 0 : (isBottomBarCollapsed ? 20 : 80)
                 )
-                .ignoresSafeArea()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(.all)
                 .zIndex(1)
 
                 BottomBarView(
@@ -72,6 +73,14 @@ struct BrowserView: View {
                     onSettingsPressed: { print("Settings pressed") },
                     onSubmit: {
                         Task { await viewModel.processUserInput(viewModel.urlString) }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isBottomBarExpanded = false
+                            isAddressBarFocused = false
+                        }
+                    },
+                    onHistoryTap: { url in
+                        viewModel.urlString = url
+                        Task { await viewModel.processUserInput(url) }
                         withAnimation(.easeInOut(duration: 0.25)) {
                             isBottomBarExpanded = false
                             isAddressBarFocused = false

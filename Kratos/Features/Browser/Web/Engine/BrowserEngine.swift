@@ -129,7 +129,6 @@ enum BrowserEngine {
                         }
                     }
 
-                    // Global function called from Swift to update toolbar height
                     window.__updateToolbarHeight = function(h) {
                         toolbarHeight = h;
                         document.documentElement.style.setProperty(

@@ -2,12 +2,12 @@ import SwiftUI
 import UIKit
 import WebKit
 
-struct HardenedWebView: UIViewControllerRepresentable {
+struct HardenedWebView: UIViewRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
     var policy: PrivacyPolicy = PrivacyPolicy()
     var bottomInset: CGFloat = 0
 
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, UIScrollViewDelegate {
         var parent: HardenedWebView
         var hasAttached = false
         var statusBarTintView: UIView?
@@ -58,22 +58,22 @@ struct HardenedWebView: UIViewControllerRepresentable {
         Coordinator(self)
     }
 
-    func makeUIViewController(context: Context) -> WebViewHostController {
-        let controller = WebViewHostController()
+    func makeUIView(context: Context) -> WKWebView {
         let webView = BrowserEngine.makeWebView(policy: policy)
-        controller.webView = webView
-        controller.additionalSafeAreaInsets.bottom = bottomInset
+
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.delegate = context.coordinator
 
         viewModel.attachWebView(webView)
         context.coordinator.hasAttached = true
         context.coordinator.installStatusBarTint(above: webView)
 
-        return controller
+        return webView
     }
 
-    func updateUIViewController(_ controller: WebViewHostController, context: Context) {
-        guard let webView = controller.webView else { return }
-
+    func updateUIView(_ webView: WKWebView, context: Context) {
         if !context.coordinator.hasAttached {
             viewModel.attachWebView(webView)
             context.coordinator.hasAttached = true
@@ -82,35 +82,27 @@ struct HardenedWebView: UIViewControllerRepresentable {
         context.coordinator.installStatusBarTint(above: webView)
         context.coordinator.updateTintColor(viewModel.themeColor)
 
-        if controller.additionalSafeAreaInsets.bottom != bottomInset {
+        let safeAreaTop = webView.safeAreaInsets.top
+
+        if webView.scrollView.contentInset.top != safeAreaTop {
+            webView.scrollView.contentInset.top = safeAreaTop
+            if webView.scrollView.contentOffset.y == 0 {
+                webView.scrollView.contentOffset.y = -safeAreaTop
+            }
+        }
+
+        let currentBottomInset = webView.scrollView.contentInset.bottom
+
+        if currentBottomInset != bottomInset {
             UIView.animate(withDuration: 0.2) {
-                controller.additionalSafeAreaInsets.bottom = bottomInset
+                webView.scrollView.contentInset.bottom = bottomInset
+                webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
             }
 
             webView.evaluateJavaScript(
                 "window.__updateToolbarHeight && window.__updateToolbarHeight(\(Int(bottomInset)))"
             )
         }
-    }
-}
-
-final class WebViewHostController: UIViewController {
-    var webView: WKWebView?
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        guard let webView = webView else { return }
-
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(webView)
-
-        NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.topAnchor),
-            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
     }
 }
 

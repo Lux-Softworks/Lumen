@@ -14,8 +14,11 @@ struct BottomBarView: View {
     var onTabsPressed: () -> Void
     var onSettingsPressed: () -> Void
     var onSubmit: () -> Void
+    var onHistoryTap: (String) -> Void
 
+    @ObservedObject private var historyStore = HistoryStore.shared
     @Namespace private var animation
+    @State private var showHistory = false
 
     var body: some View {
         ResizableSheetContainer(
@@ -33,21 +36,36 @@ struct BottomBarView: View {
             },
             onExpand: {
                 isFocused = true
+            },
+            onCollapse: {
+                isFocused = false
+            },
+            onDismissFocused: {
+                isFocused = false
             }
         ) {
             VStack(spacing: 0) {
                 if isExpanded {
                     expandedContent
-                        .transition(.opacity.animation(.easeInOut(duration: 0.1)))
+                        .transition(.opacity.animation(.smooth(duration: 0.15)))
                 } else {
                     collapsedContent
-                        .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                        .transition(.opacity.animation(.smooth(duration: 0.15)))
                 }
             }
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: isExpanded) { _, expanded in
-            if !expanded {
+            if expanded {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation {
+                        showHistory = true
+                    }
+                }
+            } else {
+                withAnimation {
+                    showHistory = false
+                }
                 isFocused = false
             }
         }
@@ -90,6 +108,51 @@ struct BottomBarView: View {
                     .matchedGeometryEffect(id: "searchBackground", in: animation)
             )
             .padding(.top, 16)
+
+            if !historyStore.recentEntries.isEmpty {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(historyStore.recentEntries.enumerated()), id: \.element.id) {
+                            index, entry in
+                            Button {
+                                onHistoryTap(entry.url)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 24)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.title)
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .padding(.vertical, 14)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(showHistory ? 1 : 0)
+                            .blur(radius: showHistory ? 0 : 4)
+                            .offset(y: showHistory ? 0 : 5)
+                            .animation(
+                                showHistory
+                                    ? .smooth(duration: 0.5).delay(0.05 + Double(index) * 0.04)
+                                    : .smooth(duration: 0.15),
+                                value: showHistory
+                            )
+                        }
+                    }
+                    .frame(minHeight: 10)
+                }
+                .padding(.top, 12)
+            }
 
             Spacer()
         }
@@ -179,6 +242,8 @@ struct ResizableSheetContainer<Content: View>: View {
     var themeColor: UIColor?
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
+    var onCollapse: (() -> Void)?
+    var onDismissFocused: (() -> Void)?
     let content: () -> Content
 
     @GestureState private var activeDragTranslation: CGFloat = 0
@@ -197,6 +262,8 @@ struct ResizableSheetContainer<Content: View>: View {
         themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
+        onCollapse: (() -> Void)? = nil,
+        onDismissFocused: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self._isExpanded = isExpanded
@@ -206,6 +273,8 @@ struct ResizableSheetContainer<Content: View>: View {
         self.themeColor = themeColor
         self.onDragStart = onDragStart
         self.onExpand = onExpand
+        self.onCollapse = onCollapse
+        self.onDismissFocused = onDismissFocused
         self.content = content
     }
 
@@ -220,6 +289,7 @@ struct ResizableSheetContainer<Content: View>: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                             isExpanded = false
                         }
+                        onCollapse?()
                     }
                     .opacity(isExpanded ? 1 : 0)
                     .allowsHitTesting(isExpanded)
@@ -259,8 +329,11 @@ struct ResizableSheetContainer<Content: View>: View {
                                 .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 
                             PlasmaProgressView(progress: progress, isLoading: isLoading)
-                                .frame(height: 1.5)
-                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                                .frame(height: 1.4)
+                                .cornerRadius(
+                                    animatedCornerRadius, corners: [.topLeft, .topRight]
+                                )
+                                .opacity(isExpanded ? 0 : 1)
                         }
                     )
                     .gesture(
@@ -284,8 +357,12 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                                 state = rubberBanded
                             }
-                            .onChanged { _ in
+                            .onChanged { value in
                                 onDragStart?()
+
+                                if abs(value.translation.height) > 10 {
+                                    onDismissFocused?()
+                                }
                             }
                             .onEnded { value in
                                 let translation = value.translation.height
@@ -318,7 +395,7 @@ struct ResizableSheetContainer<Content: View>: View {
 
                                 withAnimation(
                                     .spring(
-                                        response: 0.35, dampingFraction: 1.0, blendDuration: 0.1)
+                                        response: 0.35, dampingFraction: 0.8, blendDuration: 0.1)
                                 ) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
@@ -326,6 +403,8 @@ struct ResizableSheetContainer<Content: View>: View {
 
                                 if shouldExpand {
                                     onExpand?()
+                                } else if isExpanded && !shouldExpand {
+                                    onCollapse?()
                                 }
                             }
                     )

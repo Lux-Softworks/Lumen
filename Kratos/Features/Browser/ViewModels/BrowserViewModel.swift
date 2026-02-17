@@ -31,7 +31,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-        
+
             Task {
                 try? await brain?.loadModel()
             }
@@ -183,6 +183,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                     if !webView.isLoading {
                         self?.updateThemeColorManually(webView)
+
+                        if let url = webView.url?.absoluteString,
+                            let title = webView.title, !title.isEmpty
+                        {
+                            HistoryStore.shared.record(url: url, title: title)
+                        }
                     }
                 }
             }
