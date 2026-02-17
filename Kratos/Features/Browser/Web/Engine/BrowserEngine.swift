@@ -84,15 +84,20 @@ enum BrowserEngine {
             source: """
                 (function() {
                     var toolbarHeight = 80;
+                    var statusBarHeight = 0;
+
                     document.documentElement.style.setProperty(
                         '--toolbar-height', toolbarHeight + 'px');
+                    document.documentElement.style.setProperty(
+                        '--status-bar-height', statusBarHeight + 'px');
 
                     var style = document.createElement('style');
-                    style.textContent = '[data-bumped] { transition: bottom 0.2s ease-in-out !important; }';
+                    style.textContent =
+                        '[data-kr-bumped-bottom] { transition: bottom 0.2s ease !important; }' +
+                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }';
                     document.head.appendChild(style);
 
                     var meta = document.querySelector('meta[name="viewport"]');
-
                     if (meta) {
                         var content = meta.getAttribute('content') || '';
                         if (content.indexOf('viewport-fit') === -1) {
@@ -105,27 +110,40 @@ enum BrowserEngine {
                         document.head.appendChild(meta);
                     }
 
-                    function bumpBottomElements() {
+                    function bumpElements() {
                         var all = document.querySelectorAll('*');
                         for (var i = 0; i < all.length; i++) {
                             var el = all[i];
-                            if (el.hasAttribute('data-bumped')) continue;
-
                             var s = getComputedStyle(el);
                             if (s.position !== 'fixed' && s.position !== 'sticky') continue;
 
-                            if (s.bottom === 'auto' || s.bottom === '') continue;
-
-                            var bottomVal = parseFloat(s.bottom);
-                            if (isNaN(bottomVal) || bottomVal > 100) continue;
-
                             var rect = el.getBoundingClientRect();
-                            if (rect.top < window.innerHeight / 2) continue;
 
-                            el.setAttribute('data-original-bottom', String(bottomVal));
-                            el.style.setProperty('bottom',
-                                (bottomVal + toolbarHeight) + 'px', 'important');
-                            el.setAttribute('data-bumped', '1');
+                            if (!el.hasAttribute('data-kr-bumped-bottom') &&
+                                rect.top > window.innerHeight / 2) {
+                                var bottomVal = parseFloat(s.bottom);
+                                if (s.bottom !== 'auto' && s.bottom !== '' &&
+                                    !isNaN(bottomVal)) {
+                                    el.setAttribute('data-kr-orig-bottom', String(bottomVal));
+                                    el.style.setProperty('bottom',
+                                        (bottomVal + toolbarHeight) + 'px', 'important');
+                                    el.setAttribute('data-kr-bumped-bottom', '1');
+                                }
+                            }
+
+                            if (!el.hasAttribute('data-kr-bumped-top') &&
+                                statusBarHeight > 0 &&
+                                rect.top < window.innerHeight / 3) {
+                                var topVal = parseFloat(s.top);
+
+                                if (s.top !== 'auto' && s.top !== '' &&
+                                    !isNaN(topVal) && topVal < 60) {
+                                    el.setAttribute('data-kr-orig-top', String(topVal));
+                                    el.style.setProperty('top',
+                                        (topVal + statusBarHeight) + 'px', 'important');
+                                    el.setAttribute('data-kr-bumped-top', '1');
+                                }
+                            }
                         }
                     }
 
@@ -133,28 +151,49 @@ enum BrowserEngine {
                         toolbarHeight = h;
                         document.documentElement.style.setProperty(
                             '--toolbar-height', h + 'px');
-                        var bumped = document.querySelectorAll('[data-bumped]');
+                        var bumped = document.querySelectorAll('[data-kr-bumped-bottom]');
                         for (var i = 0; i < bumped.length; i++) {
-                            var orig = parseFloat(bumped[i].getAttribute('data-original-bottom')) || 0;
+                            var orig = parseFloat(
+                                bumped[i].getAttribute('data-kr-orig-bottom')) || 0;
                             bumped[i].style.setProperty('bottom',
                                 (orig + h) + 'px', 'important');
                         }
                     };
 
+                    window.__updateStatusBarHeight = function(h) {
+                        statusBarHeight = h;
+                        document.documentElement.style.setProperty(
+                            '--status-bar-height', h + 'px');
+                        var bumped = document.querySelectorAll('[data-kr-bumped-top]');
+                        for (var i = 0; i < bumped.length; i++) {
+                            var orig = parseFloat(
+                                bumped[i].getAttribute('data-kr-orig-top')) || 0;
+                            bumped[i].style.setProperty('top',
+                                (orig + h) + 'px', 'important');
+                        }
+                        requestAnimationFrame(bumpElements);
+                    };
+
                     if (document.readyState === 'complete') {
-                        bumpBottomElements();
+                        bumpElements();
                     } else {
-                        window.addEventListener('load', bumpBottomElements);
+                        window.addEventListener('load', bumpElements);
                     }
 
-                    setTimeout(bumpBottomElements, 1000);
-                    setTimeout(bumpBottomElements, 3000);
+                    setTimeout(bumpElements, 500);
+                    setTimeout(bumpElements, 1500);
+                    setTimeout(bumpElements, 3000);
 
+                    var debounceTimer;
                     var observer = new MutationObserver(function() {
-                        requestAnimationFrame(bumpBottomElements);
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(function() {
+                            requestAnimationFrame(bumpElements);
+                        }, 100);
                     });
                     observer.observe(document.documentElement,
-                        { childList: true, subtree: true });
+                        { childList: true, subtree: true, attributes: true,
+                          attributeFilter: ['style', 'class'] });
                 })();
                 """,
             injectionTime: .atDocumentEnd,

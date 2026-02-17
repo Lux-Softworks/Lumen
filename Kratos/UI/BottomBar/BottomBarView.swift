@@ -248,6 +248,7 @@ struct ResizableSheetContainer<Content: View>: View {
 
     @GestureState private var activeDragTranslation: CGFloat = 0
     @State private var releaseOffset: CGFloat = 0
+    @Environment(\.colorScheme) var colorScheme
 
     private let expandedHeightRatio: CGFloat = 0.65
     private let collapsedHeight: CGFloat = 80
@@ -312,8 +313,10 @@ struct ResizableSheetContainer<Content: View>: View {
                                     Group {
                                         if let themeColor = themeColor {
                                             Color(themeColor).opacity(0.7)
-                                        } else {
+                                        } else if colorScheme == .dark {
                                             Color.black.opacity(0.35)
+                                        } else {
+                                            Color.gray.opacity(0.1)
                                         }
                                     }
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
