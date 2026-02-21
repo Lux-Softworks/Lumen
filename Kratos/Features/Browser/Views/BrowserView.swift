@@ -60,6 +60,7 @@ struct BrowserView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea(.all)
+                .blur(radius: isReady ? 0 : 20)
                 .zIndex(1)
 
                 BottomBarView(
@@ -92,6 +93,7 @@ struct BrowserView: View {
                 .onChange(of: viewModel.scrollDelta) { _, delta in
                     updateScrollState(delta: delta)
                 }
+                .blur(radius: isReady ? 0 : 20)
                 .zIndex(3)
 
                 if !isReady {

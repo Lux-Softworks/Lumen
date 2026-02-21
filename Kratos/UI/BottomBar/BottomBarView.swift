@@ -36,7 +36,9 @@ struct BottomBarView: View {
                 }
             },
             onExpand: {
-                isFocused = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    isFocused = true
+                }
             },
             onCollapse: {
                 isFocused = false
@@ -110,8 +112,8 @@ struct BottomBarView: View {
             )
             .padding(.top, 16)
 
-            if !searchSuggestions.isEmpty {
-                ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical, showsIndicators: false) {
+                if !searchSuggestions.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
                             index, suggestion in
@@ -169,11 +171,7 @@ struct BottomBarView: View {
                         }
                     }
                     .frame(minHeight: 10)
-                }
-                .padding(.top, 12)
-                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
-            } else if !historyStore.recentEntries.isEmpty {
-                ScrollView(.vertical, showsIndicators: false) {
+                } else if !historyStore.recentEntries.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(Array(historyStore.recentEntries.enumerated()), id: \.element.id) {
                             index, entry in
@@ -213,9 +211,9 @@ struct BottomBarView: View {
                     }
                     .frame(minHeight: 10)
                 }
-                .padding(.top, 12)
-                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
             }
+            .padding(.top, 12)
+            .safeAreaPadding(.bottom, isFocused ? 320 : 0)
 
             Spacer()
         }
@@ -246,7 +244,7 @@ struct BottomBarView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     isExpanded = true
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     isFocused = true
                 }
             }) {
@@ -384,10 +382,14 @@ struct ResizableSheetContainer<Content: View>: View {
                                     }
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 )
-                                .cornerRadius(animatedCornerRadius, corners: [.topLeft, .topRight])
+                                .cornerRadius(
+                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
+                                    corners: [.topLeft, .topRight]
+                                )
                                 .overlay(
                                     RoundedCorner(
-                                        radius: animatedCornerRadius,
+                                        radius: animatedCornerRadius(
+                                            screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
                                     .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
@@ -397,7 +399,8 @@ struct ResizableSheetContainer<Content: View>: View {
                             PlasmaProgressView(progress: progress, isLoading: isLoading)
                                 .frame(height: 1.4)
                                 .cornerRadius(
-                                    animatedCornerRadius, corners: [.topLeft, .topRight]
+                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
+                                    corners: [.topLeft, .topRight]
                                 )
                                 .opacity(isExpanded ? 0 : 1)
                         }
@@ -499,14 +502,12 @@ struct ResizableSheetContainer<Content: View>: View {
         return min(calculatedHeight, screenHeight * expandedHeightRatio)
     }
 
-    private var animatedCornerRadius: CGFloat {
-        let dragInfo = effectiveDrag
+    private func animatedCornerRadius(screenHeight: CGFloat) -> CGFloat {
+        let currentH = currentHeight(screenHeight: screenHeight)
+        let expandedH = screenHeight * expandedHeightRatio
+        let fraction = max(0, min(1, (currentH - collapsedHeight) / (expandedH - collapsedHeight)))
 
-        if isExpanded {
-            return 30 * (1 - max(0, min(1, dragInfo / 400)))
-        } else {
-            return 30 * (max(0, min(1, abs(dragInfo) / 100)))
-        }
+        return 30 * fraction
     }
 }
 
@@ -583,6 +584,11 @@ struct PlasmaProgressView: View {
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
+
+    var animatableData: CGFloat {
+        get { radius }
+        set { radius = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(
