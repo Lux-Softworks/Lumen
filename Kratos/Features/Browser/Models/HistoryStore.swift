@@ -20,7 +20,7 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var entries: [HistoryEntry] = []
 
     private let key = "com.kratos.history"
-    private let maxEntries = 20
+    private let maxEntries = 10
 
     static let shared = HistoryStore()
 

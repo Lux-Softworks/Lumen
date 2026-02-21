@@ -16,6 +16,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published var threatEvents: [ThreatEvent] = []
     @Published var blockedTrackersCount: Int = 0
 
+    @Published var searchSuggestions: [SearchSuggestion] = []
+    private var searchCancellable: AnyCancellable?
+
     private(set) var webView: WKWebView?
     private var interceptor: NetworkInterceptor?
 
@@ -31,7 +34,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-
+        
             Task {
                 try? await brain?.loadModel()
             }
@@ -59,6 +62,37 @@ final class BrowserViewModel: NSObject, ObservableObject {
         }
 
         observeWebView(webView)
+        observeSearch()
+    }
+
+    private func observeSearch() {
+        searchCancellable =
+            $urlString
+            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
+            .removeDuplicates()
+            .sink { [weak self] query in
+                guard let self = self else { return }
+                guard !query.isEmpty, !query.hasPrefix("http") else {
+                    self.searchSuggestions = []
+                    return
+                }
+
+                Task {
+                    do {
+                        let results = try await SearchSuggestionService.shared.fetchSuggestions(
+                            for: query)
+                        await MainActor.run {
+                            if !self.urlString.isEmpty {
+                                self.searchSuggestions = results
+                            }
+                        }
+                    } catch {
+                        await MainActor.run {
+                            self.searchSuggestions = []
+                        }
+                    }
+                }
+            }
     }
 
     func navigate(to input: String) {

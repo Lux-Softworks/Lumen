@@ -69,6 +69,7 @@ struct BrowserView: View {
                     isFocused: $isAddressBarFocused,
                     isLoading: viewModel.isLoading,
                     progress: viewModel.estimatedProgress,
+                    searchSuggestions: viewModel.searchSuggestions,
                     onTabsPressed: { print("Tabs pressed") },
                     onSettingsPressed: { print("Settings pressed") },
                     onSubmit: {

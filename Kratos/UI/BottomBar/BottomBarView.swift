@@ -9,6 +9,7 @@ struct BottomBarView: View {
     var isLoading: Bool
     var progress: Double
 
+    var searchSuggestions: [SearchSuggestion] = []
     var themeColor: UIColor?
 
     var onTabsPressed: () -> Void
@@ -109,7 +110,69 @@ struct BottomBarView: View {
             )
             .padding(.top, 16)
 
-            if !historyStore.recentEntries.isEmpty {
+            if !searchSuggestions.isEmpty {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
+                            index, suggestion in
+                            Button {
+                                text = suggestion.text
+                                onSubmit()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 24)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        let attributedText: AttributedString = {
+                                            var attributedText = AttributedString(suggestion.text)
+
+                                            if !text.isEmpty {
+                                                var searchRange =
+                                                    suggestion.text
+                                                    .startIndex..<suggestion.text.endIndex
+                                                while let range = suggestion.text.range(
+                                                    of: text, options: .caseInsensitive,
+                                                    range: searchRange)
+                                                {
+                                                    if let attrRange = Range(
+                                                        range, in: attributedText)
+                                                    {
+                                                        attributedText[attrRange].font = .system(
+                                                            size: 16, weight: .bold)
+                                                        attributedText[attrRange].foregroundColor =
+                                                            .primary
+                                                    }
+                                                    searchRange =
+                                                        range.upperBound..<suggestion.text.endIndex
+                                                }
+                                            }
+
+                                            return attributedText
+                                        }()
+
+                                        Text(attributedText)
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .frame(minHeight: 10)
+                }
+                .padding(.top, 12)
+                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
+            } else if !historyStore.recentEntries.isEmpty {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         ForEach(Array(historyStore.recentEntries.enumerated()), id: \.element.id) {
@@ -134,7 +197,6 @@ struct BottomBarView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .padding(.vertical, 14)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -152,6 +214,7 @@ struct BottomBarView: View {
                     .frame(minHeight: 10)
                 }
                 .padding(.top, 12)
+                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
             }
 
             Spacer()
