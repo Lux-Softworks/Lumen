@@ -1,10 +1,17 @@
 import SwiftUI
 import UIKit
 
+enum BottomBarState: Equatable {
+    case hidden
+    case collapsed
+    case search
+    case browserSettings
+    case siteSettings
+}
+
 struct BottomBarView: View {
     @Binding var text: String
-    @Binding var isExpanded: Bool
-    @Binding var isCollapsed: Bool
+    @Binding var state: BottomBarState
     @FocusState.Binding var isFocused: Bool
     var isLoading: Bool
     var progress: Double
@@ -17,27 +24,47 @@ struct BottomBarView: View {
     var onSubmit: () -> Void
     var onHistoryTap: (String) -> Void
 
+    var onCopyUrl: () -> Void
+
     @ObservedObject private var historyStore = HistoryStore.shared
     @Namespace private var animation
     @State private var showHistory = false
 
+    var isExpanded: Bool { state != .collapsed }
+
     var body: some View {
         ResizableSheetContainer(
-            isExpanded: $isExpanded,
-            isCollapsed: $isCollapsed,
+            isExpanded: Binding(
+                get: { state == .search || state == .browserSettings || state == .siteSettings },
+                set: { expanded in
+                    if !expanded { state = .collapsed }
+                }
+            ),
+            isCollapsed: Binding(
+                get: { state == .hidden },
+                set: { collapsed in
+                    if collapsed {
+                        state = .hidden
+                    } else if state == .hidden {
+                        state = .collapsed
+                    }
+                }
+            ),
             isLoading: isLoading,
             progress: progress,
             themeColor: themeColor,
             onDragStart: {
-                if isCollapsed {
+                if state == .collapsed {
                     withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
-                        isCollapsed = false
+                        state = .search
                     }
                 }
             },
             onExpand: {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    isFocused = true
+                if state == .search {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isFocused = true
+                    }
                 }
             },
             onCollapse: {
@@ -48,7 +75,7 @@ struct BottomBarView: View {
             }
         ) {
             VStack(spacing: 0) {
-                if isExpanded {
+                if state == .search || state == .browserSettings || state == .siteSettings {
                     expandedContent
                         .transition(.opacity.animation(.smooth(duration: 0.15)))
                 } else {
@@ -58,8 +85,8 @@ struct BottomBarView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .onChange(of: isExpanded) { _, expanded in
-            if expanded {
+        .onChange(of: state) { _, newState in
+            if newState == .search || newState == .browserSettings || newState == .siteSettings {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     withAnimation {
                         showHistory = true
@@ -77,22 +104,40 @@ struct BottomBarView: View {
     var expandedContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
+                if state == .siteSettings {
+                    Button(action: onCopyUrl) {
+                        Image(systemName: "link")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                } else {
+                    Image(
+                        systemName: state == .browserSettings ? "gearshape.fill" : "magnifyingglass"
+                    )
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.secondary)
                     .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                }
 
-                TextField("Search...", text: $text)
-                    .font(.system(size: 17))
-                    .fontWeight(.bold)
-                    .textFieldStyle(.plain)
-                    .focused($isFocused)
-                    .submitLabel(.go)
-                    .onSubmit(onSubmit)
-                    .frame(height: 44)
-                    .matchedGeometryEffect(id: "searchField", in: animation)
+                TextField(
+                    state == .browserSettings ? "Browser Settings" : "Search...",
+                    text: displayBinding
+                )
+                .font(.system(size: 17))
+                .fontWeight(.bold)
+                .textFieldStyle(.plain)
+                .focused($isFocused)
+                .submitLabel(.go)
+                .onSubmit(onSubmit)
+                .frame(height: 44)
+                .disabled(state == .siteSettings || state == .browserSettings)
+                .truncationMode(
+                    (state == .siteSettings || state == .browserSettings) ? .tail : .head
+                )
+                .matchedGeometryEffect(id: "searchField", in: animation)
 
-                if !text.isEmpty {
+                if state == .search && !text.isEmpty {
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
@@ -112,114 +157,122 @@ struct BottomBarView: View {
             )
             .padding(.top, 16)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                if !searchSuggestions.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
-                            index, suggestion in
-                            Button {
-                                text = suggestion.text
-                                onSubmit()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 24)
+            if state == .search {
+                ScrollView(.vertical, showsIndicators: false) {
+                    if !searchSuggestions.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
+                                index, suggestion in
+                                Button {
+                                    text = suggestion.text
+                                    onSubmit()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                            .frame(width: 24)
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        let attributedText: AttributedString = {
-                                            var attributedText = AttributedString(suggestion.text)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            let attributedText: AttributedString = {
+                                                var attributedText = AttributedString(
+                                                    suggestion.text)
 
-                                            if !text.isEmpty {
-                                                var searchRange =
-                                                    suggestion.text
-                                                    .startIndex..<suggestion.text.endIndex
-                                                while let range = suggestion.text.range(
-                                                    of: text, options: .caseInsensitive,
-                                                    range: searchRange)
-                                                {
-                                                    if let attrRange = Range(
-                                                        range, in: attributedText)
+                                                if !text.isEmpty {
+                                                    var searchRange =
+                                                        suggestion.text
+                                                        .startIndex..<suggestion.text.endIndex
+                                                    while let range = suggestion.text.range(
+                                                        of: text, options: .caseInsensitive,
+                                                        range: searchRange)
                                                     {
-                                                        attributedText[attrRange].font = .system(
-                                                            size: 16, weight: .bold)
-                                                        attributedText[attrRange].foregroundColor =
-                                                            .primary
+                                                        if let attrRange = Range(
+                                                            range, in: attributedText)
+                                                        {
+                                                            attributedText[attrRange].font =
+                                                                .system(
+                                                                    size: 16, weight: .bold)
+                                                            attributedText[attrRange]
+                                                                .foregroundColor =
+                                                                .primary
+                                                        }
+                                                        searchRange =
+                                                            range
+                                                            .upperBound..<suggestion.text.endIndex
                                                     }
-                                                    searchRange =
-                                                        range.upperBound..<suggestion.text.endIndex
                                                 }
-                                            }
 
-                                            return attributedText
-                                        }()
+                                                return attributedText
+                                            }()
 
-                                        Text(attributedText)
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(.primary)
-                                            .lineLimit(1)
+                                            Text(attributedText)
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(.primary)
+                                                .lineLimit(1)
+                                        }
+
+                                        Spacer()
                                     }
-
-                                    Spacer()
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
-                    }
-                    .frame(minHeight: 10)
-                } else if !historyStore.recentEntries.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(Array(historyStore.recentEntries.enumerated()), id: \.element.id) {
-                            index, entry in
-                            Button {
-                                onHistoryTap(entry.url)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "magnifyingglass")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 24)
+                        .frame(minHeight: 10)
+                    } else if !historyStore.recentEntries.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(
+                                Array(historyStore.recentEntries.enumerated()), id: \.element.id
+                            ) {
+                                index, entry in
+                                Button {
+                                    onHistoryTap(entry.url)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "magnifyingglass")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                            .frame(width: 24)
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(entry.title)
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(.primary)
-                                            .lineLimit(1)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(entry.title)
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(.primary)
+                                                .lineLimit(1)
+                                        }
+
+                                        Spacer()
                                     }
-
-                                    Spacer()
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                .opacity(showHistory ? 1 : 0)
+                                .blur(radius: showHistory ? 0 : 4)
+                                .offset(y: showHistory ? 0 : 5)
+                                .animation(
+                                    showHistory
+                                        ? .smooth(duration: 0.5).delay(0.05 + Double(index) * 0.04)
+                                        : .smooth(duration: 0.15),
+                                    value: showHistory
+                                )
                             }
-                            .buttonStyle(.plain)
-                            .opacity(showHistory ? 1 : 0)
-                            .blur(radius: showHistory ? 0 : 4)
-                            .offset(y: showHistory ? 0 : 5)
-                            .animation(
-                                showHistory
-                                    ? .smooth(duration: 0.5).delay(0.05 + Double(index) * 0.04)
-                                    : .smooth(duration: 0.15),
-                                value: showHistory
-                            )
                         }
+                        .frame(minHeight: 10)
                     }
-                    .frame(minHeight: 10)
                 }
+                .padding(.top, 12)
+                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
             }
-            .padding(.top, 12)
-            .safeAreaPadding(.bottom, isFocused ? 320 : 0)
 
             Spacer()
         }
-        .opacity(isCollapsed ? 0 : 1)
-        .padding(.bottom, isCollapsed ? -44 : 0)
-        .animation(.easeInOut(duration: 0.15), value: isCollapsed)
+        .opacity(state == .hidden ? 0 : 1)
+        .padding(.bottom, state == .hidden ? -44 : 0)
+        .animation(.easeInOut(duration: 0.15), value: state == .hidden)
     }
 
     var collapsedContent: some View {
@@ -242,7 +295,7 @@ struct BottomBarView: View {
 
             Button(action: {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    isExpanded = true
+                    state = .search
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     isFocused = true
@@ -290,8 +343,39 @@ struct BottomBarView: View {
             .padding(.trailing, 8)
         }
         .frame(height: 80)
-        .opacity(isCollapsed ? 0 : 1)
-        .animation(.easeInOut(duration: 0.15), value: isCollapsed)
+        .opacity((state == .collapsed || state == .hidden) ? 1 : 0)
+        .animation(.easeInOut(duration: 0.15), value: state == .collapsed || state == .hidden)
+    }
+
+    private var displayBinding: Binding<String> {
+        Binding(
+            get: {
+                if state == .browserSettings {
+                    return "Browser Settings"
+                } else if state == .siteSettings {
+                    return neaten(url: text)
+                } else {
+                    return text
+                }
+            },
+            set: {
+                if state == .search {
+                    text = $0
+                }
+            }
+        )
+    }
+
+    private func neaten(url: String) -> String {
+        var clean = url
+        if clean.hasPrefix("https://") {
+            clean.removeFirst(8)
+        } else if clean.hasPrefix("http://") {
+            clean.removeFirst(7)
+        }
+        if clean.hasPrefix("www.") { clean.removeFirst(4) }
+        if clean.hasSuffix("/") { clean.removeLast() }
+        return clean.isEmpty ? "Search..." : clean
     }
 }
 
@@ -392,7 +476,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                             screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
                                 )
                                 .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 

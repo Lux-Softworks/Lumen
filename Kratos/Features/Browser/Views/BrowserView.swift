@@ -5,8 +5,7 @@ import UIKit
 struct BrowserView: View {
     @StateObject private var viewModel = BrowserViewModel()
 
-    @State private var isBottomBarExpanded = false
-    @State private var isBottomBarCollapsed = false
+    @State private var bottomBarState: BottomBarState = .collapsed
     @State private var isReady = false
 
     @FocusState private var isAddressBarFocused: Bool
@@ -56,7 +55,9 @@ struct BrowserView: View {
 
                 HardenedWebView(
                     viewModel: viewModel,
-                    bottomInset: isBottomBarExpanded ? 0 : (isBottomBarCollapsed ? 20 : 80)
+                    bottomInset: (bottomBarState == .search || bottomBarState == .browserSettings
+                        || bottomBarState == .siteSettings)
+                        ? 0 : (bottomBarState == .hidden ? 20 : 80)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea(.all)
@@ -65,18 +66,27 @@ struct BrowserView: View {
 
                 BottomBarView(
                     text: $viewModel.urlString,
-                    isExpanded: $isBottomBarExpanded,
-                    isCollapsed: $isBottomBarCollapsed,
+                    state: $bottomBarState,
                     isFocused: $isAddressBarFocused,
                     isLoading: viewModel.isLoading,
                     progress: viewModel.estimatedProgress,
                     searchSuggestions: viewModel.searchSuggestions,
                     onTabsPressed: { print("Tabs pressed") },
-                    onSettingsPressed: { print("Settings pressed") },
+                    onSettingsPressed: {
+                        if bottomBarState == .collapsed {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                                if viewModel.urlString.isEmpty {
+                                    bottomBarState = .browserSettings
+                                } else {
+                                    bottomBarState = .siteSettings
+                                }
+                            }
+                        }
+                    },
                     onSubmit: {
                         Task { await viewModel.processUserInput(viewModel.urlString) }
                         withAnimation(.easeInOut(duration: 0.25)) {
-                            isBottomBarExpanded = false
+                            bottomBarState = .collapsed
                             isAddressBarFocused = false
                         }
                     },
@@ -84,8 +94,14 @@ struct BrowserView: View {
                         viewModel.urlString = url
                         Task { await viewModel.processUserInput(url) }
                         withAnimation(.easeInOut(duration: 0.25)) {
-                            isBottomBarExpanded = false
+                            bottomBarState = .collapsed
                             isAddressBarFocused = false
+                        }
+                    },
+                    onCopyUrl: {
+                        UIPasteboard.general.string = viewModel.urlString
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            bottomBarState = .collapsed
                         }
                     }
                 )
@@ -120,7 +136,7 @@ struct BrowserView: View {
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        isBottomBarExpanded = true
+                        bottomBarState = .search
                     }
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -138,18 +154,18 @@ struct BrowserView: View {
             if scrollAccumulator < 0 { scrollAccumulator = 0 }
             scrollAccumulator += delta
 
-            if scrollAccumulator > 50 && !isBottomBarCollapsed && !isBottomBarExpanded {
+            if scrollAccumulator > 50 && bottomBarState == .collapsed {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    isBottomBarCollapsed = true
+                    bottomBarState = .hidden
                 }
             }
         } else {
             if scrollAccumulator > 0 { scrollAccumulator = 0 }
             scrollAccumulator += delta
 
-            if scrollAccumulator < -20 && isBottomBarCollapsed {
+            if scrollAccumulator < -20 && bottomBarState == .hidden {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    isBottomBarCollapsed = false
+                    bottomBarState = .collapsed
                 }
             }
         }
