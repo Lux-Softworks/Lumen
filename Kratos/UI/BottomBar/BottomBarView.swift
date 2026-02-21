@@ -18,6 +18,7 @@ struct BottomBarView: View {
 
     var searchSuggestions: [SearchSuggestion] = []
     var themeColor: UIColor?
+    var currentURL: URL? = nil
 
     var onTabsPressed: () -> Void
     var onSettingsPressed: () -> Void
@@ -37,7 +38,14 @@ struct BottomBarView: View {
             isExpanded: Binding(
                 get: { state == .search || state == .browserSettings || state == .siteSettings },
                 set: { expanded in
-                    if !expanded { state = .collapsed }
+                    if expanded {
+                        if state == .collapsed || state == .hidden {
+                            text = ""
+                            state = .search
+                        }
+                    } else {
+                        state = .collapsed
+                    }
                 }
             ),
             isCollapsed: Binding(
@@ -54,13 +62,15 @@ struct BottomBarView: View {
             progress: progress,
             themeColor: themeColor,
             onDragStart: {
-                if state == .collapsed {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
-                        state = .search
-                    }
+                if state == .collapsed || state == .hidden {
+                    // preserve drag here
                 }
             },
             onExpand: {
+                if state == .collapsed || state == .hidden {
+                    text = ""
+                    state = .search
+                }
                 if state == .search {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         isFocused = true
@@ -77,10 +87,10 @@ struct BottomBarView: View {
             VStack(spacing: 0) {
                 if state == .search || state == .browserSettings || state == .siteSettings {
                     expandedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.15)))
+                        .transition(.opacity.animation(.smooth(duration: 0.3)))
                 } else {
                     collapsedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.15)))
+                        .transition(.opacity.animation(.smooth(duration: 0.3)))
                 }
             }
         }
@@ -147,13 +157,17 @@ struct BottomBarView: View {
             .padding(.horizontal, 16)
             .frame(height: 44)
             .background(
-                Color.primary.opacity(0.08)
+                Color.primary.opacity(0.12)
                     .clipShape(Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
                     )
                     .matchedGeometryEffect(id: "searchBackground", in: animation)
+                    .shadow(
+                        color: Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255).opacity(
+                            0.6),
+                        radius: 12, x: 0, y: 0)
             )
             .padding(.top, 16)
 
@@ -272,7 +286,7 @@ struct BottomBarView: View {
         }
         .opacity(state == .hidden ? 0 : 1)
         .padding(.bottom, state == .hidden ? -44 : 0)
-        .animation(.easeInOut(duration: 0.15), value: state == .hidden)
+        .animation(.smooth(duration: 0.3), value: state == .hidden)
     }
 
     var collapsedContent: some View {
@@ -280,9 +294,9 @@ struct BottomBarView: View {
             Button(action: onTabsPressed) {
                 Image(systemName: "square.on.square")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.primary.opacity(0.8))
+                    .foregroundColor(.primary.opacity(0.9))
                     .frame(width: 44, height: 44)
-                    .background(Color.primary.opacity(0.08))
+                    .background(Color.primary.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -294,7 +308,8 @@ struct BottomBarView: View {
             Spacer()
 
             Button(action: {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                text = ""
+                withAnimation(.smooth(duration: 0.3)) {
                     state = .search
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -302,13 +317,18 @@ struct BottomBarView: View {
                 }
             }) {
                 ZStack {
-                    Color.primary.opacity(0.08)
+                    Color.primary.opacity(0.12)
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
                                 .stroke(Color.primary.opacity(0.15), lineWidth: 1)
                         )
                         .matchedGeometryEffect(id: "searchBackground", in: animation)
+                        .shadow(
+                            color: Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255).opacity(
+                                0.6),
+                            radius: 12, x: 0, y: 0
+                        )
                         .frame(width: 80, height: 44)
 
                     HStack(spacing: 0) {
@@ -331,9 +351,9 @@ struct BottomBarView: View {
             Button(action: onSettingsPressed) {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary.opacity(0.8))
+                    .foregroundColor(.primary.opacity(0.9))
                     .frame(width: 44, height: 44)
-                    .background(Color.primary.opacity(0.08))
+                    .background(Color.primary.opacity(0.12))
                     .clipShape(Circle())
                     .overlay(
                         Circle()
@@ -344,7 +364,7 @@ struct BottomBarView: View {
         }
         .frame(height: 80)
         .opacity((state == .collapsed || state == .hidden) ? 1 : 0)
-        .animation(.easeInOut(duration: 0.15), value: state == .collapsed || state == .hidden)
+        .animation(.smooth(duration: 0.3), value: state == .collapsed || state == .hidden)
     }
 
     private var displayBinding: Binding<String> {
@@ -353,7 +373,7 @@ struct BottomBarView: View {
                 if state == .browserSettings {
                     return "Browser Settings"
                 } else if state == .siteSettings {
-                    return neaten(url: text)
+                    return neaten(url: currentURL?.absoluteString ?? text)
                 } else {
                     return text
                 }
@@ -432,7 +452,7 @@ struct ResizableSheetContainer<Content: View>: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             isExpanded = false
                         }
                         onCollapse?()
@@ -449,16 +469,14 @@ struct ResizableSheetContainer<Content: View>: View {
                         alignment: .top
                     )
                     .opacity(isCollapsed ? 0 : 1)
-                    .animation(.easeInOut(duration: 0.2), value: isCollapsed)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isCollapsed)
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)
                                 .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 .overlay(
                                     Group {
-                                        if let themeColor = themeColor {
-                                            Color(themeColor).opacity(0.7)
-                                        } else if colorScheme == .dark {
+                                        if colorScheme == .dark {
                                             Color.black.opacity(0.35)
                                         } else {
                                             Color.gray.opacity(0.1)
@@ -480,12 +498,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                 )
                                 .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 
-                            PlasmaProgressView(progress: progress, isLoading: isLoading)
-                                .frame(height: 1.4)
-                                .cornerRadius(
-                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
-                                    corners: [.topLeft, .topRight]
-                                )
+                            ProgressView(progress: progress, isLoading: isLoading)
                                 .opacity(isExpanded ? 0 : 1)
                         }
                     )
@@ -546,10 +559,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                     shouldExpand = translation < -50 || velocity < -500
                                 }
 
-                                withAnimation(
-                                    .spring(
-                                        response: 0.35, dampingFraction: 0.8, blendDuration: 0.1)
-                                ) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
                                 }
@@ -595,60 +605,79 @@ struct ResizableSheetContainer<Content: View>: View {
     }
 }
 
-struct PlasmaProgressView: View {
+struct ProgressView: View {
     var progress: Double
     var isLoading: Bool
 
     @State private var displayedProgress: Double = 0
     @State private var visible: Bool = false
-
     @State private var isFinishing: Bool = false
 
     private let gradient = LinearGradient(
         colors: [
-            Color(red: 1.0, green: 0.85, blue: 0.1),
-            Color(red: 1.0, green: 0.55, blue: 0.1),
-            Color(red: 0.9, green: 0.25, blue: 0.4),
-            Color(red: 0.55, green: 0.1, blue: 0.65),
-            Color(red: 0.25, green: 0.05, blue: 0.7),
+            Color(red: 253 / 255, green: 251 / 255, blue: 240 / 255),
+            Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
+            Color(red: 60 / 255, green: 140 / 255, blue: 240 / 255),
         ],
         startPoint: .leading,
         endPoint: .trailing
     )
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                gradient
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .mask(
-                        Rectangle()
-                            .frame(width: geometry.size.width * CGFloat(displayedProgress))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    )
-            }
-            .opacity(visible ? 1 : 0)
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(gradient)
+                .blur(radius: 6)
+                .opacity(0.8)
+                .frame(height: 2.25)
+
+            Capsule()
+                .fill(gradient)
+                .shadow(
+                    color: Color.black.opacity(0.2),
+                    radius: 1, y: 1
+                )
+                .frame(height: 2.25)
         }
+        .scaleEffect(x: displayedProgress, anchor: .leading)
+        .offset(y: -(2.25 / 2))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .opacity(visible ? 1 : 0)
         .onChange(of: isLoading) { _, loading in
             if loading {
                 isFinishing = false
 
-                withAnimation(.smooth(duration: 0.2)) {
+                var transaction = Transaction(animation: .none)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    displayedProgress = 0
+                }
+
+                withAnimation(.smooth(duration: 0.3)) {
                     visible = true
                 }
             } else {
                 isFinishing = true
+                withAnimation(.smooth(duration: 0.3)) {
+                    displayedProgress = 1.0
+                }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     guard self.isFinishing else { return }
 
                     withAnimation(.smooth(duration: 0.3)) {
                         visible = false
                     }
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         guard self.isFinishing else { return }
-                        displayedProgress = 0
+
+                        var transaction = Transaction(animation: .none)
+                        transaction.disablesAnimations = true
+
+                        withTransaction(transaction) {
+                            displayedProgress = 0
+                        }
                         isFinishing = false
                     }
                 }
@@ -656,10 +685,11 @@ struct PlasmaProgressView: View {
         }
         .onChange(of: progress) { _, newValue in
             guard !isFinishing else { return }
-            guard visible else { return }
 
             if newValue > displayedProgress {
-                displayedProgress = newValue
+                withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
+                    displayedProgress = newValue
+                }
             }
         }
     }

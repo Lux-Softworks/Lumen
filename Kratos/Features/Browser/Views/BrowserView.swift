@@ -15,36 +15,43 @@ struct BrowserView: View {
             ZStack(alignment: .top) {
                 ZStack {
                     LinearGradient(
-                        colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
+                        colors: [
+                            Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
+                            Color(red: 252 / 255, green: 238 / 255, blue: 209 / 255),
+                        ],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
 
                     Group {
                         Circle()
-                            .fill(Color.orange)
+                            .fill(Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255))
                             .frame(width: geometry.size.width * 0.8)
-                            .blur(radius: 80)
+                            .blur(radius: 40)
                             .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.1)
                             .opacity(0.8)
 
                         Circle()
-                            .fill(Color.yellow)
+                            .fill(Color(red: 154 / 255, green: 196 / 255, blue: 237 / 255))
                             .frame(width: geometry.size.width * 0.9)
-                            .blur(radius: 100)
+                            .blur(radius: 50)
                             .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.4)
                             .opacity(0.8)
 
                         Circle()
-                            .fill(Color.blue)
+                            .fill(Color(red: 185 / 255, green: 219 / 255, blue: 222 / 255))
                             .frame(width: geometry.size.width * 0.6)
-                            .blur(radius: 90)
+                            .blur(radius: 45)
                             .offset(x: -geometry.size.width * 0.1, y: geometry.size.height * 0.7)
                             .opacity(0.5)
                     }
-                    .opacity(0.5)
+                    .opacity(0.8)
+
+                    Color.black.opacity(0.3)
 
                     Rectangle()
-                        .fill(.ultraThinMaterial).opacity(0.96)
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                        .opacity(0.7)
                         .overlay(
                             RoundedRectangle(cornerRadius: 0)
                                 .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
@@ -71,14 +78,18 @@ struct BrowserView: View {
                     isLoading: viewModel.isLoading,
                     progress: viewModel.estimatedProgress,
                     searchSuggestions: viewModel.searchSuggestions,
+                    themeColor: viewModel.themeColor,
+                    currentURL: viewModel.currentURL,
                     onTabsPressed: { print("Tabs pressed") },
                     onSettingsPressed: {
                         if bottomBarState == .collapsed {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
-                                if viewModel.urlString.isEmpty {
-                                    bottomBarState = .browserSettings
-                                } else {
+                            withAnimation(.smooth(duration: 0.3)) {
+                                if let url = viewModel.currentURL, !url.absoluteString.isEmpty,
+                                    url.absoluteString != "about:blank"
+                                {
                                     bottomBarState = .siteSettings
+                                } else {
+                                    bottomBarState = .browserSettings
                                 }
                             }
                         }
@@ -99,7 +110,13 @@ struct BrowserView: View {
                         }
                     },
                     onCopyUrl: {
-                        UIPasteboard.general.string = viewModel.urlString
+                        if let validURL = viewModel.currentURL?.absoluteString, !validURL.isEmpty,
+                            validURL != "about:blank"
+                        {
+                            UIPasteboard.general.string = validURL
+                        } else {
+                            UIPasteboard.general.string = viewModel.urlString
+                        }
                         withAnimation(.easeInOut(duration: 0.25)) {
                             bottomBarState = .collapsed
                         }
@@ -110,16 +127,22 @@ struct BrowserView: View {
                     updateScrollState(delta: delta)
                 }
                 .blur(radius: isReady ? 0 : 20)
-                .zIndex(3)
+                .zIndex(999)
 
                 if !isReady {
                     ZStack {
                         LinearGradient(
-                            colors: [.indigo.opacity(0.8), .purple.opacity(0.6)],
+                            colors: [
+                                Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
+                                Color(red: 252 / 255, green: 238 / 255, blue: 209 / 255),
+                            ],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         )
+                        Color.black.opacity(0.3)
                         Rectangle()
-                            .fill(.ultraThinMaterial).opacity(0.96)
+                            .fill(.ultraThinMaterial)
+                            .environment(\.colorScheme, .dark)
+                            .opacity(0.7)
                     }
                     .ignoresSafeArea()
                     .transition(.opacity)
@@ -135,7 +158,7 @@ struct BrowserView: View {
                 }
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         bottomBarState = .search
                     }
 
@@ -155,7 +178,7 @@ struct BrowserView: View {
             scrollAccumulator += delta
 
             if scrollAccumulator > 50 && bottomBarState == .collapsed {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .hidden
                 }
             }
@@ -164,7 +187,7 @@ struct BrowserView: View {
             scrollAccumulator += delta
 
             if scrollAccumulator < -20 && bottomBarState == .hidden {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .collapsed
                 }
             }
