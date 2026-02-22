@@ -16,33 +16,24 @@ struct BrowserView: View {
                 ZStack {
                     LinearGradient(
                         colors: [
-                            Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
-                            Color(red: 252 / 255, green: 238 / 255, blue: 209 / 255),
+                            AppTheme.Colors.background,
+                            AppTheme.Colors.background,
                         ],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
 
                     Group {
                         Circle()
-                            .fill(Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255))
-                            .frame(width: geometry.size.width * 0.8)
-                            .blur(radius: 40)
-                            .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.1)
-                            .opacity(0.8)
+                            .fill(AppTheme.Colors.accent.opacity(0.4))
+                            .frame(width: geometry.size.width * 1.2)
+                            .blur(radius: 100)
+                            .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.2)
 
                         Circle()
-                            .fill(Color(red: 154 / 255, green: 196 / 255, blue: 237 / 255))
-                            .frame(width: geometry.size.width * 0.9)
-                            .blur(radius: 50)
-                            .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.4)
-                            .opacity(0.8)
-
-                        Circle()
-                            .fill(Color(red: 185 / 255, green: 219 / 255, blue: 222 / 255))
-                            .frame(width: geometry.size.width * 0.6)
-                            .blur(radius: 45)
-                            .offset(x: -geometry.size.width * 0.1, y: geometry.size.height * 0.7)
-                            .opacity(0.5)
+                            .fill(AppTheme.Colors.secondaryAccent.opacity(0.3))
+                            .frame(width: geometry.size.width * 1.1)
+                            .blur(radius: 90)
+                            .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.3)
                     }
                     .opacity(0.8)
 
@@ -57,6 +48,8 @@ struct BrowserView: View {
                                 .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                         )
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
                 .ignoresSafeArea()
                 .zIndex(0)
 
@@ -120,6 +113,9 @@ struct BrowserView: View {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             bottomBarState = .collapsed
                         }
+                    },
+                    onReload: {
+                        viewModel.reload()
                     }
                 )
                 .frame(maxHeight: .infinity, alignment: .bottom)
@@ -131,18 +127,10 @@ struct BrowserView: View {
 
                 if !isReady {
                     ZStack {
-                        LinearGradient(
-                            colors: [
-                                Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
-                                Color(red: 252 / 255, green: 238 / 255, blue: 209 / 255),
-                            ],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                        Color.black.opacity(0.3)
+                        AppTheme.Colors.background
+                        AppTheme.Colors.accent.opacity(0.05)
                         Rectangle()
                             .fill(.ultraThinMaterial)
-                            .environment(\.colorScheme, .dark)
-                            .opacity(0.7)
                     }
                     .ignoresSafeArea()
                     .transition(.opacity)
@@ -173,11 +161,21 @@ struct BrowserView: View {
     @State private var scrollAccumulator: CGFloat = 0
 
     private func updateScrollState(delta: CGFloat) {
+        if viewModel.scrollOffset < 50 {
+            if bottomBarState == .hidden {
+                withAnimation(.smooth(duration: 0.3)) {
+                    bottomBarState = .collapsed
+                }
+            }
+            scrollAccumulator = 0
+            return
+        }
+
         if delta > 0 {
             if scrollAccumulator < 0 { scrollAccumulator = 0 }
             scrollAccumulator += delta
 
-            if scrollAccumulator > 50 && bottomBarState == .collapsed {
+            if scrollAccumulator > 60 && bottomBarState == .collapsed {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .hidden
                 }

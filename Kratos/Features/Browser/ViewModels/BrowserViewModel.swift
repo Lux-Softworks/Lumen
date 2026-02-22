@@ -319,6 +319,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private var lastContentOffset: CGFloat = 0
     @Published var scrollDelta: CGFloat = 0
+    @Published var scrollOffset: CGFloat = 0
     @Published var themeColor: UIColor? = nil
 
     private func startScrollObservation(_ webView: WKWebView) {
@@ -338,6 +339,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                     let delta = currentOffset - self.lastContentOffset
                     self.scrollDelta = delta
+                    self.scrollOffset = currentOffset
                     self.lastContentOffset = currentOffset
                 }
             }

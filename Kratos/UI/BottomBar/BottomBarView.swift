@@ -26,10 +26,13 @@ struct BottomBarView: View {
     var onHistoryTap: (String) -> Void
 
     var onCopyUrl: () -> Void
+    var onReload: () -> Void
 
     @ObservedObject private var historyStore = HistoryStore.shared
     @Namespace private var animation
     @State private var showHistory = false
+    @State private var reloadRotation: Double = 0
+    @State private var isSpinning: Bool = false
 
     var isExpanded: Bool { state != .collapsed }
 
@@ -117,8 +120,9 @@ struct BottomBarView: View {
                 if state == .siteSettings {
                     Button(action: onCopyUrl) {
                         Image(systemName: "link")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                            .frame(width: 44, height: 44)
                     }
                     .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
                 } else {
@@ -126,7 +130,8 @@ struct BottomBarView: View {
                         systemName: state == .browserSettings ? "gearshape.fill" : "magnifyingglass"
                     )
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .frame(width: 44, height: 44)
                     .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
                 }
 
@@ -150,24 +155,53 @@ struct BottomBarView: View {
                 if state == .search && !text.isEmpty {
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+
+                if state == .siteSettings {
+                    Button(action: onReload) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.clear)
+                                .frame(width: 20, height: 20)
+
+                            Image(systemName: "arrow.clockwise")
+                                .resizable()
+                                .antialiased(true)
+                                .scaledToFit()
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                                .frame(width: 18, height: 18)
+                                .rotationEffect(.degrees(reloadRotation), anchor: .center)
+                                .drawingGroup()
+                        }
+                        .frame(width: 44, height: 44)
+                    }
+                    .matchedGeometryEffect(id: "reloadButton", in: animation)
+                    .onChange(of: isLoading) { _, loading in
+                        if loading {
+                            if !isSpinning {
+                                isSpinning = true
+                                triggerSpin()
+                            }
+                        } else {
+                            isSpinning = false
+                        }
                     }
                 }
             }
             .padding(.horizontal, 16)
             .frame(height: 44)
             .background(
-                Color.primary.opacity(0.12)
+                frostedBackground
                     .clipShape(Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                     )
                     .matchedGeometryEffect(id: "searchBackground", in: animation)
-                    .shadow(
-                        color: Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255).opacity(
-                            0.6),
-                        radius: 12, x: 0, y: 0)
             )
             .padding(.top, 16)
 
@@ -184,7 +218,7 @@ struct BottomBarView: View {
                                     HStack(spacing: 12) {
                                         Image(systemName: "plus")
                                             .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
                                             .frame(width: 24)
 
                                         VStack(alignment: .leading, spacing: 2) {
@@ -205,10 +239,7 @@ struct BottomBarView: View {
                                                         {
                                                             attributedText[attrRange].font =
                                                                 .system(
-                                                                    size: 16, weight: .bold)
-                                                            attributedText[attrRange]
-                                                                .foregroundColor =
-                                                                .primary
+                                                                    size: 16, weight: .heavy)
                                                         }
                                                         searchRange =
                                                             range
@@ -221,7 +252,7 @@ struct BottomBarView: View {
 
                                             Text(attributedText)
                                                 .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.primary)
+                                                .foregroundColor(AppTheme.Colors.text)
                                                 .lineLimit(1)
                                         }
 
@@ -247,13 +278,13 @@ struct BottomBarView: View {
                                     HStack(spacing: 12) {
                                         Image(systemName: "magnifyingglass")
                                             .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
                                             .frame(width: 24)
 
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(entry.title)
                                                 .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.primary)
+                                                .foregroundColor(AppTheme.Colors.text)
                                                 .lineLimit(1)
                                         }
 
@@ -289,18 +320,34 @@ struct BottomBarView: View {
         .animation(.smooth(duration: 0.3), value: state == .hidden)
     }
 
+    private var frostedBackground: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            AppTheme.Colors.uiElement.opacity(0.5)
+        }
+    }
+
+    // TODO: make this smooth at one point but one rotation is good enough for now
+    private func triggerSpin() {
+        guard isSpinning else { return }
+
+        withAnimation(.interpolatingSpring(stiffness: 100, damping: 10)) {
+            reloadRotation += 360
+        }
+    }
+
     var collapsedContent: some View {
         HStack(spacing: 0) {
             Button(action: onTabsPressed) {
                 Image(systemName: "square.on.square")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.primary.opacity(0.9))
+                    .foregroundColor(AppTheme.Colors.text)
                     .frame(width: 44, height: 44)
-                    .background(Color.primary.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(frostedBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                     )
             }
             .padding(.leading, 8)
@@ -317,25 +364,33 @@ struct BottomBarView: View {
                 }
             }) {
                 ZStack {
-                    Color.primary.opacity(0.12)
+                    frostedBackground
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                                .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                         )
                         .matchedGeometryEffect(id: "searchBackground", in: animation)
-                        .shadow(
-                            color: Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255).opacity(
-                                0.6),
-                            radius: 12, x: 0, y: 0
-                        )
                         .frame(width: 80, height: 44)
 
                     HStack(spacing: 0) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundColor(.primary.opacity(0.9))
-                            .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                        ZStack {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.text)
+                                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+
+                            Image(systemName: "arrow.clockwise")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.text)
+                                .frame(width: 18, height: 18)
+                                .rotationEffect(.degrees(0))
+                                .opacity(0)
+                                .matchedGeometryEffect(id: "reloadButton", in: animation)
+                        }
+                        .frame(width: 80, height: 44)
 
                         TextField("", text: .constant(""))
                             .labelsHidden()
@@ -351,13 +406,13 @@ struct BottomBarView: View {
             Button(action: onSettingsPressed) {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary.opacity(0.9))
+                    .foregroundColor(AppTheme.Colors.text)
                     .frame(width: 44, height: 44)
-                    .background(Color.primary.opacity(0.12))
+                    .background(frostedBackground)
                     .clipShape(Circle())
                     .overlay(
                         Circle()
-                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                     )
             }
             .padding(.trailing, 8)
@@ -494,12 +549,17 @@ struct ResizableSheetContainer<Content: View>: View {
                                             screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
-                                    .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
+                                    .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
                                 )
                                 .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 
-                            ProgressView(progress: progress, isLoading: isLoading)
-                                .opacity(isExpanded ? 0 : 1)
+                            ProgressView(
+                                progress: progress,
+                                isLoading: isLoading,
+                                width: outerGeometry.size.width,
+                                cornerRadius: animatedCornerRadius(
+                                    screenHeight: outerGeometry.size.height),
+                            )
                         }
                     )
                     .gesture(
@@ -597,17 +657,20 @@ struct ResizableSheetContainer<Content: View>: View {
     }
 
     private func animatedCornerRadius(screenHeight: CGFloat) -> CGFloat {
+        let expandedRadius: CGFloat = 39
         let currentH = currentHeight(screenHeight: screenHeight)
         let expandedH = screenHeight * expandedHeightRatio
         let fraction = max(0, min(1, (currentH - collapsedHeight) / (expandedH - collapsedHeight)))
 
-        return 30 * fraction
+        return expandedRadius * fraction
     }
 }
 
 struct ProgressView: View {
     var progress: Double
     var isLoading: Bool
+    var width: CGFloat
+    var cornerRadius: CGFloat
 
     @State private var displayedProgress: Double = 0
     @State private var visible: Bool = false
@@ -615,9 +678,9 @@ struct ProgressView: View {
 
     private let gradient = LinearGradient(
         colors: [
-            Color(red: 253 / 255, green: 251 / 255, blue: 240 / 255),
-            Color(red: 162 / 255, green: 179 / 255, blue: 219 / 255),
-            Color(red: 60 / 255, green: 140 / 255, blue: 240 / 255),
+            AppTheme.Colors.accent.opacity(0.5),
+            AppTheme.Colors.accent.opacity(0.8),
+            AppTheme.Colors.accent,
         ],
         startPoint: .leading,
         endPoint: .trailing
@@ -627,9 +690,13 @@ struct ProgressView: View {
         ZStack(alignment: .leading) {
             Capsule()
                 .fill(gradient)
-                .blur(radius: 6)
-                .opacity(0.8)
-                .frame(height: 2.25)
+                .blur(radius: 12)
+                .opacity(0.25)
+                .frame(height: 5.5)
+                .shadow(
+                    color: AppTheme.Colors.accent.opacity(0.25),
+                    radius: 1, y: 10
+                )
 
             Capsule()
                 .fill(gradient)
@@ -637,18 +704,19 @@ struct ProgressView: View {
                     color: Color.black.opacity(0.2),
                     radius: 1, y: 1
                 )
-                .frame(height: 2.25)
+                .frame(height: 1.3)
         }
         .scaleEffect(x: displayedProgress, anchor: .leading)
-        .offset(y: -(2.25 / 2))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: width - cornerRadius * 2, maxHeight: .infinity, alignment: .topLeading)
         .opacity(visible ? 1 : 0)
+        .offset(y: -2.2)
         .onChange(of: isLoading) { _, loading in
             if loading {
                 isFinishing = false
 
                 var transaction = Transaction(animation: .none)
                 transaction.disablesAnimations = true
+
                 withTransaction(transaction) {
                     displayedProgress = 0
                 }
