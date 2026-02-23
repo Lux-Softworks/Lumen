@@ -5,14 +5,32 @@ final class TrackerDatabase {
     static let shared = TrackerDatabase()
 
     private var trackers: [String: ThreatDetector.TrackerInfo] = [:]
-    private(set) var entityCount: Int = 0
-    private(set) var domainCount: Int = 0
+    private var _entityCount: Int = 0
+    private var _domainCount: Int = 0
+    private let lock = NSRecursiveLock()
+
+    var entityCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _entityCount
+    }
+
+    var domainCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _domainCount
+    }
 
     private init() {
-        loadBundledDatabase()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.loadBundledDatabase()
+        }
     }
 
     func lookup(domain: String) -> ThreatDetector.TrackerInfo? {
+        lock.lock()
+        defer { lock.unlock() }
+
         if let direct = trackers[domain] {
             return direct
         }
@@ -28,23 +46,31 @@ final class TrackerDatabase {
     }
 
     func allEntries() -> [String: ThreatDetector.TrackerInfo] {
-        trackers
+        lock.lock()
+        defer { lock.unlock() }
+        return trackers
     }
 
     func merge(_ additional: [String: ThreatDetector.TrackerInfo]) {
+        lock.lock()
+        defer { lock.unlock() }
+
         for (key, value) in additional {
             trackers[key] = value
         }
-        domainCount = trackers.count
+        _domainCount = trackers.count
     }
 
     func reload() {
+        lock.lock()
         trackers.removeAll()
-        
-        entityCount = 0
-        domainCount = 0
+        _entityCount = 0
+        _domainCount = 0
+        lock.unlock()
 
-        loadBundledDatabase()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.loadBundledDatabase()
+        }
     }
 
     private func loadBundledDatabase() {
@@ -76,6 +102,7 @@ final class TrackerDatabase {
             "Anti-fraud": .unknown
         ]
 
+        var newTrackers: [String: ThreatDetector.TrackerInfo] = [:]
         var seenEntities: Set<String> = []
 
         for (categoryName, categoryEntries) in categories {
@@ -117,7 +144,7 @@ final class TrackerDatabase {
                             .replacingOccurrences(of: "https://", with: "")
                             .components(separatedBy: "/").first ?? domain
 
-                        trackers[cleaned] = info
+                        newTrackers[cleaned] = info
                     }
 
                     seenEntities.insert(entityName)
@@ -125,7 +152,14 @@ final class TrackerDatabase {
             }
         }
 
-        entityCount = seenEntities.count
-        domainCount = trackers.count
+        lock.lock()
+        defer { lock.unlock() }
+
+        for (key, value) in newTrackers {
+            trackers[key] = value
+        }
+
+        _entityCount = seenEntities.count
+        _domainCount = trackers.count
     }
 }
