@@ -8,6 +8,8 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
     private let httpsOnly: Bool
     private let logger = Logger(subsystem: "com.Kratos.browser", category: "NetworkInterceptor")
 
+    private static let xhrKeywords = ["/api/", "/collect", "/pixel", "/beacon", "/track", "/event"]
+
     private(set) var currentPageURL: URL?
     private(set) var requestLog: [InterceptedRequest] = []
     private(set) var detectedThreats: [ThreatEvent] = []
@@ -188,13 +190,21 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             break
         }
 
-        let urlString = url.absoluteString.lowercased()
+        // Optimized check: scan path and query separately instead of full absoluteString
+        // This avoids creating a new lowercased copy of the entire URL string.
+        let path = url.path
+        for keyword in Self.xhrKeywords {
+            if path.range(of: keyword, options: .caseInsensitive) != nil {
+                return .xhr
+            }
+        }
 
-        if urlString.contains("/api/") || urlString.contains("/collect")
-            || urlString.contains("/pixel") || urlString.contains("/beacon")
-            || urlString.contains("/track") || urlString.contains("/event")
-        {
-            return .xhr
+        if let query = url.query {
+            for keyword in Self.xhrKeywords {
+                if query.range(of: keyword, options: .caseInsensitive) != nil {
+                    return .xhr
+                }
+            }
         }
 
         return .other

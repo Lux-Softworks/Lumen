@@ -1,14 +1,6 @@
 import SwiftUI
 import UIKit
 
-enum BottomBarState: Equatable {
-    case hidden
-    case collapsed
-    case search
-    case browserSettings
-    case siteSettings
-}
-
 struct BottomBarView: View {
     @Binding var text: String
     @Binding var state: BottomBarState
@@ -90,7 +82,7 @@ struct BottomBarView: View {
             VStack(spacing: 0) {
                 if state == .search || state == .browserSettings || state == .siteSettings {
                     expandedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.3)))
+                        .transition(.opacity.animation(.smooth(duration: 0.12)))
                 } else {
                     collapsedContent
                         .transition(.opacity.animation(.smooth(duration: 0.3)))
@@ -100,13 +92,13 @@ struct BottomBarView: View {
         .ignoresSafeArea(.keyboard)
         .onChange(of: state) { _, newState in
             if newState == .search || newState == .browserSettings || newState == .siteSettings {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    withAnimation(.smooth(duration: 0.2)) {
                         showHistory = true
                     }
                 }
             } else {
-                withAnimation {
+                withAnimation(.smooth(duration: 0.12)) {
                     showHistory = false
                 }
                 isFocused = false
@@ -300,8 +292,8 @@ struct BottomBarView: View {
                                 .offset(y: showHistory ? 0 : 5)
                                 .animation(
                                     showHistory
-                                        ? .smooth(duration: 0.5).delay(0.05 + Double(index) * 0.04)
-                                        : .smooth(duration: 0.15),
+                                        ? .smooth(duration: 0.2).delay(Double(index) * 0.02)
+                                        : .smooth(duration: 0.12),
                                     value: showHistory
                                 )
                             }
@@ -451,353 +443,5 @@ struct BottomBarView: View {
         if clean.hasPrefix("www.") { clean.removeFirst(4) }
         if clean.hasSuffix("/") { clean.removeLast() }
         return clean.isEmpty ? "Search..." : clean
-    }
-}
-
-struct ResizableSheetContainer<Content: View>: View {
-    @Binding var isExpanded: Bool
-    @Binding var isCollapsed: Bool
-    var isLoading: Bool
-    var progress: Double
-    var themeColor: UIColor?
-    var onDragStart: (() -> Void)?
-    var onExpand: (() -> Void)?
-    var onCollapse: (() -> Void)?
-    var onDismissFocused: (() -> Void)?
-    let content: () -> Content
-
-    @GestureState private var activeDragTranslation: CGFloat = 0
-    @State private var releaseOffset: CGFloat = 0
-    @Environment(\.colorScheme) var colorScheme
-
-    private let expandedHeightRatio: CGFloat = 0.65
-    private let collapsedHeight: CGFloat = 80
-    private let sliverHeight: CGFloat = 20
-    private let handleHeight: CGFloat = 60
-
-    init(
-        isExpanded: Binding<Bool>,
-        isCollapsed: Binding<Bool>,
-        isLoading: Bool,
-        progress: Double,
-        themeColor: UIColor? = nil,
-        onDragStart: (() -> Void)? = nil,
-        onExpand: (() -> Void)? = nil,
-        onCollapse: (() -> Void)? = nil,
-        onDismissFocused: (() -> Void)? = nil,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self._isExpanded = isExpanded
-        self._isCollapsed = isCollapsed
-        self.isLoading = isLoading
-        self.progress = progress
-        self.themeColor = themeColor
-        self.onDragStart = onDragStart
-        self.onExpand = onExpand
-        self.onCollapse = onCollapse
-        self.onDismissFocused = onDismissFocused
-        self.content = content
-    }
-
-    var body: some View {
-        GeometryReader { outerGeometry in
-            ZStack(alignment: .bottom) {
-                Color.black.opacity(0.3)
-                    .background(.ultraThinMaterial)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            isExpanded = false
-                        }
-                        onCollapse?()
-                    }
-                    .opacity(isExpanded ? 1 : 0)
-                    .allowsHitTesting(isExpanded)
-                    .zIndex(0)
-
-                content()
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
-                    .frame(
-                        height: currentHeight(screenHeight: outerGeometry.size.height),
-                        alignment: .top
-                    )
-                    .opacity(isCollapsed ? 0 : 1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isCollapsed)
-                    .background(
-                        ZStack(alignment: .top) {
-                            BlurView(style: .systemChromeMaterial)
-                                .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                                .overlay(
-                                    Group {
-                                        if colorScheme == .dark {
-                                            Color.black.opacity(0.35)
-                                        } else {
-                                            Color.gray.opacity(0.1)
-                                        }
-                                    }
-                                    .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-                                )
-                                .cornerRadius(
-                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
-                                    corners: [.topLeft, .topRight]
-                                )
-                                .overlay(
-                                    RoundedCorner(
-                                        radius: animatedCornerRadius(
-                                            screenHeight: outerGeometry.size.height),
-                                        corners: [.topLeft, .topRight]
-                                    )
-                                    .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
-                                )
-                                .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
-
-                            ProgressView(
-                                progress: progress,
-                                isLoading: isLoading,
-                                width: outerGeometry.size.width,
-                                cornerRadius: animatedCornerRadius(
-                                    screenHeight: outerGeometry.size.height),
-                            )
-                        }
-                    )
-                    .gesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                            .updating($activeDragTranslation) { value, state, _ in
-                                let translation = value.translation.height
-                                let rubberBanded: CGFloat
-
-                                if isExpanded {
-                                    if translation > 0 {
-                                        rubberBanded = translation
-                                    } else {
-                                        rubberBanded = 0
-                                    }
-                                } else {
-                                    if translation < 0 {
-                                        rubberBanded = translation
-                                    } else {
-                                        rubberBanded = translation * 0.1
-                                    }
-                                }
-                                state = rubberBanded
-                            }
-                            .onChanged { value in
-                                onDragStart?()
-
-                                if abs(value.translation.height) > 10 {
-                                    onDismissFocused?()
-                                }
-                            }
-                            .onEnded { value in
-                                let translation = value.translation.height
-                                let velocity = value.velocity.height
-                                let finalOffset: CGFloat
-
-                                if isExpanded {
-                                    if translation > 0 {
-                                        finalOffset = translation
-                                    } else {
-                                        finalOffset = 0
-                                    }
-                                } else {
-                                    if translation < 0 {
-                                        finalOffset = translation
-                                    } else {
-                                        finalOffset = 0
-                                    }
-                                }
-
-                                releaseOffset = finalOffset
-
-                                let shouldExpand: Bool
-
-                                if isExpanded {
-                                    shouldExpand = translation < 100 && velocity < 500
-                                } else {
-                                    shouldExpand = translation < -50 || velocity < -500
-                                }
-
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                    isExpanded = shouldExpand
-                                    releaseOffset = 0
-                                }
-
-                                if shouldExpand {
-                                    onExpand?()
-                                } else if isExpanded && !shouldExpand {
-                                    onCollapse?()
-                                }
-                            }
-                    )
-                    .zIndex(1)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-        }
-    }
-
-    private var effectiveDrag: CGFloat {
-        if activeDragTranslation != 0 {
-            return activeDragTranslation
-        }
-
-        return releaseOffset
-    }
-
-    private func currentHeight(screenHeight: CGFloat) -> CGFloat {
-        if isCollapsed {
-            return sliverHeight
-        }
-        let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
-        let calculatedHeight = baseHeight - effectiveDrag
-
-        return min(calculatedHeight, screenHeight * expandedHeightRatio)
-    }
-
-    private func animatedCornerRadius(screenHeight: CGFloat) -> CGFloat {
-        let expandedRadius: CGFloat = 39
-        let currentH = currentHeight(screenHeight: screenHeight)
-        let expandedH = screenHeight * expandedHeightRatio
-        let fraction = max(0, min(1, (currentH - collapsedHeight) / (expandedH - collapsedHeight)))
-
-        return expandedRadius * fraction
-    }
-}
-
-struct ProgressView: View {
-    var progress: Double
-    var isLoading: Bool
-    var width: CGFloat
-    var cornerRadius: CGFloat
-
-    @State private var displayedProgress: Double = 0
-    @State private var visible: Bool = false
-    @State private var isFinishing: Bool = false
-
-    private let gradient = LinearGradient(
-        colors: [
-            AppTheme.Colors.accent.opacity(0.5),
-            AppTheme.Colors.accent.opacity(0.8),
-            AppTheme.Colors.accent,
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(gradient)
-                .blur(radius: 12)
-                .opacity(0.25)
-                .frame(height: 5.5)
-                .shadow(
-                    color: AppTheme.Colors.accent.opacity(0.25),
-                    radius: 1, y: 10
-                )
-
-            Capsule()
-                .fill(gradient)
-                .shadow(
-                    color: Color.black.opacity(0.2),
-                    radius: 1, y: 1
-                )
-                .frame(height: 1.3)
-        }
-        .scaleEffect(x: displayedProgress, anchor: .leading)
-        .frame(maxWidth: width - cornerRadius * 2, maxHeight: .infinity, alignment: .topLeading)
-        .opacity(visible ? 1 : 0)
-        .offset(y: -2.2)
-        .onChange(of: isLoading) { _, loading in
-            if loading {
-                isFinishing = false
-
-                var transaction = Transaction(animation: .none)
-                transaction.disablesAnimations = true
-
-                withTransaction(transaction) {
-                    displayedProgress = 0
-                }
-
-                withAnimation(.smooth(duration: 0.3)) {
-                    visible = true
-                }
-            } else {
-                isFinishing = true
-                withAnimation(.smooth(duration: 0.3)) {
-                    displayedProgress = 1.0
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    guard self.isFinishing else { return }
-
-                    withAnimation(.smooth(duration: 0.3)) {
-                        visible = false
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        guard self.isFinishing else { return }
-
-                        var transaction = Transaction(animation: .none)
-                        transaction.disablesAnimations = true
-
-                        withTransaction(transaction) {
-                            displayedProgress = 0
-                        }
-                        isFinishing = false
-                    }
-                }
-            }
-        }
-        .onChange(of: progress) { _, newValue in
-            guard !isFinishing else { return }
-
-            if newValue > displayedProgress {
-                withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
-                    displayedProgress = newValue
-                }
-            }
-        }
-    }
-}
-
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
-
-    var animatableData: CGFloat {
-        get { radius }
-        set { radius = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-
-        return Path(path.cgPath)
-    }
-}
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
-
-struct BlurView: UIViewRepresentable {
-    var style: UIBlurEffect.Style
-
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let view = UIVisualEffectView(effect: UIBlurEffect(style: style))
-        return view
-    }
-
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
-        uiView.effect = UIBlurEffect(style: style)
     }
 }
