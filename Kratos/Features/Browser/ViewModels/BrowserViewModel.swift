@@ -66,21 +66,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let url: URL
-
-        if let parsed = URL(string: trimmed), parsed.scheme != nil,
-            parsed.host != nil || parsed.scheme == "about"
-        {
-            url = parsed
-        } else if trimmed.contains(".") && !trimmed.contains(" ") {
-            url = URL(string: "https://\(trimmed)") ?? Self.defaultURL
-        } else {
-            let encoded =
-                trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
-
-            url = URL(string: String(format: Self.searchEngineTemplate, encoded)) ?? Self.defaultURL
-        }
-
+        let url = Self.classifyInput(trimmed)
         loadURL(url)
     }
 
