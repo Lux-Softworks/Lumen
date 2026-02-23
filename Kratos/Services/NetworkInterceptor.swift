@@ -50,7 +50,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
         }
 
-        // Use HTTPSUpgradeLogic for unified and secure policy
         let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
         switch action {
@@ -66,7 +65,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             return
 
         case .allow:
-            // Analysis and logging
             let pageURL = currentPageURL ?? url
             let isThirdParty = detector.classifyRequest(requestURL: url, pageURL: pageURL)
             let resourceType = mapResourceType(navigationAction)
@@ -183,8 +181,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             break
         }
 
-        // Optimized check: scan path and query separately instead of full absoluteString
-        // This avoids creating a new lowercased copy of the entire URL string.
         let path = url.path
         for keyword in Self.xhrKeywords {
             if path.range(of: keyword, options: .caseInsensitive) != nil {
@@ -220,6 +216,21 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         for (entity, count) in entityCounts.sorted(by: { $0.value > $1.value }).prefix(10) {
             logger.warning("\(entity): \(count) event(s)")
         }
+    }
+
+    func reportFingerprintingEvent(scriptUrl: URL, pageUrl: URL, api: String) {
+        let isThirdParty = detector.classifyRequest(requestURL: scriptUrl, pageURL: pageUrl)
+
+        let request = InterceptedRequest(
+            url: scriptUrl,
+            pageURL: pageUrl,
+            headers: [:],
+            isThirdParty: isThirdParty,
+            resourceType: InterceptedRequest.ResourceType.script,
+            timestamp: Date()
+        )
+
+        detector.analyzeHookedFingerprint(request: request, api: api)
     }
 }
 
