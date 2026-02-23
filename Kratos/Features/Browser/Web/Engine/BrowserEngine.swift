@@ -25,11 +25,11 @@ enum HTTPSUpgradeLogic {
 
     static func decidePolicy(for url: URL, httpsOnly: Bool) -> PolicyAction {
         guard let scheme = url.scheme?.lowercased() else {
-            return .allow
+            return .cancel
         }
 
         switch scheme {
-        case "https", "about":
+        case "https", "about", "file":
             return .allow
         case "http":
             if httpsOnly {
@@ -45,7 +45,7 @@ enum HTTPSUpgradeLogic {
 
             return .allow
         default:
-            return httpsOnly ? .cancel : .allow
+            return .cancel
         }
     }
 }

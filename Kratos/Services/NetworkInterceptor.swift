@@ -50,22 +50,25 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
         }
 
-        if scheme == "http" && httpsOnly {
-            if let httpsURL = upgradeToHTTPS(url) {
-                logger.info("HTTPS upgrade: \(url.absoluteString) → \(httpsURL.absoluteString)")
-                webView.load(URLRequest(url: httpsURL))
-                decisionHandler(.cancel)
+        // Use HTTPSUpgradeLogic for unified and secure policy
+        let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
-                return
-            }
+        switch action {
+        case .upgrade(let httpsURL):
+            logger.info("HTTPS upgrade: \(url.absoluteString) → \(httpsURL.absoluteString)")
+            webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
             return
-        }
 
-        if scheme == "https" || scheme == "about" || scheme == "file" {
+        case .cancel:
+            logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none")")
+            decisionHandler(.cancel)
+            return
+
+        case .allow:
+            // Analysis and logging
             let pageURL = currentPageURL ?? url
             let isThirdParty = detector.classifyRequest(requestURL: url, pageURL: pageURL)
-
             let resourceType = mapResourceType(navigationAction)
 
             let request = InterceptedRequest(
@@ -85,10 +88,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
 
             decisionHandler(.allow)
-            return
         }
-
-        decisionHandler(.allow)
     }
 
     func webView(
@@ -152,13 +152,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         withError error: Error
     ) {
         logger.error("Navigation failed: \(error.localizedDescription)")
-    }
-
-    private func upgradeToHTTPS(_ url: URL) -> URL? {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.scheme = "https"
-
-        return components?.url
     }
 
     private func mapResourceType(_ action: WKNavigationAction) -> InterceptedRequest.ResourceType {
