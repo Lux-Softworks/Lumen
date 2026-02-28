@@ -40,17 +40,31 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
     func testHTTPSOnlyEnabled_AllowsOtherSchemes() {
         let aboutURL = URL(string: "about:blank")!
         XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: aboutURL, httpsOnly: true), .allow)
+
+        let fileURL = URL(string: "file:///path/to/file")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: fileURL, httpsOnly: true), .allow)
     }
 
     func testHTTPSOnlyEnabled_BlocksUnsafeSchemes() {
-        let fileURL = URL(string: "file:///path/to/file")!
-        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: fileURL, httpsOnly: true), .cancel)
-
         let ftpURL = URL(string: "ftp://example.com/file")!
         XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: ftpURL, httpsOnly: true), .cancel)
 
         let javascriptURL = URL(string: "javascript:alert(1)")!
         XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: javascriptURL, httpsOnly: true), .cancel)
+
+        let dataURL = URL(string: "data:text/html,<html></html>")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: dataURL, httpsOnly: true), .cancel)
+    }
+
+    func testHTTPSOnlyDisabled_BlocksDangerousSchemes() {
+        let ftpURL = URL(string: "ftp://example.com/file")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: ftpURL, httpsOnly: false), .cancel)
+
+        let javascriptURL = URL(string: "javascript:alert(1)")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: javascriptURL, httpsOnly: false), .cancel)
+
+        let dataURL = URL(string: "data:text/html,<html></html>")!
+        XCTAssertEqual(HTTPSUpgradeLogic.decidePolicy(for: dataURL, httpsOnly: false), .cancel)
     }
 
     func testUpgradePreservesPathAndQuery() {
@@ -75,11 +89,11 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
         }
     }
 
-    func testURLWithoutScheme_Allows() {
+    func testURLWithoutScheme_Cancels() {
         if let url = URL(string: "example.com") {
             // scheme is nil
             let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: true)
-            XCTAssertEqual(action, .allow)
+            XCTAssertEqual(action, .cancel)
         }
     }
 }

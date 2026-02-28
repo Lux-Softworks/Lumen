@@ -25,11 +25,11 @@ enum HTTPSUpgradeLogic {
 
     static func decidePolicy(for url: URL, httpsOnly: Bool) -> PolicyAction {
         guard let scheme = url.scheme?.lowercased() else {
-            return .allow
+            return .cancel
         }
 
         switch scheme {
-        case "https", "about":
+        case "https", "about", "file":
             return .allow
         case "http":
             if httpsOnly {
@@ -45,7 +45,7 @@ enum HTTPSUpgradeLogic {
 
             return .allow
         default:
-            return httpsOnly ? .cancel : .allow
+            return .cancel
         }
     }
 }
@@ -201,6 +201,65 @@ enum BrowserEngine {
         )
         config.userContentController.addUserScript(bottomInsetScript)
 
+        let fingerprintingScript = WKUserScript(
+            source: """
+                (function() {
+                    function getScriptUrl() {
+                        try { throw new Error(); } catch(e) {
+                            var stack = e.stack || '';
+                            var match = stack.match(/https?:\\/\\/[^\\s:"']+/);
+                            if (match) return match[0];
+                        }
+                        return window.location.href;
+                    }
+
+                    function report(api) {
+                        window.webkit.messageHandlers.fingerprintObserver.postMessage({
+                            pageUrl: window.location.href,
+                            scriptUrl: getScriptUrl(),
+                            api: api
+                        });
+                    }
+
+                    var origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                    HTMLCanvasElement.prototype.toDataURL = function() {
+                        report('canvas.toDataURL');
+                        return origToDataURL.apply(this, arguments);
+                    };
+
+                    var origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+                    CanvasRenderingContext2D.prototype.getImageData = function() {
+                        report('getImageData');
+                        return origGetImageData.apply(this, arguments);
+                    };
+
+                    var origGetParameter = WebGLRenderingContext.prototype.getParameter;
+                    WebGLRenderingContext.prototype.getParameter = function() {
+                        report('webgl.getParameter');
+                        return origGetParameter.apply(this, arguments);
+                    };
+
+                    if (window.AudioContext) {
+                        var origCreateOscillator = AudioContext.prototype.createOscillator;
+                        AudioContext.prototype.createOscillator = function() {
+                            report('createOscillator');
+                            return origCreateOscillator.apply(this, arguments);
+                        };
+                    }
+                })();
+                """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        config.userContentController.addUserScript(fingerprintingScript)
+
+        let fingerprintMessageHandler = FingerprintMessageHandler()
+        config.userContentController.add(fingerprintMessageHandler, name: "fingerprintObserver")
+
+        objc_setAssociatedObject(
+            config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
         return config
     }
 
@@ -228,6 +287,15 @@ enum BrowserEngine {
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
 
+        if let handler = objc_getAssociatedObject(
+            config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler
+        {
+            handler.interceptor = interceptor
+            objc_setAssociatedObject(
+                webView, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, handler,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+
         return webView
     }
 
@@ -240,6 +308,28 @@ enum BrowserEngine {
 
 private enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
+    static var fingerprintHandlerKey: UInt8 = 1
+}
+
+final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var interceptor: NetworkInterceptor?
+
+    func userContentController(
+        _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
+    ) {
+        guard message.name == "fingerprintObserver",
+            let body = message.body as? [String: Any],
+            let pageUrlString = body["pageUrl"] as? String,
+            let scriptUrlString = body["scriptUrl"] as? String,
+            let api = body["api"] as? String,
+            let pageUrl = URL(string: pageUrlString),
+            let scriptUrl = URL(string: scriptUrlString)
+        else {
+            return
+        }
+
+        interceptor?.reportFingerprintingEvent(scriptUrl: scriptUrl, pageUrl: pageUrl, api: api)
+    }
 }
 
 extension WKWebView {

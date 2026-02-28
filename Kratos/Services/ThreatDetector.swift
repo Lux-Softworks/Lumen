@@ -108,7 +108,7 @@ final class ThreatDetector {
     private static let suspiciousQueryKeys: Set<String> = [
         "uid", "userid", "user_id", "device_id", "deviceid", "idfa", "gaid",
         "aaid", "email", "mail", "phone", "lat", "lon", "latitude", "longitude",
-        "fingerprint", "fp", "uuid", "advertising_id", "android_id", "idfv"
+        "fingerprint", "fp", "uuid", "advertising_id", "android_id", "idfv",
     ]
 
     private static let fingerprintAPIs: Set<String> = [
@@ -117,18 +117,18 @@ final class ThreatDetector {
         "AudioContext", "OfflineAudioContext", "createOscillator",
         "navigator.plugins", "navigator.mimeTypes", "navigator.hardwareConcurrency",
         "screen.colorDepth", "screen.pixelDepth",
-        "getBattery", "getGamepads", "mediaDevices.enumerateDevices"
+        "getBattery", "getGamepads", "mediaDevices.enumerateDevices",
     ]
 
     private static let knownCryptominerDomains: Set<String> = [
         "coinhive.com", "coin-hive.com", "gus.host", "cnhv.co",
         "crypto-loot.com", "cryptoloot.pro", "minero.cc",
-        "authedmine.com", "jsecoin.com", "mineralt.io"
+        "authedmine.com", "jsecoin.com", "mineralt.io",
     ]
 
     private static let knownFingerprintingScriptPatterns: Set<String> = [
         "fingerprintjs", "fingerprint2", "clientjs",
-        "evercookie", "supercookie", "panopticlick"
+        "evercookie", "supercookie", "panopticlick",
     ]
 
     init() {
@@ -172,7 +172,8 @@ final class ThreatDetector {
 
     func classifyRequest(requestURL: URL, pageURL: URL) -> Bool {
         guard let requestHost = requestURL.host?.lowercased(),
-              let pageHost = pageURL.host?.lowercased() else {
+            let pageHost = pageURL.host?.lowercased()
+        else {
             return false
         }
 
@@ -182,11 +183,30 @@ final class ThreatDetector {
         return requestDomain != pageDomain
     }
 
+    private static let commonCompoundTLDs: Set<String> = [
+        "co.uk", "org.uk", "me.uk", "net.uk", "gov.uk", "ac.uk",
+        "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp",
+        "com.au", "net.au", "org.au", "edu.au", "gov.au",
+        "co.nz", "net.nz", "org.nz", "geek.nz", "kiwi.nz",
+        "co.za", "gov.za", "org.za", "ac.za", "net.za",
+        "com.br", "net.br", "org.br", "gov.br", "edu.br",
+        "com.mx", "org.mx", "gob.mx", "edu.mx", "net.mx",
+        "co.in", "net.in", "org.in", "gov.in", "ac.in",
+        "com.sg", "net.sg", "org.sg", "gov.sg", "edu.sg",
+    ]
+
     func extractRegistrableDomain(from host: String) -> String {
         let parts = host.split(separator: ".")
 
         if parts.count <= 2 {
             return host
+        }
+
+        let lastTwo = parts.suffix(2).joined(separator: ".")
+        if Self.commonCompoundTLDs.contains(lastTwo) {
+            if parts.count >= 3 {
+                return parts.suffix(3).joined(separator: ".")
+            }
         }
 
         return parts.suffix(2).joined(separator: ".")
@@ -202,23 +222,23 @@ final class ThreatDetector {
         let severity: ThreatSeverity
 
         switch tracker.category {
-            case .advertising:
-                severity = .high
+        case .advertising:
+            severity = .high
 
-            case .analytics:
-                severity = .medium
+        case .analytics:
+            severity = .medium
 
-            case .social:
-                severity = .medium
+        case .social:
+            severity = .medium
 
-            case .fingerprinting:
-                severity = .critical
+        case .fingerprinting:
+            severity = .critical
 
-            case .cryptomining:
-                severity = .critical
+        case .cryptomining:
+            severity = .critical
 
-            case .unknown:
-                severity = .low
+        case .unknown:
+            severity = .low
         }
 
         let entity = ThreatEntity(
@@ -270,11 +290,51 @@ final class ThreatDetector {
         )
     }
 
+    func analyzeHookedFingerprint(request: InterceptedRequest, api: String) {
+        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
+
+        guard Self.fingerprintAPIs.contains(api) else { return }
+
+        guard request.isThirdParty else { return }
+
+        let trackerInfo = lookupTracker(domain: domain)
+        let isKnownTracker = trackerInfo != nil
+
+        let severity: ThreatSeverity = isKnownTracker ? .critical : .medium
+
+        var entity: ThreatEntity? = nil
+        if let tracker = trackerInfo {
+            entity = ThreatEntity(
+                name: tracker.entityName,
+                domains: tracker.domains,
+                category: tracker.category,
+                privacyPolicyURL: nil,
+                abuseContactEmail: nil
+            )
+        }
+
+        let event = ThreatEvent(
+            id: UUID(),
+            timestamp: request.timestamp,
+            type: .fingerprinter,
+            severity: severity,
+            sourceURL: request.url,
+            sourceDomain: domain,
+            pageURL: request.pageURL,
+            entity: entity,
+            details: "Active cross-site fingerprinting detected: accessed \(api)",
+            dataAtRisk: [.deviceFingerprint]
+        )
+
+        delegate?.threatDetector(self, didDetect: event)
+    }
+
     private func detectDataExfiltration(_ request: InterceptedRequest) -> ThreatEvent? {
         guard request.isThirdParty else { return nil }
 
         guard let components = URLComponents(url: request.url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems else {
+            let queryItems = components.queryItems
+        else {
             return nil
         }
 
@@ -294,7 +354,9 @@ final class ThreatDetector {
         let dataRisk: [DataCategory] = suspiciousParams.compactMap { param in
             let lower = param.lowercased()
             if lower.contains("email") || lower.contains("mail") { return .personalIdentifiers }
-            if lower.contains("lat") || lower.contains("lon") || lower.contains("location") { return .locationData }
+            if lower.contains("lat") || lower.contains("lon") || lower.contains("location") {
+                return .locationData
+            }
             if lower.contains("fingerprint") || lower.contains("fp") { return .deviceFingerprint }
             if lower.contains("device") || lower.contains("id") { return .personalIdentifiers }
             return .browsingHistory
@@ -311,7 +373,8 @@ final class ThreatDetector {
             sourceDomain: domain,
             pageURL: request.pageURL,
             entity: nil,
-            details: "Suspicious data exfiltration via parameters: \(suspiciousParams.joined(separator: ", "))",
+            details:
+                "Suspicious data exfiltration via parameters: \(suspiciousParams.joined(separator: ", "))",
             dataAtRisk: Array(Set(dataRisk))
         )
     }
@@ -321,12 +384,15 @@ final class ThreatDetector {
 
         let hasCookieSyncIndicators: Bool = {
             guard let components = URLComponents(url: request.url, resolvingAgainstBaseURL: false),
-                  let queryItems = components.queryItems else {
+                let queryItems = components.queryItems
+            else {
                 return false
             }
 
             let keys = Set(queryItems.map { $0.name.lowercased() })
-            let syncKeys: Set<String> = ["partner", "partner_id", "sync", "sync_id", "cookie_id", "match", "cm", "csync"]
+            let syncKeys: Set<String> = [
+                "partner", "partner_id", "sync", "sync_id", "cookie_id", "match", "cm", "csync",
+            ]
 
             return !keys.isDisjoint(with: syncKeys)
         }()

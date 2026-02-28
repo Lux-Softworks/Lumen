@@ -50,22 +50,23 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
         }
 
-        if scheme == "http" && httpsOnly {
-            if let httpsURL = upgradeToHTTPS(url) {
-                logger.info("HTTPS upgrade: \(url.absoluteString) → \(httpsURL.absoluteString)")
-                webView.load(URLRequest(url: httpsURL))
-                decisionHandler(.cancel)
+        let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
-                return
-            }
+        switch action {
+        case .upgrade(let httpsURL):
+            logger.info("HTTPS upgrade: \(url.absoluteString) → \(httpsURL.absoluteString)")
+            webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
             return
-        }
 
-        if scheme == "https" || scheme == "about" || scheme == "file" {
+        case .cancel:
+            logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none")")
+            decisionHandler(.cancel)
+            return
+
+        case .allow:
             let pageURL = currentPageURL ?? url
             let isThirdParty = detector.classifyRequest(requestURL: url, pageURL: pageURL)
-
             let resourceType = mapResourceType(navigationAction)
 
             let request = InterceptedRequest(
@@ -85,10 +86,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
 
             decisionHandler(.allow)
-            return
         }
-
-        decisionHandler(.allow)
     }
 
     func webView(
@@ -154,13 +152,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         logger.error("Navigation failed: \(error.localizedDescription)")
     }
 
-    private func upgradeToHTTPS(_ url: URL) -> URL? {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.scheme = "https"
-
-        return components?.url
-    }
-
     private func mapResourceType(_ action: WKNavigationAction) -> InterceptedRequest.ResourceType {
         if action.targetFrame?.isMainFrame == true {
             return .document
@@ -190,8 +181,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             break
         }
 
-        // Optimized check: scan path and query separately instead of full absoluteString
-        // This avoids creating a new lowercased copy of the entire URL string.
         let path = url.path
         for keyword in Self.xhrKeywords {
             if path.range(of: keyword, options: .caseInsensitive) != nil {
@@ -227,6 +216,21 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         for (entity, count) in entityCounts.sorted(by: { $0.value > $1.value }).prefix(10) {
             logger.warning("\(entity): \(count) event(s)")
         }
+    }
+
+    func reportFingerprintingEvent(scriptUrl: URL, pageUrl: URL, api: String) {
+        let isThirdParty = detector.classifyRequest(requestURL: scriptUrl, pageURL: pageUrl)
+
+        let request = InterceptedRequest(
+            url: scriptUrl,
+            pageURL: pageUrl,
+            headers: [:],
+            isThirdParty: isThirdParty,
+            resourceType: InterceptedRequest.ResourceType.script,
+            timestamp: Date()
+        )
+
+        detector.analyzeHookedFingerprint(request: request, api: api)
     }
 }
 

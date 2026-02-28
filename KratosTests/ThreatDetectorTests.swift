@@ -151,6 +151,41 @@ final class ThreatDetectorTests: XCTestCase {
         XCTAssertEqual(exfilEvents.first?.severity, .critical)
     }
 
+    func testDetectDataExfiltration_DataCategories() {
+        let testCases: [(params: String, expectedCategories: Set<DataCategory>)] = [
+            ("email=test@example.com", [.personalIdentifiers]),
+            ("mail=test@example.com", [.personalIdentifiers]),
+            ("lat=12.34&lon=56.78", [.locationData]),
+            ("latitude=12.34&longitude=56.78", [.locationData]),
+            ("fingerprint=abc", [.deviceFingerprint]),
+            ("fp=abc", [.deviceFingerprint]),
+            ("device_id=123", [.personalIdentifiers]),
+            ("uid=456", [.personalIdentifiers]),
+            ("phone=555-1234", [.browsingHistory]),
+            ("email=test@example.com&lat=12.34&fp=abc", [.personalIdentifiers, .locationData, .deviceFingerprint])
+        ]
+
+        for testCase in testCases {
+            let request = InterceptedRequest(
+                url: URL(string: "https://tracker.ad.com/collect?\(testCase.params)")!,
+                pageURL: URL(string: "https://www.shop.com")!,
+                headers: [:],
+                isThirdParty: true,
+                resourceType: .xhr,
+                timestamp: Date()
+            )
+
+            let events = detector.analyze(request)
+            let exfilEvent = events.first { $0.type == .dataExfiltration }
+
+            XCTAssertNotNil(exfilEvent, "Expected data exfiltration event for params: \(testCase.params)")
+            if let event = exfilEvent {
+                let actualCategories = Set(event.dataAtRisk)
+                XCTAssertEqual(actualCategories, testCase.expectedCategories, "Incorrect categories for params: \(testCase.params)")
+            }
+        }
+    }
+
     func testDetectDataExfiltration_NoSuspiciousParams_NoDetection() {
         let request = InterceptedRequest(
             url: URL(string: "https://tracker.ad.com/collect?page=home&ref=google")!,
