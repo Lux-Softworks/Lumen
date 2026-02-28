@@ -178,4 +178,19 @@ final class BrowserEngineTests: XCTestCase {
         XCTAssertTrue(policy.limitsNavigationToHTTPS)
         XCTAssertNil(policy.customUserAgent)
     }
+
+    func testMakeConfiguration_RegistersReadingSignalScript() {
+        let policy = PrivacyPolicy()
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        let script = config.userContentController.userScripts.first {
+            $0.source.contains("lumenReadingSignalInstalled")
+        }
+        XCTAssertNotNil(script)
+
+        let defaultConfig = ReadingSignalConfig.default
+        XCTAssertTrue(script!.source.contains("DWELL_THRESHOLD = \(defaultConfig.dwellThresholdSeconds)"))
+        XCTAssertTrue(script!.source.contains("SCROLL_THRESHOLD = \(defaultConfig.scrollDepthThreshold)"))
+        XCTAssertTrue(script!.source.contains("POLL_INTERVAL_MS = \(defaultConfig.pollIntervalMs)"))
+    }
 }

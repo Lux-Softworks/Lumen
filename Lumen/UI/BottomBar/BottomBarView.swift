@@ -81,12 +81,19 @@ struct BottomBarView: View {
         ) {
             VStack(spacing: 0) {
                 if state == .search || state == .browserSettings || state == .siteSettings {
-                    expandedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.12)))
+                    searchBarRow
+                        .transition(.opacity.animation(.smooth(duration: 0.2)))
                 } else {
                     collapsedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.3)))
+                        .transition(.opacity.animation(.smooth(duration: 0.2)))
                 }
+
+                if state == .search {
+                    searchSuggestionsArea
+                        .transition(.opacity.animation(.smooth(duration: 0.1)))
+                }
+
+                Spacer()
             }
         }
         .ignoresSafeArea(.keyboard)
@@ -98,7 +105,7 @@ struct BottomBarView: View {
                     }
                 }
             } else {
-                withAnimation(.smooth(duration: 0.12)) {
+                withAnimation(.smooth(duration: 0.07)) {
                     showHistory = false
                 }
                 isFocused = false
@@ -106,210 +113,203 @@ struct BottomBarView: View {
         }
     }
 
-    var expandedContent: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                if state == .siteSettings {
-                    Button(action: onCopyUrl) {
-                        Image(systemName: "link")
+    var searchBarRow: some View {
+        HStack(spacing: 12) {
+            if state == .siteSettings {
+                Button(action: onCopyUrl) {
+                    Image(systemName: "link")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                }
+                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+            } else {
+                Image(
+                    systemName: state == .browserSettings ? "gearshape.fill" : "magnifyingglass"
+                )
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                .frame(width: 44, height: 44)
+                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+            }
+
+            TextField(
+                state == .browserSettings ? "Browser Settings" : "Search...",
+                text: displayBinding
+            )
+            .font(.system(size: 17))
+            .fontWeight(.bold)
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .submitLabel(.go)
+            .onSubmit(onSubmit)
+            .frame(height: 44)
+            .disabled(state == .siteSettings || state == .browserSettings)
+            .truncationMode(
+                (state == .siteSettings || state == .browserSettings) ? .tail : .head
+            )
+            .matchedGeometryEffect(id: "searchField", in: animation)
+
+            if state == .search && !text.isEmpty {
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+
+            if state == .siteSettings {
+                Button(action: onReload) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.clear)
+                            .frame(width: 20, height: 20)
+
+                        Image(systemName: "arrow.clockwise")
+                            .resizable()
+                            .antialiased(true)
+                            .scaledToFit()
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                            .frame(width: 44, height: 44)
+                            .frame(width: 18, height: 18)
+                            .rotationEffect(.degrees(reloadRotation), anchor: .center)
+                            .drawingGroup()
                     }
-                    .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
-                } else {
-                    Image(
-                        systemName: state == .browserSettings ? "gearshape.fill" : "magnifyingglass"
-                    )
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
                     .frame(width: 44, height: 44)
-                    .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
                 }
-
-                TextField(
-                    state == .browserSettings ? "Browser Settings" : "Search...",
-                    text: displayBinding
-                )
-                .font(.system(size: 17))
-                .fontWeight(.bold)
-                .textFieldStyle(.plain)
-                .focused($isFocused)
-                .submitLabel(.go)
-                .onSubmit(onSubmit)
-                .frame(height: 44)
-                .disabled(state == .siteSettings || state == .browserSettings)
-                .truncationMode(
-                    (state == .siteSettings || state == .browserSettings) ? .tail : .head
-                )
-                .matchedGeometryEffect(id: "searchField", in: animation)
-
-                if state == .search && !text.isEmpty {
-                    Button(action: { text = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                }
-
-                if state == .siteSettings {
-                    Button(action: onReload) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.clear)
-                                .frame(width: 20, height: 20)
-
-                            Image(systemName: "arrow.clockwise")
-                                .resizable()
-                                .antialiased(true)
-                                .scaledToFit()
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                                .frame(width: 18, height: 18)
-                                .rotationEffect(.degrees(reloadRotation), anchor: .center)
-                                .drawingGroup()
+                .matchedGeometryEffect(id: "reloadButton", in: animation)
+                .onChange(of: isLoading) { _, loading in
+                    if loading {
+                        if !isSpinning {
+                            isSpinning = true
+                            triggerSpin()
                         }
-                        .frame(width: 44, height: 44)
-                    }
-                    .matchedGeometryEffect(id: "reloadButton", in: animation)
-                    .onChange(of: isLoading) { _, loading in
-                        if loading {
-                            if !isSpinning {
-                                isSpinning = true
-                                triggerSpin()
-                            }
-                        } else {
-                            isSpinning = false
-                        }
+                    } else {
+                        isSpinning = false
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            .background(
-                frostedBackground
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
-                    )
-                    .matchedGeometryEffect(id: "searchBackground", in: animation)
-            )
-            .padding(.top, 16)
-
-            if state == .search {
-                ScrollView(.vertical, showsIndicators: false) {
-                    if !searchSuggestions.isEmpty {
-                        VStack(spacing: 0) {
-                            ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
-                                index, suggestion in
-                                Button {
-                                    text = suggestion.text
-                                    onSubmit()
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                                            .frame(width: 24)
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            let attributedText: AttributedString = {
-                                                var attributedText = AttributedString(
-                                                    suggestion.text)
-
-                                                if !text.isEmpty {
-                                                    var searchRange =
-                                                        suggestion.text
-                                                        .startIndex..<suggestion.text.endIndex
-                                                    while let range = suggestion.text.range(
-                                                        of: text, options: .caseInsensitive,
-                                                        range: searchRange)
-                                                    {
-                                                        if let attrRange = Range(
-                                                            range, in: attributedText)
-                                                        {
-                                                            attributedText[attrRange].font =
-                                                                .system(
-                                                                    size: 16, weight: .heavy)
-                                                        }
-                                                        searchRange =
-                                                            range
-                                                            .upperBound..<suggestion.text.endIndex
-                                                    }
-                                                }
-
-                                                return attributedText
-                                            }()
-
-                                            Text(attributedText)
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(AppTheme.Colors.text)
-                                                .lineLimit(1)
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .frame(minHeight: 10)
-                    } else if !historyStore.recentEntries.isEmpty {
-                        VStack(spacing: 0) {
-                            ForEach(
-                                Array(historyStore.recentEntries.enumerated()), id: \.element.id
-                            ) {
-                                index, entry in
-                                Button {
-                                    onHistoryTap(entry.url)
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "magnifyingglass")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                                            .frame(width: 24)
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(entry.title)
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(AppTheme.Colors.text)
-                                                .lineLimit(1)
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .opacity(showHistory ? 1 : 0)
-                                .blur(radius: showHistory ? 0 : 4)
-                                .offset(y: showHistory ? 0 : 5)
-                                .animation(
-                                    showHistory
-                                        ? .smooth(duration: 0.2).delay(Double(index) * 0.02)
-                                        : .smooth(duration: 0.12),
-                                    value: showHistory
-                                )
-                            }
-                        }
-                        .frame(minHeight: 10)
-                    }
-                }
-                .padding(.top, 12)
-                .safeAreaPadding(.bottom, isFocused ? 320 : 0)
-            }
-
-            Spacer()
         }
-        .opacity(state == .hidden ? 0 : 1)
-        .padding(.bottom, state == .hidden ? -44 : 0)
-        .animation(.smooth(duration: 0.3), value: state == .hidden)
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .background(
+            frostedBackground
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                )
+                .matchedGeometryEffect(id: "searchBackground", in: animation)
+        )
+        .padding(.top, 16)
+    }
+
+    var searchSuggestionsArea: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            if !searchSuggestions.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
+                        index, suggestion in
+                        Button {
+                            text = suggestion.text
+                            onSubmit()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                                    .frame(width: 24)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    let attributedText: AttributedString = {
+                                        var attributedText = AttributedString(
+                                            suggestion.text)
+
+                                        if !text.isEmpty {
+                                            var searchRange =
+                                                suggestion.text
+                                                .startIndex..<suggestion.text.endIndex
+                                            while let range = suggestion.text.range(
+                                                of: text, options: .caseInsensitive,
+                                                range: searchRange)
+                                            {
+                                                if let attrRange = Range(
+                                                    range, in: attributedText)
+                                                {
+                                                    attributedText[attrRange].font =
+                                                        .system(
+                                                            size: 16, weight: .heavy)
+                                                }
+                                                searchRange =
+                                                    range
+                                                    .upperBound..<suggestion.text.endIndex
+                                            }
+                                        }
+
+                                        return attributedText
+                                    }()
+
+                                    Text(attributedText)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(AppTheme.Colors.text)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(minHeight: 10)
+            } else if !historyStore.recentEntries.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(historyStore.recentEntries.enumerated()), id: \.element.id
+                    ) {
+                        index, entry in
+                        Button {
+                            onHistoryTap(entry.url)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                                    .frame(width: 24)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.title)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(AppTheme.Colors.text)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(showHistory ? 1 : 0)
+                        .blur(radius: showHistory ? 0 : 4)
+                        .offset(y: showHistory ? 0 : 5)
+                        .animation(
+                            showHistory
+                                ? .smooth(duration: 0.32).delay(Double(index) * 0.035)
+                                : .smooth(duration: 0.07),
+                            value: showHistory
+                        )
+                    }
+                }
+                .frame(minHeight: 10)
+            }
+        }
+        .padding(.top, 12)
+        .safeAreaPadding(.bottom, isFocused ? 320 : 0)
     }
 
     private var frostedBackground: some View {
@@ -410,8 +410,6 @@ struct BottomBarView: View {
             .padding(.trailing, 8)
         }
         .frame(height: 80)
-        .opacity((state == .collapsed || state == .hidden) ? 1 : 0)
-        .animation(.smooth(duration: 0.3), value: state == .collapsed || state == .hidden)
     }
 
     private var displayBinding: Binding<String> {

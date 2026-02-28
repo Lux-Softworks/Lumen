@@ -260,6 +260,21 @@ enum BrowserEngine {
             config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        let readingSignalConfig = ReadingSignalConfig.default
+        let readingSignalScript = WKUserScript(
+            source: ReadingSignalScript.makeScript(config: readingSignalConfig),
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(readingSignalScript)
+
+        let readingSignalHandler = ReadingSignalHandler(config: readingSignalConfig)
+        config.userContentController.add(readingSignalHandler, name: "readingSignal")
+
+        objc_setAssociatedObject(
+            config, &_WKWebViewAssociatedKeys.readingSignalHandlerKey, readingSignalHandler,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
         return config
     }
 
@@ -309,6 +324,7 @@ enum BrowserEngine {
 private enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
     static var fingerprintHandlerKey: UInt8 = 1
+    static var readingSignalHandlerKey: UInt8 = 2
 }
 
 final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {
