@@ -1,7 +1,7 @@
 import WebKit
 import XCTest
 
-@testable import Kratos
+@testable import Lumen
 
 final class BrowserEngineTests: XCTestCase {
     func testMakeRequest_CachePolicy() {
@@ -135,10 +135,10 @@ final class BrowserEngineTests: XCTestCase {
 
     func testMakeConfiguration_CustomUserAgent() {
         var policy = PrivacyPolicy()
-        policy.customUserAgent = "KratosBot/1.0"
+        policy.customUserAgent = "LumenBot/1.0"
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        XCTAssertEqual(config.applicationNameForUserAgent, "KratosBot/1.0")
+        XCTAssertEqual(config.applicationNameForUserAgent, "LumenBot/1.0")
     }
 
     func testMakeWebView_HasNavigationDelegate() {

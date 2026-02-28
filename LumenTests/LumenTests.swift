@@ -1,6 +1,6 @@
 //
-//  KratosTests.swift
-//  KratosTests
+//  LumenTests.swift
+//  LumenTests
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
@@ -8,9 +8,9 @@
 import WebKit
 import XCTest
 
-@testable import Kratos
+@testable import Lumen
 
-final class KratosTests: XCTestCase {
+final class LumenTests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

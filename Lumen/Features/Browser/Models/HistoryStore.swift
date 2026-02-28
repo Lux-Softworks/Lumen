@@ -19,7 +19,7 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
 final class HistoryStore: ObservableObject {
     @Published private(set) var entries: [HistoryEntry] = []
 
-    private let key = "com.kratos.history"
+    private let key = "com.lumen.history"
     private let maxEntries = 10
 
     static let shared = HistoryStore()

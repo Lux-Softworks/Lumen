@@ -1,6 +1,6 @@
 //
-//  KratosApp.swift
-//  Kratos
+//  LumenApp.swift
+//  Lumen
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct KratosApp: App {
+struct LumenApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

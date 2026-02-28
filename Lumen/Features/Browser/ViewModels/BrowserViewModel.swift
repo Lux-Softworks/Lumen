@@ -24,7 +24,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(
-        subsystem: "com.kratossoftworks.Kratos", category: "BrowserViewModel")
+        subsystem: "com.luxsoftworks.Lumen", category: "BrowserViewModel")
 
     static let defaultURL = URL(string: "https://www.google.com")!
     static let searchEngineTemplate = "https://www.google.com/search?q=%@"
@@ -34,7 +34,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeBrain() {
         /* if brain == nil {
             brain = LocalBrain()
-
+        
             Task {
                 try? await brain?.loadModel()
             }

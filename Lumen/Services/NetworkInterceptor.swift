@@ -6,7 +6,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     private let detector: ThreatDetector
     private let httpsOnly: Bool
-    private let logger = Logger(subsystem: "com.Kratos.browser", category: "NetworkInterceptor")
+    private let logger = Logger(subsystem: "com.Lumen.browser", category: "NetworkInterceptor")
 
     private static let xhrKeywords = ["/api/", "/collect", "/pixel", "/beacon", "/track", "/event"]
 

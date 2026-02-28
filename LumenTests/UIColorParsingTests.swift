@@ -1,6 +1,6 @@
 import XCTest
 import UIKit
-@testable import Kratos
+@testable import Lumen
 
 final class UIColorParsingTests: XCTestCase {
     private func assertColorsEqual(_ color1: UIColor?, _ color2: UIColor?, file: StaticString = #file, line: UInt = #line) {

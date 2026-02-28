@@ -26,37 +26,37 @@
 			containerPortal = C367F5322EFA58D90076A657 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = C367F5392EFA58D90076A657;
-			remoteInfo = Kratos;
+			remoteInfo = Lumen;
 		};
 		C367F5522EFA58DB0076A657 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C367F5322EFA58D90076A657 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = C367F5392EFA58D90076A657;
-			remoteInfo = Kratos;
+			remoteInfo = Lumen;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		C367F53A2EFA58D90076A657 /* Kratos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kratos.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C367F5472EFA58DB0076A657 /* KratosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KratosTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		C367F5512EFA58DB0076A657 /* KratosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KratosUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C367F53A2EFA58D90076A657 /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C367F5472EFA58DB0076A657 /* LumenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C367F5512EFA58DB0076A657 /* LumenUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumenUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		C367F53C2EFA58D90076A657 /* Kratos */ = {
+		C367F53C2EFA58D90076A657 /* Lumen */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Kratos;
+			path = Lumen;
 			sourceTree = "<group>";
 		};
-		C367F54A2EFA58DB0076A657 /* KratosTests */ = {
+		C367F54A2EFA58DB0076A657 /* LumenTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = KratosTests;
+			path = LumenTests;
 			sourceTree = "<group>";
 		};
-		C367F5542EFA58DB0076A657 /* KratosUITests */ = {
+		C367F5542EFA58DB0076A657 /* LumenUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = KratosUITests;
+			path = LumenUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -94,9 +94,9 @@
 		C367F5312EFA58D90076A657 = {
 			isa = PBXGroup;
 			children = (
-				C367F53C2EFA58D90076A657 /* Kratos */,
-				C367F54A2EFA58DB0076A657 /* KratosTests */,
-				C367F5542EFA58DB0076A657 /* KratosUITests */,
+				C367F53C2EFA58D90076A657 /* Lumen */,
+				C367F54A2EFA58DB0076A657 /* LumenTests */,
+				C367F5542EFA58DB0076A657 /* LumenUITests */,
 				C367F53B2EFA58D90076A657 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,9 +104,9 @@
 		C367F53B2EFA58D90076A657 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C367F53A2EFA58D90076A657 /* Kratos.app */,
-				C367F5472EFA58DB0076A657 /* KratosTests.xctest */,
-				C367F5512EFA58DB0076A657 /* KratosUITests.xctest */,
+				C367F53A2EFA58D90076A657 /* Lumen.app */,
+				C367F5472EFA58DB0076A657 /* LumenTests.xctest */,
+				C367F5512EFA58DB0076A657 /* LumenUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,9 +114,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C367F5392EFA58D90076A657 /* Kratos */ = {
+		C367F5392EFA58D90076A657 /* Lumen */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C367F55B2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "Kratos" */;
+			buildConfigurationList = C367F55B2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "Lumen" */;
 			buildPhases = (
 				C367F5362EFA58D90076A657 /* Sources */,
 				C367F5372EFA58D90076A657 /* Frameworks */,
@@ -125,9 +125,9 @@
 			buildRules = (
 			);
 			fileSystemSynchronizedGroups = (
-				C367F53C2EFA58D90076A657 /* Kratos */,
+				C367F53C2EFA58D90076A657 /* Lumen */,
 			);
-			name = Kratos;
+			name = Lumen;
 			packageProductDependencies = (
 				C348ACAC2F3EBE6E0035C0C0 /* MLX */,
 				C348ACAE2F3EBE6E0035C0C0 /* MLXFFT */,
@@ -141,13 +141,13 @@
 				C348ACC62F3F51410035C0C0 /* MLXLMCommon */,
 				C348ACC82F3F51410035C0C0 /* MLXVLM */,
 			);
-			productName = Kratos;
-			productReference = C367F53A2EFA58D90076A657 /* Kratos.app */;
+			productName = Lumen;
+			productReference = C367F53A2EFA58D90076A657 /* Lumen.app */;
 			productType = "com.apple.product-type.application";
 		};
-		C367F5462EFA58DB0076A657 /* KratosTests */ = {
+		C367F5462EFA58DB0076A657 /* LumenTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C367F55E2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "KratosTests" */;
+			buildConfigurationList = C367F55E2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "LumenTests" */;
 			buildPhases = (
 				C367F5432EFA58DB0076A657 /* Sources */,
 				C367F5442EFA58DB0076A657 /* Frameworks */,
@@ -159,16 +159,16 @@
 				C367F5492EFA58DB0076A657 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				C367F54A2EFA58DB0076A657 /* KratosTests */,
+				C367F54A2EFA58DB0076A657 /* LumenTests */,
 			);
-			name = KratosTests;
-			productName = KratosTests;
-			productReference = C367F5472EFA58DB0076A657 /* KratosTests.xctest */;
+			name = LumenTests;
+			productName = LumenTests;
+			productReference = C367F5472EFA58DB0076A657 /* LumenTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		C367F5502EFA58DB0076A657 /* KratosUITests */ = {
+		C367F5502EFA58DB0076A657 /* LumenUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C367F5612EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "KratosUITests" */;
+			buildConfigurationList = C367F5612EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "LumenUITests" */;
 			buildPhases = (
 				C367F54D2EFA58DB0076A657 /* Sources */,
 				C367F54E2EFA58DB0076A657 /* Frameworks */,
@@ -180,11 +180,11 @@
 				C367F5532EFA58DB0076A657 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				C367F5542EFA58DB0076A657 /* KratosUITests */,
+				C367F5542EFA58DB0076A657 /* LumenUITests */,
 			);
-			name = KratosUITests;
-			productName = KratosUITests;
-			productReference = C367F5512EFA58DB0076A657 /* KratosUITests.xctest */;
+			name = LumenUITests;
+			productName = LumenUITests;
+			productReference = C367F5512EFA58DB0076A657 /* LumenUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -210,7 +210,7 @@
 					};
 				};
 			};
-			buildConfigurationList = C367F5352EFA58D90076A657 /* Build configuration list for PBXProject "Kratos" */;
+			buildConfigurationList = C367F5352EFA58D90076A657 /* Build configuration list for PBXProject "Lumen" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -228,9 +228,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C367F5392EFA58D90076A657 /* Kratos */,
-				C367F5462EFA58DB0076A657 /* KratosTests */,
-				C367F5502EFA58DB0076A657 /* KratosUITests */,
+				C367F5392EFA58D90076A657 /* Lumen */,
+				C367F5462EFA58DB0076A657 /* LumenTests */,
+				C367F5502EFA58DB0076A657 /* LumenUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -274,18 +274,18 @@
 /* Begin PBXTargetDependency section */
 		C367F5492EFA58DB0076A657 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = C367F5392EFA58D90076A657 /* Kratos */;
+			target = C367F5392EFA58D90076A657 /* Lumen */;
 			targetProxy = C367F5482EFA58DB0076A657 /* PBXContainerItemProxy */;
 		};
 		C367F5532EFA58DB0076A657 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = C367F5392EFA58D90076A657 /* Kratos */;
+			target = C367F5392EFA58D90076A657 /* Lumen */;
 			targetProxy = C367F5522EFA58DB0076A657 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		C367F5592EFA58DB0076A657 /* Debug configuration for PBXProject "Kratos" */ = {
+		C367F5592EFA58DB0076A657 /* Debug configuration for PBXProject "Lumen" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -350,7 +350,7 @@
 			};
 			name = Debug;
 		};
-		C367F55A2EFA58DB0076A657 /* Release configuration for PBXProject "Kratos" */ = {
+		C367F55A2EFA58DB0076A657 /* Release configuration for PBXProject "Lumen" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -408,18 +408,18 @@
 			};
 			name = Release;
 		};
-		C367F55C2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "Kratos" */ = {
+		C367F55C2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "Lumen" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Kratos/App/Kratos.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Lumen/App/Lumen.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Kratos;
+				INFOPLIST_KEY_CFBundleDisplayName = Lumen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -431,7 +431,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kratossoftworks.Kratos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.Lumen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -443,18 +443,18 @@
 			};
 			name = Debug;
 		};
-		C367F55D2EFA58DB0076A657 /* Release configuration for PBXNativeTarget "Kratos" */ = {
+		C367F55D2EFA58DB0076A657 /* Release configuration for PBXNativeTarget "Lumen" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Kratos/App/Kratos.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Lumen/App/Lumen.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Kratos;
+				INFOPLIST_KEY_CFBundleDisplayName = Lumen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -466,7 +466,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kratossoftworks.Kratos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.Lumen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -478,7 +478,7 @@
 			};
 			name = Release;
 		};
-		C367F55F2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "KratosTests" */ = {
+		C367F55F2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "LumenTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -488,7 +488,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ironveil.KratosTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -496,11 +496,11 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kratos.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kratos";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lumen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lumen";
 			};
 			name = Debug;
 		};
-		C367F5602EFA58DB0076A657 /* Release configuration for PBXNativeTarget "KratosTests" */ = {
+		C367F5602EFA58DB0076A657 /* Release configuration for PBXNativeTarget "LumenTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -510,7 +510,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ironveil.KratosTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -518,11 +518,11 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kratos.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kratos";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lumen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lumen";
 			};
 			name = Release;
 		};
-		C367F5622EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "KratosUITests" */ = {
+		C367F5622EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "LumenUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -530,7 +530,7 @@
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ironveil.KratosUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -538,11 +538,11 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Kratos;
+				TEST_TARGET_NAME = Lumen;
 			};
 			name = Debug;
 		};
-		C367F5632EFA58DB0076A657 /* Release configuration for PBXNativeTarget "KratosUITests" */ = {
+		C367F5632EFA58DB0076A657 /* Release configuration for PBXNativeTarget "LumenUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -550,7 +550,7 @@
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ironveil.KratosUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -558,42 +558,42 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Kratos;
+				TEST_TARGET_NAME = Lumen;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C367F5352EFA58D90076A657 /* Build configuration list for PBXProject "Kratos" */ = {
+		C367F5352EFA58D90076A657 /* Build configuration list for PBXProject "Lumen" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C367F5592EFA58DB0076A657 /* Debug configuration for PBXProject "Kratos" */,
-				C367F55A2EFA58DB0076A657 /* Release configuration for PBXProject "Kratos" */,
+				C367F5592EFA58DB0076A657 /* Debug configuration for PBXProject "Lumen" */,
+				C367F55A2EFA58DB0076A657 /* Release configuration for PBXProject "Lumen" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		C367F55B2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "Kratos" */ = {
+		C367F55B2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "Lumen" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C367F55C2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "Kratos" */,
-				C367F55D2EFA58DB0076A657 /* Release configuration for PBXNativeTarget "Kratos" */,
+				C367F55C2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "Lumen" */,
+				C367F55D2EFA58DB0076A657 /* Release configuration for PBXNativeTarget "Lumen" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		C367F55E2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "KratosTests" */ = {
+		C367F55E2EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "LumenTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C367F55F2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "KratosTests" */,
-				C367F5602EFA58DB0076A657 /* Release configuration for PBXNativeTarget "KratosTests" */,
+				C367F55F2EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "LumenTests" */,
+				C367F5602EFA58DB0076A657 /* Release configuration for PBXNativeTarget "LumenTests" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		C367F5612EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "KratosUITests" */ = {
+		C367F5612EFA58DB0076A657 /* Build configuration list for PBXNativeTarget "LumenUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C367F5622EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "KratosUITests" */,
-				C367F5632EFA58DB0076A657 /* Release configuration for PBXNativeTarget "KratosUITests" */,
+				C367F5622EFA58DB0076A657 /* Debug configuration for PBXNativeTarget "LumenUITests" */,
+				C367F5632EFA58DB0076A657 /* Release configuration for PBXNativeTarget "LumenUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

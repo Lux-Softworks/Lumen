@@ -1,13 +1,13 @@
 //
-//  KratosUITestsLaunchTests.swift
-//  KratosUITests
+//  LumenUITestsLaunchTests.swift
+//  LumenUITests
 //
 //  Created by Daniel Kosukhin on 12/22/25.
 //
 
 import XCTest
 
-final class KratosUITestsLaunchTests: XCTestCase {
+final class LumenUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
