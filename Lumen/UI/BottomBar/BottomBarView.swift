@@ -21,10 +21,14 @@ struct BottomBarView: View {
     var onReload: () -> Void
 
     @ObservedObject private var historyStore = HistoryStore.shared
+
     @Namespace private var animation
     @State private var showHistory = false
     @State private var reloadRotation: Double = 0
     @State private var isSpinning: Bool = false
+    @State private var toolbarDragFraction: CGFloat = 0
+    @State private var suggestionsExpanded = false
+    @State private var suggestionsOpacity: Double = 0
 
     var isExpanded: Bool { state != .collapsed }
 
@@ -57,15 +61,14 @@ struct BottomBarView: View {
             progress: progress,
             themeColor: themeColor,
             onDragStart: {
-                if state == .collapsed || state == .hidden {
-                    // preserve drag here
-                }
+                if state == .collapsed || state == .hidden {}
             },
             onExpand: {
                 if state == .collapsed || state == .hidden {
                     text = ""
                     state = .search
                 }
+
                 if state == .search {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         isFocused = true
@@ -77,6 +80,15 @@ struct BottomBarView: View {
             },
             onDismissFocused: {
                 isFocused = false
+            },
+            onDragProgress: { fraction in
+                if fraction == 0 {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                        toolbarDragFraction = 0
+                    }
+                } else {
+                    toolbarDragFraction = fraction
+                }
             }
         ) {
             VStack(spacing: 0) {
@@ -88,27 +100,68 @@ struct BottomBarView: View {
                         .transition(.opacity.animation(.smooth(duration: 0.2)))
                 }
 
-                if state == .search {
-                    searchSuggestionsArea
-                        .transition(.opacity.animation(.smooth(duration: 0.1)))
-                }
+                searchSuggestionsArea
+                    .opacity(suggestionsOpacity)
+                    .allowsHitTesting(state == .search)
+                    .frame(maxHeight: suggestionsExpanded ? .infinity : 0, alignment: .top)
+                    .clipped()
+
+                dragRevealedHistory
+                    .opacity(
+                        state == .search || state == .browserSettings || state == .siteSettings
+                            ? 0 : 1
+                    )
+                    .allowsHitTesting(
+                        !(state == .search || state == .browserSettings || state == .siteSettings))
 
                 Spacer()
             }
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: state) { _, newState in
-            if newState == .search || newState == .browserSettings || newState == .siteSettings {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    withAnimation(.smooth(duration: 0.2)) {
+            let wasDragging = toolbarDragFraction > 0
+
+            if newState == .search {
+                suggestionsExpanded = true
+
+                if wasDragging {
+                    toolbarDragFraction = 0
+                    var t = Transaction(animation: .none)
+                    t.disablesAnimations = true
+                    withTransaction(t) {
                         showHistory = true
+                        suggestionsOpacity = 1
+                    }
+                } else {
+                    toolbarDragFraction = 0
+                    withAnimation(.smooth(duration: 0.15)) {
+                        suggestionsOpacity = 1
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            showHistory = true
+                        }
                     }
                 }
             } else {
-                withAnimation(.smooth(duration: 0.07)) {
-                    showHistory = false
+                if newState != .browserSettings && newState != .siteSettings {
+                    isFocused = false
                 }
-                isFocused = false
+
+                toolbarDragFraction = 0
+
+                withAnimation(.smooth(duration: 0.15)) {
+                    showHistory = false
+                    suggestionsOpacity = 0
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    if state != .search {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            suggestionsExpanded = false
+                        }
+                    }
+                }
             }
         }
     }
@@ -312,6 +365,42 @@ struct BottomBarView: View {
         .safeAreaPadding(.bottom, isFocused ? 320 : 0)
     }
 
+    private var dragRevealedHistory: some View {
+        let historyOpacity = min(1.0, toolbarDragFraction * 3.0)
+
+        return VStack(spacing: 0) {
+            ForEach(
+                Array(historyStore.recentEntries.enumerated()), id: \.element.id
+            ) { _, entry in
+                Button {
+                    onHistoryTap(entry.url)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.title)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(AppTheme.Colors.text)
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 12)
+        .opacity(historyOpacity)
+    }
+
     private var frostedBackground: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
@@ -329,7 +418,10 @@ struct BottomBarView: View {
     }
 
     var collapsedContent: some View {
-        HStack(spacing: 0) {
+        let sideOpacity = max(0, 1 - toolbarDragFraction * 3.0)
+        let sideSlide: CGFloat = toolbarDragFraction * 14
+
+        return HStack(spacing: 0) {
             Button(action: onTabsPressed) {
                 Image(systemName: "square.on.square")
                     .font(.system(size: 20, weight: .semibold))
@@ -343,6 +435,8 @@ struct BottomBarView: View {
                     )
             }
             .padding(.leading, 8)
+            .opacity(sideOpacity)
+            .offset(x: -sideSlide)
 
             Spacer()
 
@@ -408,6 +502,8 @@ struct BottomBarView: View {
                     )
             }
             .padding(.trailing, 8)
+            .opacity(sideOpacity)
+            .offset(x: sideSlide)
         }
         .frame(height: 80)
     }

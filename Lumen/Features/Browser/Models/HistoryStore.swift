@@ -31,9 +31,7 @@ final class HistoryStore: ObservableObject {
     func record(url: String, title: String) {
         guard !url.isEmpty, url != "about:blank" else { return }
 
-        if let lastIndex = entries.firstIndex(where: { $0.url == url }) {
-            entries.remove(at: lastIndex)
-        }
+        entries.removeAll { $0.url == url }
 
         let entry = HistoryEntry(url: url, title: title)
         entries.insert(entry, at: 0)
@@ -59,6 +57,16 @@ final class HistoryStore: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: key),
             let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data)
         else { return }
-        entries = decoded
+
+        var seen = Set<String>()
+        var deduped = [HistoryEntry]()
+        for entry in decoded {
+            if !seen.contains(entry.url) {
+                seen.insert(entry.url)
+                deduped.append(entry)
+            }
+        }
+
+        entries = deduped
     }
 }

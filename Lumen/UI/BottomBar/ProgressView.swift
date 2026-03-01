@@ -43,29 +43,29 @@ struct ProgressView: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Capsule()
+            Ellipse()
                 .fill(glowGradient)
-                .blur(radius: 22)
-                .opacity(0.16)
+                .blur(radius: 28)
+                .opacity(0.11)
+                .frame(height: 38)
+
+            Ellipse()
+                .fill(glowGradient)
+                .blur(radius: 9)
+                .opacity(0.26)
                 .frame(height: 14)
 
             Capsule()
-                .fill(glowGradient)
-                .blur(radius: 5.5)
-                .opacity(0.36)
-                .frame(height: 5)
-
-            Capsule()
                 .fill(barGradient)
-                .blur(radius: 1.5)
-                .opacity(0.6)
-                .frame(height: 2.5)
+                .blur(radius: 2)
+                .opacity(0.5)
+                .frame(height: 4)
 
-            Capsule()
+            Ellipse()
                 .fill(tipGradient)
-                .blur(radius: 4.5)
-                .opacity(0.82)
-                .frame(height: 8)
+                .blur(radius: 5)
+                .opacity(0.78)
+                .frame(height: 10)
 
             Capsule()
                 .fill(barGradient)
@@ -74,7 +74,7 @@ struct ProgressView: View {
         .scaleEffect(x: displayedProgress, anchor: .leading)
         .frame(maxWidth: width - cornerRadius * 2, maxHeight: .infinity, alignment: .topLeading)
         .opacity(visible ? 1 : 0)
-        .offset(y: -6.95) // necessary offset for progress bar to be aligned. DO NOT CHANGE
+        .offset(y: -18.95)  // necessary offset for progress bar to be aligned. DO NOT CHANGE
         .onChange(of: isLoading) { _, loading in
             if loading {
                 isFinishing = false
