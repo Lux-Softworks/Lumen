@@ -3,7 +3,7 @@ import XCTest
 
 final class ReadingSignalPayloadTests: XCTestCase {
 
-    func test_decodesValidPayload() throws {
+    func testDecodesValidPayload() throws {
         let json = """
         {
             "url": "https://example.com/article",
@@ -23,7 +23,7 @@ final class ReadingSignalPayloadTests: XCTestCase {
         XCTAssertTrue(payload.triggered)
     }
 
-    func test_decodesUnTriggeredPayload() throws {
+    func testDecodesUnTriggeredPayload() throws {
         let json = """
         {
             "url": "https://example.com",
@@ -38,7 +38,7 @@ final class ReadingSignalPayloadTests: XCTestCase {
         XCTAssertFalse(payload.triggered)
     }
 
-    func test_throwsOnMissingRequiredField() {
+    func testThrowsOnMissingRequiredField() {
         let json = """
         {
             "url": "https://example.com",

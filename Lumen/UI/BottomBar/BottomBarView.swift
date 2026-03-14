@@ -164,6 +164,14 @@ struct BottomBarView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                keyboardHeight = frame.height - 10
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardHeight = 0
+        }
     }
 
     var searchBarRow: some View {
@@ -362,8 +370,10 @@ struct BottomBarView: View {
             }
         }
         .padding(.top, 12)
-        .safeAreaPadding(.bottom, isFocused ? 320 : 0)
+        .safeAreaPadding(.bottom, isFocused ? keyboardHeight : 0)
     }
+
+    @State private var keyboardHeight: CGFloat = 0
 
     private var dragRevealedHistory: some View {
         let historyOpacity = min(1.0, toolbarDragFraction * 3.0)
@@ -511,31 +521,33 @@ struct BottomBarView: View {
     private var displayBinding: Binding<String> {
         Binding(
             get: {
-                if state == .browserSettings {
+                switch state {
+                case .browserSettings:
                     return "Browser Settings"
-                } else if state == .siteSettings {
+                case .siteSettings:
                     return neaten(url: currentURL?.absoluteString ?? text)
-                } else {
+                default:
                     return text
                 }
             },
-            set: {
+            set: { newValue in
                 if state == .search {
-                    text = $0
+                    text = newValue
                 }
             }
         )
     }
 
     private func neaten(url: String) -> String {
-        var clean = url
-        if clean.hasPrefix("https://") {
-            clean.removeFirst(8)
-        } else if clean.hasPrefix("http://") {
-            clean.removeFirst(7)
+        guard let urlComponents = URLComponents(string: url),
+              let host = urlComponents.host else {
+            return url.isEmpty ? "Search..." : url
         }
-        if clean.hasPrefix("www.") { clean.removeFirst(4) }
-        if clean.hasSuffix("/") { clean.removeLast() }
-        return clean.isEmpty ? "Search..." : clean
+
+        var cleanHost = host
+        if cleanHost.hasPrefix("www.") {
+            cleanHost.removeFirst(4)
+        }
+        return cleanHost
     }
 }

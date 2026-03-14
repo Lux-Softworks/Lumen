@@ -4,13 +4,13 @@ import MLXLLM
 import MLXLMCommon
 internal import Tokenizers
 
-enum BrainIntent {
+enum KnowledgeIntent {
     case action
     case context
     case knowledge
 }
 
-actor LocalBrain {
+actor LocalKnowledgeProvider {
     private var modelContainer: ModelContainer?
     private var loadingTask: Task<ModelContainer, Error>?
 
@@ -76,7 +76,7 @@ actor LocalBrain {
         }
     }
 
-    func route(_ input: String) async -> BrainIntent {
+    func route(_ input: String) async -> KnowledgeIntent {
         let lower = input.lowercased()
 
         if lower.starts(with: "click") || lower.starts(with: "tap") || lower.starts(with: "fill")

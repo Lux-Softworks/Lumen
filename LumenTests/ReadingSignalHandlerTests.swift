@@ -11,45 +11,45 @@ final class ReadingSignalHandlerTests: XCTestCase {
         handler = ReadingSignalHandler(config: .default)
     }
 
-    func test_excludesBankingKeywordInHost() {
+    func testExcludesBankingKeywordInHost() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://mybank.com/dashboard"))
     }
 
-    func test_excludesBankingKeywordInSubdomain() {
+    func testExcludesBankingKeywordInSubdomain() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://online.banking.example.com"))
     }
 
-    func test_excludesAccountKeywordInHost() {
+    func testExcludesAccountKeywordInHost() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://myaccount.google.com"))
     }
 
-    func test_excludesHealthKeywordInHost() {
+    func testExcludesHealthKeywordInHost() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://patient.healthportal.com"))
     }
 
-    func test_excludesGmailExactHost() {
+    func testExcludesGmailExactHost() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://mail.google.com/mail/u/0/#inbox"))
     }
 
-    func test_excludesOutlookExactHost() {
+    func testExcludesOutlookExactHost() {
         XCTAssertTrue(handler.isExcluded(urlString: "https://outlook.com/mail/inbox"))
     }
 
-    func test_allowsNormalArticle() {
+    func testAllowsNormalArticle() {
         XCTAssertFalse(handler.isExcluded(urlString: "https://example.com/article"))
     }
 
-    func test_allowsNewsArticle() {
+    func testAllowsNewsArticle() {
         XCTAssertFalse(
             handler.isExcluded(urlString: "https://www.nytimes.com/2026/01/01/tech/story.html")
         )
     }
 
-    func test_excludesInvalidURL() {
+    func testExcludesInvalidURL() {
         XCTAssertTrue(handler.isExcluded(urlString: "not-a-url"))
     }
 
-    func test_customConfigExclusionKeywordIsRespected() {
+    func testCustomConfigExclusionKeywordIsRespected() {
         var custom = ReadingSignalConfig.default
         custom.excludedHostKeywords = ["secret"]
         let customHandler = ReadingSignalHandler(config: custom)
@@ -57,14 +57,14 @@ final class ReadingSignalHandlerTests: XCTestCase {
         XCTAssertFalse(customHandler.isExcluded(urlString: "https://example.com"))
     }
 
-    func test_customConfigExcludedHostIsRespected() {
+    func testCustomConfigExcludedHostIsRespected() {
         var custom = ReadingSignalConfig.default
         custom.excludedHosts = ["private.company.com"]
         let customHandler = ReadingSignalHandler(config: custom)
         XCTAssertTrue(customHandler.isExcluded(urlString: "https://private.company.com/dashboard"))
     }
 
-    func test_callbackFiredForValidPayload() {
+    func testCallbackFiredForValidPayload() {
         let expectation = expectation(description: "callback fired")
         handler.onReadingSignalTriggered = { payload in
             XCTAssertEqual(payload.url, "https://example.com/article")
@@ -83,7 +83,7 @@ final class ReadingSignalHandlerTests: XCTestCase {
         waitForExpectations(timeout: 1)
     }
 
-    func test_callbackNotFiredWhenTriggeredFalse() {
+    func testCallbackNotFiredWhenTriggeredFalse() {
         var called = false
         handler.onReadingSignalTriggered = { _ in called = true }
 
@@ -98,7 +98,7 @@ final class ReadingSignalHandlerTests: XCTestCase {
         XCTAssertFalse(called)
     }
 
-    func test_callbackNotFiredForExcludedURL() {
+    func testCallbackNotFiredForExcludedURL() {
         var called = false
         handler.onReadingSignalTriggered = { _ in called = true }
 
@@ -113,7 +113,7 @@ final class ReadingSignalHandlerTests: XCTestCase {
         XCTAssertFalse(called)
     }
 
-    func test_callbackNotFiredForMalformedBody() {
+    func testCallbackNotFiredForMalformedBody() {
         var called = false
         handler.onReadingSignalTriggered = { _ in called = true }
 

@@ -4,6 +4,7 @@ import UIKit
 import WebKit
 import os.log
 
+@MainActor
 final class BrowserViewModel: NSObject, ObservableObject {
     @Published var urlString: String = ""
     @Published var currentURL: URL?
@@ -29,14 +30,14 @@ final class BrowserViewModel: NSObject, ObservableObject {
     static let defaultURL = URL(string: "https://www.google.com")!
     static let searchEngineTemplate = "https://www.google.com/search?q=%@"
 
-    private var brain: LocalBrain?
+    private var knowledgeProvider: LocalKnowledgeProvider?
 
-    func initializeBrain() {
-        /* if brain == nil {
-            brain = LocalBrain()
+    func initializeKnowledgeProvider() {
+        /* if knowledgeProvider == nil {
+            knowledgeProvider = LocalKnowledgeProvider()
         
             Task {
-                try? await brain?.loadModel()
+                try? await knowledgeProvider?.loadModel()
             }
         } */
     }
