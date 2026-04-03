@@ -18,6 +18,8 @@
 		C348ACC52F3F51410035C0C0 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC42F3F51410035C0C0 /* MLXLLM */; };
 		C348ACC72F3F51410035C0C0 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC62F3F51410035C0C0 /* MLXLMCommon */; };
 		C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC82F3F51410035C0C0 /* MLXVLM */; };
+		C35221442F7F7A5600F9636E /* Readability in Frameworks */ = {isa = PBXBuildFile; productRef = C35221432F7F7A5600F9636E /* Readability */; };
+		C35221462F7F7A5600F9636E /* ReadabilityUI in Frameworks */ = {isa = PBXBuildFile; productRef = C35221452F7F7A5600F9636E /* ReadabilityUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,10 +68,12 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				C348ACC72F3F51410035C0C0 /* MLXLMCommon in Frameworks */,
+				C35221442F7F7A5600F9636E /* Readability in Frameworks */,
 				C348ACC52F3F51410035C0C0 /* MLXLLM in Frameworks */,
 				C348ACC32F3F51410035C0C0 /* MLXEmbedders in Frameworks */,
 				C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */,
 				C348ACB72F3EBE6E0035C0C0 /* MLXOptimizers in Frameworks */,
+				C35221462F7F7A5600F9636E /* ReadabilityUI in Frameworks */,
 				C348ACB12F3EBE6E0035C0C0 /* MLXFast in Frameworks */,
 				C348ACB32F3EBE6E0035C0C0 /* MLXLinalg in Frameworks */,
 				C348ACAD2F3EBE6E0035C0C0 /* MLX in Frameworks */,
@@ -140,6 +144,8 @@
 				C348ACC42F3F51410035C0C0 /* MLXLLM */,
 				C348ACC62F3F51410035C0C0 /* MLXLMCommon */,
 				C348ACC82F3F51410035C0C0 /* MLXVLM */,
+				C35221432F7F7A5600F9636E /* Readability */,
+				C35221452F7F7A5600F9636E /* ReadabilityUI */,
 			);
 			productName = Lumen;
 			productReference = C367F53A2EFA58D90076A657 /* Lumen.app */;
@@ -222,6 +228,7 @@
 			packageReferences = (
 				C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = C367F53B2EFA58D90076A657 /* Products */;
@@ -616,6 +623,14 @@
 				version = 2.30.3;
 			};
 		};
+		C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Ryu0118/swift-readability";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -673,6 +688,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXVLM;
+		};
+		C35221432F7F7A5600F9636E /* Readability */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */;
+			productName = Readability;
+		};
+		C35221452F7F7A5600F9636E /* ReadabilityUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */;
+			productName = ReadabilityUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
