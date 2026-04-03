@@ -11,6 +11,10 @@ enum KnowledgeIntent {
 }
 
 actor LocalKnowledgeProvider {
+    static let shared = LocalKnowledgeProvider()
+    
+    let predefinedTopics = ["Technology", "Science", "Politics", "Health", "Finance", "Business", "Sports", "Entertainment", "Education", "Environment", "Travel", "Food & Cooking", "Art & Design", "History", "Philosophy", "Psychology", "Engineering", "Space", "Medicine", "Other"]
+
     private var modelContainer: ModelContainer?
     private var loadingTask: Task<ModelContainer, Error>?
 
@@ -18,7 +22,6 @@ actor LocalKnowledgeProvider {
         if modelContainer != nil { return }
 
         #if targetEnvironment(simulator)
-            print("MLX model loading is disabled on Simulator to prevent crashes")
             return
         #endif
 
@@ -29,7 +32,7 @@ actor LocalKnowledgeProvider {
 
         let task = Task<ModelContainer, Error> {
             let config = ModelConfiguration(
-                id: "mlx-community/Qwen2.5-3B-Instruct-4bit"
+                id: "mlx-community/Llama-3.2-3B-Instruct-4bit"
             )
             return try await LLMModelFactory.shared.loadContainer(configuration: config)
         }
@@ -37,45 +40,14 @@ actor LocalKnowledgeProvider {
         self.loadingTask = task
         self.modelContainer = try await task.value
         self.loadingTask = nil
-
-        _ = await self.debugRun(prompt: "test")
     }
 
-    func debugRun(prompt: String = "Hello, are you operational?") async -> String {
-        if modelContainer == nil {
-            do {
-                try await self.loadModel()
-            } catch {
-                return "Model load error: \(error.localizedDescription)"
-            }
-        }
-
-        guard let container = modelContainer else {
-            return "Model load error: Container is nil"
-        }
-
-        let parameters = GenerateParameters(maxTokens: 50, temperature: 0.15)
-
-        do {
-            let output = try await container.perform { context in
-                let promptTokens = context.tokenizer.encode(text: prompt)
-                let result = try await MLXLMCommon.generate(
-                    promptTokens: promptTokens,
-                    parameters: parameters,
-                    model: context.model,
-                    tokenizer: context.tokenizer,
-                    didGenerate: { _ in .more }
-                )
-                return result.output
-            }
-
-            if output.isEmpty { return "Error: Model returned empty string" }
-            return output
-        } catch {
-            return "Error generating: \(error)"
-        }
+    func unloadModel() {
+        modelContainer = nil
+        loadingTask = nil
     }
 
+    /*
     func route(_ input: String) async -> KnowledgeIntent {
         let lower = input.lowercased()
 
@@ -92,5 +64,125 @@ actor LocalKnowledgeProvider {
         }
 
         return .knowledge
+    }
+    */
+
+    func summarizeWithLLM(content: String, title: String?) async throws -> String {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(domain: "LocalKnowledgeProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        let prompt = """
+        Summarize the following content with the title in 2-3 concise sentences (exclude one or the other if nil):
+
+        Content: \(content.prefix(2000))
+        Title: \(title ?? "N/A")
+        """
+
+        let parameters = GenerateParameters(maxTokens: 150, temperature: 0.1)
+
+        let output = try await container.perform { context in
+            let promptTokens = context.tokenizer.encode(text: prompt)
+
+            let result = try await MLXLMCommon.generate(
+                promptTokens: promptTokens,
+                parameters: parameters,
+                model: context.model,
+                tokenizer: context.tokenizer,
+                didGenerate: { _ in .more }
+            )
+
+            await unloadModel()
+            return result.output
+        }
+
+        return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+    }
+
+    func summarizeWebsiteWithLLM(content: String, title: String?) async throws -> String {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(domain: "LocalKnowledgeProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        let prompt = """
+        Based on this content, what is the overall purpose or category of this website/domain? 
+        Respond with a very short description (max 12 words).
+
+        Content: \(content.prefix(1500))
+        Title: \(title ?? "N/A")
+        """
+
+        let parameters = GenerateParameters(maxTokens: 40, temperature: 0.1)
+
+        let output = try await container.perform { context in
+            let promptTokens = context.tokenizer.encode(text: prompt)
+
+            let result = try await MLXLMCommon.generate(
+                promptTokens: promptTokens,
+                parameters: parameters,
+                model: context.model,
+                tokenizer: context.tokenizer,
+                didGenerate: { _ in .more }
+            )
+
+            await unloadModel()
+            return result.output
+        }
+
+        return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+    }
+
+    func classifyTopicWithLLM(content: String, title: String?) async throws -> String {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(domain: "LocalKnowledgeProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        let prompt = """
+        You are a topic classifier. Choose ONE topic from this list:
+        \(predefinedTopics.joined(separator: ", "))
+
+        If the article doesn't clearly fit any category, respond with "Other".
+
+        Title: \(title ?? "N/A")
+        Content: \(content.prefix(2000))
+
+        Respond with ONLY the topic name from the list above.
+        """
+
+        let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
+
+        let output = try await container.perform { context in
+            let promptTokens = context.tokenizer.encode(text: prompt)
+            let result = try await MLXLMCommon.generate(
+                promptTokens: promptTokens,
+                parameters: parameters,
+                model: context.model,
+                tokenizer: context.tokenizer,
+                didGenerate: { _ in .more }
+            )
+
+            await unloadModel()
+            return result.output
+        }
+
+        let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if predefinedTopics.contains(cleanedOutput) {
+            return cleanedOutput
+        } else {
+            return "Other"
+        }
     }
 }

@@ -223,6 +223,11 @@ enum BrowserEngine {
         config.userContentController.addUserScript(readingSignalScript)
 
         let readingSignalHandler = ReadingSignalHandler(config: readingSignalConfig)
+        readingSignalHandler.onReadingSignalTriggered = { payload, webView in
+            Task {
+                await KnowledgeCaptureService.shared.handleSignal(payload, webView: webView)
+            }
+        }
         config.userContentController.add(readingSignalHandler, name: "readingSignal")
 
         objc_setAssociatedObject(

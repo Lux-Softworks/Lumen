@@ -42,6 +42,7 @@ actor KnowledgeStorage {
             id TEXT PRIMARY KEY,
             domain TEXT NOT NULL UNIQUE,
             display_name TEXT NOT NULL,
+            summary TEXT,
             favicon TEXT,
             topic_id TEXT,
             page_count INTEGER DEFAULT 0,
@@ -81,10 +82,38 @@ actor KnowledgeStorage {
         CREATE INDEX IF NOT EXISTS idx_pages_timestamp ON pages(timestamp DESC);
         """
 
+        let createFTS = """
+        CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+            title,
+            content,
+            content='pages',
+            content_rowid=rowid
+        );
+        """
+
+        let createFTSTriggers = """
+        CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
+            INSERT INTO pages_fts(rowid, title, content)
+            VALUES (new.rowid, new.title, new.content);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
+            DELETE FROM pages_fts WHERE rowid = old.rowid;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
+            DELETE FROM pages_fts WHERE rowid = old.rowid;
+            INSERT INTO pages_fts(rowid, title, content)
+            VALUES (new.rowid, new.title, new.content);
+        END;
+        """
+
         try execute(createTopicsTable)
         try execute(createWebsitesTable)
         try execute(createPagesTable)
         try execute(createIndexes)
+        try execute(createFTS)
+        try execute(createFTSTriggers)
     }
 
     func save(
@@ -92,25 +121,29 @@ actor KnowledgeStorage {
         title: String?,
         content: String,
         author: String? = nil,
+        summary: String? = nil,
         description: String? = nil,
         readingTime: Int? = nil,
         scrollDepth: Double? = nil
-    ) throws -> String {
+    ) async throws -> String {
         try initialize()
 
-        let domain = PageContent.extractDomain(from: url)
+        let domain = await PageContent.extractDomain(from: url)
         let websiteID: String
         if let existingWebsite = try fetchWebsite(domain: domain) {
             websiteID = existingWebsite.id
         } else {
-            websiteID = try createWebsite(domain: domain, displayName: domain)
+            let newWebsite = await Website(domain: domain, displayName: domain)
+            try createWebsite(website: newWebsite)
+            websiteID = newWebsite.id
         }
 
-        let page = PageContent(
+        let page = await PageContent(
             websiteID: websiteID,
             url: url,
             title: title,
             content: content,
+            summary: summary,
             author: author,
             description: description,
             readingTime: readingTime,
@@ -170,12 +203,10 @@ actor KnowledgeStorage {
         }
     }
 
-    private func createWebsite(domain: String, displayName: String) throws -> String {
-        let website = Website(domain: domain, displayName: displayName)
-
+    func createWebsite(website: Website) throws {
         let sql = """
         INSERT INTO websites (
-            id, domain, display_name, favicon, topic_id, page_count, total_words,
+            id, domain, display_name, summary, topic_id, page_count, total_words,
             first_visit, last_visit, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
@@ -184,16 +215,67 @@ actor KnowledgeStorage {
             sqlite3_bind_text(statement, 1, website.id, -1, nil)
             sqlite3_bind_text(statement, 2, website.domain, -1, nil)
             sqlite3_bind_text(statement, 3, website.displayName, -1, nil)
-            sqlite3_bind_null(statement, 4)
-            sqlite3_bind_null(statement, 5)
+            sqlite3_bind_text(statement, 4, website.summary, -1, nil)
+            if let topicID = website.topicID {
+                sqlite3_bind_text(statement, 5, topicID, -1, nil)
+            } else {
+                sqlite3_bind_null(statement, 5)
+            }
             sqlite3_bind_int(statement, 6, Int32(website.pageCount))
             sqlite3_bind_int(statement, 7, Int32(website.totalWords))
             sqlite3_bind_int64(statement, 8, Int64(website.firstVisit.timeIntervalSince1970))
             sqlite3_bind_int64(statement, 9, Int64(website.lastVisit.timeIntervalSince1970))
             sqlite3_bind_int64(statement, 10, Int64(website.createdAt.timeIntervalSince1970))
         })
+    }
 
-        return website.id
+    func updateWebsite(_ website: Website) throws {
+        let sql = """
+        UPDATE websites SET
+            domain = ?,
+            display_name = ?,
+            summary = ?,
+            topic_id = ?,
+            page_count = ?,
+            total_words = ?,
+            last_visit = ?
+        WHERE id = ?
+        """
+
+        try execute(sql, bindValues: { statement in
+            sqlite3_bind_text(statement, 1, website.domain, -1, nil)
+            sqlite3_bind_text(statement, 2, website.displayName, -1, nil)
+            sqlite3_bind_text(statement, 3, website.summary, -1, nil)
+            if let topicID = website.topicID {
+                sqlite3_bind_text(statement, 4, topicID, -1, nil)
+            } else {
+                sqlite3_bind_null(statement, 4)
+            }
+            sqlite3_bind_int(statement, 5, Int32(website.pageCount))
+            sqlite3_bind_int(statement, 6, Int32(website.totalWords))
+            sqlite3_bind_int64(statement, 7, Int64(website.lastVisit.timeIntervalSince1970))
+            sqlite3_bind_text(statement, 8, website.id, -1, nil)
+        })
+    }
+
+    func fetchTopic(name: String) throws -> Topic? {
+        try initialize()
+
+        let sql = "SELECT * FROM topics WHERE name = ?"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+
+        sqlite3_bind_text(statement, 1, name, -1, nil)
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return nil
+        }
+
+        return try parseTopic(from: statement)
     }
 
     func fetchWebsite(domain: String) throws -> Website? {
@@ -291,18 +373,17 @@ actor KnowledgeStorage {
     func searchPages(query: String, limit: Int = 50) throws -> [PageContent] {
         try initialize()
 
-        let searchPattern = "%\(query)%"
         let sql = """
-        SELECT * FROM pages
-        WHERE title LIKE ? OR content LIKE ?
-        ORDER BY timestamp DESC
+        SELECT p.* FROM pages p
+        JOIN pages_fts ON p.rowid = pages_fts.rowid
+        WHERE pages_fts MATCH ?
+        ORDER BY rank
         LIMIT ?
         """
 
         return try queryPages(sql: sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, searchPattern, -1, nil)
-            sqlite3_bind_text(statement, 2, searchPattern, -1, nil)
-            sqlite3_bind_int(statement, 3, Int32(limit))
+            sqlite3_bind_text(statement, 1, query, -1, nil)
+            sqlite3_bind_int(statement, 2, Int32(limit))
         })
     }
 
@@ -558,22 +639,26 @@ actor KnowledgeStorage {
         let domain = String(cString: sqlite3_column_text(statement, 1))
         let displayName = String(cString: sqlite3_column_text(statement, 2))
 
-        let favicon = sqlite3_column_type(statement, 3) != SQLITE_NULL
+        let summary = sqlite3_column_type(statement, 3) != SQLITE_NULL
             ? String(cString: sqlite3_column_text(statement, 3)) : nil
 
-        let topicID = sqlite3_column_type(statement, 4) != SQLITE_NULL
+        let favicon = sqlite3_column_type(statement, 4) != SQLITE_NULL
             ? String(cString: sqlite3_column_text(statement, 4)) : nil
 
-        let pageCount = Int(sqlite3_column_int(statement, 5))
-        let totalWords = Int(sqlite3_column_int(statement, 6))
-        let firstVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 7)))
-        let lastVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 8)))
-        let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 9)))
+        let topicID = sqlite3_column_type(statement, 5) != SQLITE_NULL
+            ? String(cString: sqlite3_column_text(statement, 5)) : nil
+
+        let pageCount = Int(sqlite3_column_int(statement, 6))
+        let totalWords = Int(sqlite3_column_int(statement, 7))
+        let firstVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 8)))
+        let lastVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 9)))
+        let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 10)))
 
         return Website(
             id: id,
             domain: domain,
             displayName: displayName,
+            summary: summary,
             favicon: favicon,
             topicID: topicID,
             pageCount: pageCount,

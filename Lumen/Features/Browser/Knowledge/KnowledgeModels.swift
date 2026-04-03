@@ -1,19 +1,5 @@
 import Foundation
 
-let PREDEFINED_TOPICS = [
-    "Technology",
-    "Science",
-    "Politics",
-    "Health",
-    "Finance",
-    "Business",
-    "Sports",
-    "Entertainment",
-    "Education",
-    "Environment",
-    "Other"
-]
-
 extension String {
     static func topicID() -> String {
         return "topic_\(UUID().uuidString)"
@@ -35,19 +21,20 @@ extension String {
 struct Website: Identifiable, Codable {
     let id: String
     let domain: String
-    let displayName: String
-    let favicon: String?
-    let topicID: String?
-    let pageCount: Int
-    let totalWords: Int
+    var displayName: String
+    var summary: String?
+    var topicID: String?
+    var pageCount: Int
+    var totalWords: Int
     let firstVisit: Date
-    let lastVisit: Date
+    var lastVisit: Date
     let createdAt: Date
 
     init(
         id: String = .websiteID(),
         domain: String,
         displayName: String? = nil,
+        summary: String? = nil,
         favicon: String? = nil,
         topicID: String? = nil,
         pageCount: Int = 0,
@@ -59,7 +46,7 @@ struct Website: Identifiable, Codable {
         self.id = id
         self.domain = domain
         self.displayName = displayName ?? domain
-        self.favicon = favicon
+        self.summary = summary
         self.topicID = topicID
         self.pageCount = pageCount
         self.totalWords = totalWords

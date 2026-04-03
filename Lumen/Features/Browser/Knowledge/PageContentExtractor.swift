@@ -35,9 +35,8 @@ struct PageContentExtractor {
             return Date()
         }()
 
-        // Clean HTML to plain text
         let cleanedContent = try cleanHTML(article.content)
-        
+
         return ExtractedContent(
             url: resolvedURL,
             title: article.title,
@@ -98,22 +97,19 @@ private extension PageContentExtractor {
         }
         return nil
     }
-    
+
     func cleanHTML(_ html: String) throws -> String {
         let doc = try SwiftSoup.parse(html)
-        
-        // Remove script and style tags
+
         try doc.select("script, style").remove()
-        
-        // Get text content with proper spacing
+
         let text = try doc.text()
-        
-        // Clean up extra whitespace
+
         let cleaned = text
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        
+
         return cleaned
     }
 }

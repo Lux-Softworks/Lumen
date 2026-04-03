@@ -5,7 +5,7 @@ final class ReadingSignalHandler: NSObject, WKScriptMessageHandler {
 
     private let config: ReadingSignalConfig
 
-    var onReadingSignalTriggered: ((ReadingSignalPayload) -> Void)?
+    var onReadingSignalTriggered: ((ReadingSignalPayload, WKWebView?) -> Void)?
 
     init(config: ReadingSignalConfig = .default) {
         self.config = config
@@ -18,10 +18,10 @@ final class ReadingSignalHandler: NSObject, WKScriptMessageHandler {
         guard message.name == "readingSignal",
               let body = message.body as? [String: Any]
         else { return }
-        process(body: body)
+        process(body: body, webView: message.webView)
     }
 
-    func process(body: [String: Any]) {
+    func process(body: [String: Any], webView: WKWebView?) {
         guard let data = try? JSONSerialization.data(withJSONObject: body),
               let payload = try? JSONDecoder().decode(ReadingSignalPayload.self, from: data)
         else { return }
@@ -29,7 +29,7 @@ final class ReadingSignalHandler: NSObject, WKScriptMessageHandler {
         guard payload.triggered else { return }
         guard !isExcluded(urlString: payload.url) else { return }
 
-        onReadingSignalTriggered?(payload)
+        onReadingSignalTriggered?(payload, webView)
     }
 
     func isExcluded(urlString: String) -> Bool {
