@@ -121,8 +121,11 @@ final class BrowserEngineTests: XCTestCase {
         let policy = PrivacyPolicy()
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        XCTAssertFalse(config.preferences.allowFileAccessFromFileURLs)
-        XCTAssertFalse(config.preferences.allowUniversalAccessFromFileURLs)
+        let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
+        let universalAccess = config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
+
+        XCTAssertEqual(fileAccess, false)
+        XCTAssertEqual(universalAccess, false)
     }
 
     func testMakeConfiguration_JavaScriptCanOpenWindowsAutomatically_Disabled() {

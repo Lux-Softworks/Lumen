@@ -1,5 +1,19 @@
 import Foundation
 
+let PREDEFINED_TOPICS = [
+    "Technology",
+    "Science",
+    "Politics",
+    "Health",
+    "Finance",
+    "Business",
+    "Sports",
+    "Entertainment",
+    "Education",
+    "Environment",
+    "Other"
+]
+
 extension String {
     static func topicID() -> String {
         return "topic_\(UUID().uuidString)"
@@ -125,7 +139,7 @@ struct PageContent: Identifiable, Codable {
         self.createdAt = createdAt
     }
 
-    private static func normalizeURL(_ url: String) -> String {
+    static func normalizeURL(_ url: String) -> String {
         var normalized = url.lowercased()
         normalized = normalized.replacingOccurrences(of: "https://", with: "")
         normalized = normalized.replacingOccurrences(of: "http://", with: "")
@@ -134,12 +148,12 @@ struct PageContent: Identifiable, Codable {
         return normalized
     }
 
-    private static func extractDomain(from url: String) -> String {
+    static func extractDomain(from url: String) -> String {
         guard let host = URL(string: url)?.host else { return "" }
         return host.replacingOccurrences(of: "www.", with: "")
     }
 
-    private static func countWords(in text: String) -> Int {
+    static func countWords(in text: String) -> Int {
         return text.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }.count
     }

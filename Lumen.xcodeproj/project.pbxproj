@@ -20,6 +20,8 @@
 		C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = C348ACC82F3F51410035C0C0 /* MLXVLM */; };
 		C35221442F7F7A5600F9636E /* Readability in Frameworks */ = {isa = PBXBuildFile; productRef = C35221432F7F7A5600F9636E /* Readability */; };
 		C35221462F7F7A5600F9636E /* ReadabilityUI in Frameworks */ = {isa = PBXBuildFile; productRef = C35221452F7F7A5600F9636E /* ReadabilityUI */; };
+		C35221512F803B9800F9636E /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = C35221502F803B9800F9636E /* SwiftSoup */; };
+		C35221532F803B9800F9636E /* SwiftSoupProfile in Frameworks */ = {isa = PBXBuildFile; productRef = C35221522F803B9800F9636E /* SwiftSoupProfile */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,7 @@
 				C348ACC52F3F51410035C0C0 /* MLXLLM in Frameworks */,
 				C348ACC32F3F51410035C0C0 /* MLXEmbedders in Frameworks */,
 				C348ACC92F3F51410035C0C0 /* MLXVLM in Frameworks */,
+				C35221532F803B9800F9636E /* SwiftSoupProfile in Frameworks */,
 				C348ACB72F3EBE6E0035C0C0 /* MLXOptimizers in Frameworks */,
 				C35221462F7F7A5600F9636E /* ReadabilityUI in Frameworks */,
 				C348ACB12F3EBE6E0035C0C0 /* MLXFast in Frameworks */,
@@ -80,6 +83,7 @@
 				C348ACB52F3EBE6E0035C0C0 /* MLXNN in Frameworks */,
 				C348ACAF2F3EBE6E0035C0C0 /* MLXFFT in Frameworks */,
 				C348ACB92F3EBE6E0035C0C0 /* MLXRandom in Frameworks */,
+				C35221512F803B9800F9636E /* SwiftSoup in Frameworks */,
 			);
 		};
 		C367F5442EFA58DB0076A657 /* Frameworks */ = {
@@ -146,6 +150,8 @@
 				C348ACC82F3F51410035C0C0 /* MLXVLM */,
 				C35221432F7F7A5600F9636E /* Readability */,
 				C35221452F7F7A5600F9636E /* ReadabilityUI */,
+				C35221502F803B9800F9636E /* SwiftSoup */,
+				C35221522F803B9800F9636E /* SwiftSoupProfile */,
 			);
 			productName = Lumen;
 			productReference = C367F53A2EFA58D90076A657 /* Lumen.app */;
@@ -229,6 +235,7 @@
 				C348ACAB2F3EBE6E0035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				C348ACC12F3F51410035C0C0 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */,
+				C352214F2F803B9800F9636E /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = C367F53B2EFA58D90076A657 /* Products */;
@@ -631,6 +638,14 @@
 				minimumVersion = 0.3.0;
 			};
 		};
+		C352214F2F803B9800F9636E /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup";
+			requirement = {
+				kind = exactVersion;
+				version = 2.13.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -698,6 +713,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C35221422F7F7A5600F9636E /* XCRemoteSwiftPackageReference "swift-readability" */;
 			productName = ReadabilityUI;
+		};
+		C35221502F803B9800F9636E /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C352214F2F803B9800F9636E /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
+		};
+		C35221522F803B9800F9636E /* SwiftSoupProfile */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C352214F2F803B9800F9636E /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoupProfile;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
