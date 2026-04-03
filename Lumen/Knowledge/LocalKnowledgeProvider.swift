@@ -12,7 +12,7 @@ enum KnowledgeIntent {
 
 actor LocalKnowledgeProvider {
     static let shared = LocalKnowledgeProvider()
-    
+
     let predefinedTopics = ["Technology", "Science", "Politics", "Health", "Finance", "Business", "Sports", "Entertainment", "Education", "Environment", "Travel", "Food & Cooking", "Art & Design", "History", "Philosophy", "Psychology", "Engineering", "Space", "Medicine", "Other"]
 
     private var modelContainer: ModelContainer?
@@ -113,7 +113,7 @@ actor LocalKnowledgeProvider {
         }
 
         let prompt = """
-        Based on this content, what is the overall purpose or category of this website/domain? 
+        Based on this content, what is the overall purpose or category of this website/domain?
         Respond with a very short description (max 12 words).
 
         Content: \(content.prefix(1500))
@@ -184,5 +184,43 @@ actor LocalKnowledgeProvider {
         } else {
             return "Other"
         }
+    }
+
+    func refineQueryAndFindKeywordWithLLM(query: String) async throws -> String {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(domain: "LocalKnowledgeProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        let prompt = """
+        Your task is to refine the given query to be more suitable for database search.
+        Once the query is refined, please find the most relevant keyword from the refined query.
+        Respond with ONLY the keyword.
+
+        Query: \(query)
+        """
+
+        let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
+
+        let output = try await container.perform { context in
+            let promptTokens = context.tokenizer.encode(text: prompt)
+            let result = try await MLXLMCommon.generate(
+                promptTokens: promptTokens,
+                parameters: parameters,
+                model: context.model,
+                tokenizer: context.tokenizer,
+                didGenerate: { _ in .more }
+            )
+
+            await unloadModel()
+            return result.output
+        }
+
+        let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleanedOutput
     }
 }

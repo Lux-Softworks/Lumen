@@ -61,7 +61,7 @@ class KnowledgeCaptureService {
 
             let pageSummary = await KnowledgeClassifier.summarize(content: extractedContent.content, title: extractedContent.title)
 
-            _ = try await KnowledgeStorage.shared.save(
+            let pageID = try await KnowledgeStorage.shared.save(
                 url: payload.url,
                 title: extractedContent.title,
                 content: extractedContent.content,
@@ -71,6 +71,12 @@ class KnowledgeCaptureService {
                 readingTime: payload.readingTime,
                 scrollDepth: payload.scrollDepth
             )
+
+            Task.detached(priority: .utility) {
+                if let embedding = await EmbeddingService.shared.generateEmbedding(for: extractedContent.content) {
+                    try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
+                }
+            }
         } catch {
             print("Knowledge capture failed: \(error)")
         }

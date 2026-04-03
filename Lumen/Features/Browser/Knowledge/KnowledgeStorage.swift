@@ -82,6 +82,14 @@ actor KnowledgeStorage {
         CREATE INDEX IF NOT EXISTS idx_pages_timestamp ON pages(timestamp DESC);
         """
 
+        let createEmbeddingsTable = """
+        CREATE TABLE IF NOT EXISTS page_embeddings (
+            page_id TEXT PRIMARY KEY,
+            vector BLOB NOT NULL,
+            FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+        );
+        """
+
         let createFTS = """
         CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
             title,
@@ -111,6 +119,7 @@ actor KnowledgeStorage {
         try execute(createTopicsTable)
         try execute(createWebsitesTable)
         try execute(createPagesTable)
+        try execute(createEmbeddingsTable)
         try execute(createIndexes)
         try execute(createFTS)
         try execute(createFTSTriggers)
@@ -296,6 +305,60 @@ actor KnowledgeStorage {
         }
 
         return try parseWebsite(from: statement)
+    }
+
+    func saveEmbedding(pageID: String, vector: [Double]) throws {
+        try initialize()
+        let sql = "INSERT OR REPLACE INTO page_embeddings (page_id, vector) VALUES (?, ?)"
+        let data = vector.withUnsafeBytes { Data($0) }
+        
+        try execute(sql, bindValues: { statement in
+            sqlite3_bind_text(statement, 1, pageID, -1, nil)
+            sqlite3_bind_blob(statement, 2, (data as NSData).bytes, Int32(data.count), nil)
+        })
+    }
+
+    func searchSemantic(query: String, limit: Int = 3) async throws -> [PageContent] {
+        try initialize()
+        
+        guard let queryVector = await EmbeddingService.shared.generateEmbedding(for: query) else {
+            return []
+        }
+        
+        let sql = "SELECT page_id, vector FROM page_embeddings"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        
+        var similarities: [(pageID: String, score: Double)] = []
+        
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let pageID = String(cString: sqlite3_column_text(statement, 0))
+            let blobData = sqlite3_column_blob(statement, 1)
+            let blobSize = Int(sqlite3_column_bytes(statement, 1))
+            
+            let count = blobSize / MemoryLayout<Double>.size
+            let vector = Array(UnsafeBufferPointer(start: blobData?.assumingMemoryBound(to: Double.self), count: count))
+            
+            let score = VectorMath.cosineSimilarity(queryVector, vector)
+            similarities.append((pageID: pageID, score: score))
+        }
+        
+        let topResults = similarities
+            .sorted { $0.score > $1.score }
+            .prefix(limit)
+        
+        var pages: [PageContent] = []
+        for result in topResults {
+            if let page = try fetchPage(pageID: result.pageID) {
+                pages.append(page)
+            }
+        }
+        
+        return pages
     }
 
     func fetchAllWebsites() throws -> [Website] {
