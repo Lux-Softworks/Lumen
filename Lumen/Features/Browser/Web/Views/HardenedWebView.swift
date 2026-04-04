@@ -4,8 +4,12 @@ import WebKit
 
 struct HardenedWebView: UIViewControllerRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
-    var policy: PrivacyPolicy = PrivacyPolicy()
+    @StateObject private var settings = BrowserSettings.shared
     var bottomInset: CGFloat = 0
+    
+    var policy: PrivacyPolicy {
+        settings.policy(for: viewModel.currentURL)
+    }
 
     class Coordinator: NSObject {
         var parent: HardenedWebView

@@ -31,6 +31,7 @@ struct BottomBarView: View {
     @State private var suggestionsOpacity: Double = 0
 
     var isExpanded: Bool { state != .collapsed }
+    var showSearchBar: Bool { state == .search || state == .browserSettings || state == .siteSettings }
 
     var body: some View {
         ResizableSheetContainer(
@@ -92,29 +93,46 @@ struct BottomBarView: View {
             }
         ) {
             VStack(spacing: 0) {
-                if state == .search || state == .browserSettings || state == .siteSettings {
-                    searchBarRow
-                        .transition(.opacity.animation(.smooth(duration: 0.2)))
-                } else {
+                ZStack(alignment: .top) {
                     collapsedContent
-                        .transition(.opacity.animation(.smooth(duration: 0.2)))
+                        .opacity(showSearchBar ? 0 : 1)
+                        .allowsHitTesting(!showSearchBar)
+
+                    searchBarRow
+                        .opacity(showSearchBar ? 1 : 0)
+                        .allowsHitTesting(showSearchBar)
                 }
 
-                searchSuggestionsArea
-                    .opacity(suggestionsOpacity)
-                    .allowsHitTesting(state == .search)
-                    .frame(maxHeight: suggestionsExpanded ? .infinity : 0, alignment: .top)
-                    .clipped()
-
-                dragRevealedHistory
-                    .opacity(
-                        state == .search || state == .browserSettings || state == .siteSettings
-                            ? 0 : 1
+                if state == .browserSettings || state == .siteSettings {
+                    SettingsPage(
+                        type: state == .browserSettings ? .browser : .site,
+                        currentURL: currentURL,
+                        onDismiss: {
+                            state = .collapsed
+                        }
                     )
-                    .allowsHitTesting(
-                        !(state == .search || state == .browserSettings || state == .siteSettings))
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
+                            removal: .opacity.animation(.smooth(duration: 0.15))
+                        )
+                    )
+                } else {
+                    searchSuggestionsArea
+                        .opacity(suggestionsOpacity)
+                        .allowsHitTesting(state == .search)
+                        .frame(maxHeight: suggestionsExpanded ? .infinity : 0, alignment: .top)
+                        .clipped()
+                        .safeAreaPadding(.bottom, (state == .search && isFocused) ? keyboardHeight : 0)
+                }
 
-                Spacer()
+                if state != .search && state != .browserSettings && state != .siteSettings {
+                    dragRevealedHistory
+                }
+
+                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings {
+                    Spacer(minLength: 0)
+                }
             }
         }
         .ignoresSafeArea(.keyboard)
@@ -144,10 +162,7 @@ struct BottomBarView: View {
                     }
                 }
             } else {
-                if newState != .browserSettings && newState != .siteSettings {
-                    isFocused = false
-                }
-
+                isFocused = false
                 toolbarDragFraction = 0
 
                 withAnimation(.smooth(duration: 0.15)) {
@@ -176,30 +191,37 @@ struct BottomBarView: View {
 
     var searchBarRow: some View {
         HStack(spacing: 12) {
-            if state == .siteSettings {
+            ZStack {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .opacity(state == .search ? 1 : 0)
+
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .opacity(state == .browserSettings ? 1 : 0)
+
                 Button(action: onCopyUrl) {
                     Image(systemName: "link")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                        .frame(width: 44, height: 44)
                 }
-                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
-            } else {
-                Image(
-                    systemName: state == .browserSettings ? "gearshape.fill" : "magnifyingglass"
-                )
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                .frame(width: 44, height: 44)
-                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                .opacity(state == .siteSettings ? 1 : 0)
+                .allowsHitTesting(state == .siteSettings)
             }
+            .frame(width: 44, height: 44)
+            .matchedGeometryEffect(id: "magnifyingGlass", in: animation, isSource: showSearchBar)
 
             TextField(
                 state == .browserSettings ? "Browser Settings" : "Search...",
                 text: displayBinding
             )
-            .font(.system(size: 17))
-            .fontWeight(.bold)
+            .font(
+                (state == .browserSettings || state == .siteSettings)
+                    ? AppTheme.Typography.serifDisplay(size: 17, weight: .bold)
+                    : AppTheme.Typography.sansBody(size: 17, weight: .bold)
+            )
             .textFieldStyle(.plain)
             .focused($isFocused)
             .submitLabel(.go)
@@ -209,45 +231,40 @@ struct BottomBarView: View {
             .truncationMode(
                 (state == .siteSettings || state == .browserSettings) ? .tail : .head
             )
-            .matchedGeometryEffect(id: "searchField", in: animation)
+            .matchedGeometryEffect(id: "searchField", in: animation, isSource: showSearchBar)
 
-            if state == .search && !text.isEmpty {
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                }
-                .transition(.scale.combined(with: .opacity))
+            // Clear button — opacity only, no insertion/removal
+            Button(action: { text = "" }) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
             }
+            .opacity(state == .search && !text.isEmpty ? 1 : 0)
+            .allowsHitTesting(state == .search && !text.isEmpty)
 
-            if state == .siteSettings {
-                Button(action: onReload) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.clear)
-                            .frame(width: 20, height: 20)
-
-                        Image(systemName: "arrow.clockwise")
-                            .resizable()
-                            .antialiased(true)
-                            .scaledToFit()
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                            .frame(width: 18, height: 18)
-                            .rotationEffect(.degrees(reloadRotation), anchor: .center)
-                            .drawingGroup()
-                    }
+            // Reload button — always in hierarchy
+            Button(action: onReload) {
+                Image(systemName: "arrow.clockwise")
+                    .resizable()
+                    .antialiased(true)
+                    .scaledToFit()
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                    .frame(width: 18, height: 18)
+                    .rotationEffect(.degrees(reloadRotation), anchor: .center)
+                    .drawingGroup()
                     .frame(width: 44, height: 44)
-                }
-                .matchedGeometryEffect(id: "reloadButton", in: animation)
-                .onChange(of: isLoading) { _, loading in
-                    if loading {
-                        if !isSpinning {
-                            isSpinning = true
-                            triggerSpin()
-                        }
-                    } else {
-                        isSpinning = false
+            }
+            .opacity(state == .siteSettings ? 1 : 0)
+            .allowsHitTesting(state == .siteSettings)
+            .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: showSearchBar)
+            .onChange(of: isLoading) { _, loading in
+                if loading {
+                    if !isSpinning {
+                        isSpinning = true
+                        triggerSpin()
                     }
+                } else {
+                    isSpinning = false
                 }
             }
         }
@@ -260,7 +277,7 @@ struct BottomBarView: View {
                     Capsule()
                         .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                 )
-                .matchedGeometryEffect(id: "searchBackground", in: animation)
+                .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: showSearchBar)
         )
         .padding(.top, 16)
     }
@@ -370,7 +387,6 @@ struct BottomBarView: View {
             }
         }
         .padding(.top, 12)
-        .safeAreaPadding(.bottom, isFocused ? keyboardHeight : 0)
     }
 
     @State private var keyboardHeight: CGFloat = 0
@@ -413,8 +429,8 @@ struct BottomBarView: View {
 
     private var frostedBackground: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-            AppTheme.Colors.uiElement.opacity(0.5)
+            AppTheme.Colors.uiElement
+            AppTheme.Colors.background.opacity(0.1)
         }
     }
 
@@ -452,7 +468,7 @@ struct BottomBarView: View {
 
             Button(action: {
                 text = ""
-                withAnimation(.smooth(duration: 0.3)) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                     state = .search
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -466,7 +482,7 @@ struct BottomBarView: View {
                             Capsule()
                                 .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                         )
-                        .matchedGeometryEffect(id: "searchBackground", in: animation)
+                        .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: !showSearchBar)
                         .frame(width: 80, height: 44)
 
                     HStack(spacing: 0) {
@@ -474,7 +490,7 @@ struct BottomBarView: View {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(AppTheme.Colors.text)
-                                .matchedGeometryEffect(id: "magnifyingGlass", in: animation)
+                                .matchedGeometryEffect(id: "magnifyingGlass", in: animation, isSource: !showSearchBar)
 
                             Image(systemName: "arrow.clockwise")
                                 .resizable()
@@ -484,7 +500,7 @@ struct BottomBarView: View {
                                 .frame(width: 18, height: 18)
                                 .rotationEffect(.degrees(0))
                                 .opacity(0)
-                                .matchedGeometryEffect(id: "reloadButton", in: animation)
+                                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: !showSearchBar)
                         }
                         .frame(width: 80, height: 44)
 
@@ -492,7 +508,7 @@ struct BottomBarView: View {
                             .labelsHidden()
                             .frame(width: 0, height: 0)
                             .opacity(0)
-                            .matchedGeometryEffect(id: "searchField", in: animation)
+                            .matchedGeometryEffect(id: "searchField", in: animation, isSource: !showSearchBar)
                     }
                 }
             }

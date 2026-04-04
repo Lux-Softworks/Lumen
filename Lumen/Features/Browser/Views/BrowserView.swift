@@ -76,7 +76,7 @@ struct BrowserView: View {
                     onTabsPressed: { print("Tabs pressed") },
                     onSettingsPressed: {
                         if bottomBarState == .collapsed {
-                            withAnimation(.smooth(duration: 0.3)) {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                                 if let url = viewModel.currentURL, !url.absoluteString.isEmpty,
                                     url.absoluteString != "about:blank"
                                 {
@@ -89,7 +89,7 @@ struct BrowserView: View {
                     },
                     onSubmit: {
                         Task { await viewModel.processUserInput(viewModel.urlString) }
-                        withAnimation(.easeInOut(duration: 0.25)) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             bottomBarState = .collapsed
                             isAddressBarFocused = false
                         }
@@ -97,7 +97,7 @@ struct BrowserView: View {
                     onHistoryTap: { url in
                         viewModel.urlString = url
                         Task { await viewModel.processUserInput(url) }
-                        withAnimation(.easeInOut(duration: 0.25)) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             bottomBarState = .collapsed
                             isAddressBarFocused = false
                         }
@@ -110,7 +110,7 @@ struct BrowserView: View {
                         } else {
                             UIPasteboard.general.string = viewModel.urlString
                         }
-                        withAnimation(.easeInOut(duration: 0.25)) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             bottomBarState = .collapsed
                         }
                     },

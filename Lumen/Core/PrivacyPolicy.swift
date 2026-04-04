@@ -1,6 +1,6 @@
 import Foundation
 
-struct PrivacyPolicy {
+struct PrivacyPolicy: Codable {
     var blocksThirdPartyCookies: Bool = true
     var allowsJavaScript: Bool = true
     var allowsInlineMediaPlayback: Bool = false

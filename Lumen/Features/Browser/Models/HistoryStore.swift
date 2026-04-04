@@ -47,6 +47,11 @@ final class HistoryStore: ObservableObject {
         Array(entries.prefix(10))
     }
 
+    func clearAll() {
+        entries = []
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(entries) {
             UserDefaults.standard.set(data, forKey: key)

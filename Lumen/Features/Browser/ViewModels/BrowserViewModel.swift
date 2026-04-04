@@ -27,15 +27,20 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private let logger = Logger(
         subsystem: "com.luxsoftworks.Lumen", category: "BrowserViewModel")
 
-    static let defaultURL = URL(string: "https://www.google.com")!
-    static let searchEngineTemplate = "https://www.google.com/search?q=%@"
+    private var defaultURL: URL {
+        BrowserSettings.shared.searchEngine.homePage
+    }
+
+    private var searchEngineTemplate: String {
+        BrowserSettings.shared.searchEngine.templateURL
+    }
 
     private var knowledgeProvider: LocalKnowledgeProvider?
 
     func initializeKnowledgeProvider() {
         /* if knowledgeProvider == nil {
             knowledgeProvider = LocalKnowledgeProvider()
-        
+
             Task {
                 try? await knowledgeProvider?.loadModel()
             }
@@ -80,11 +85,16 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                 Task {
                     do {
-                        let results = try await SearchSuggestionService.shared.fetchSuggestions(
-                            for: query)
+                        async let googleResults = SearchSuggestionService.shared.fetchSuggestions(for: query)
+                        async let semanticResults = KnowledgeStorage.shared.searchSemantic(query: query)
+
+                        let web = try await googleResults
+                        let local = try await semanticResults
+
                         await MainActor.run {
                             if !self.urlString.isEmpty {
-                                self.searchSuggestions = results
+                                let localSuggestions = local.map { SearchSuggestion(text: $0.url) }
+                                self.searchSuggestions = localSuggestions + web
                             }
                         }
                     } catch {
@@ -100,7 +110,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let url = Self.classifyInput(trimmed)
+        let url = self.classifyInput(trimmed)
         loadURL(url)
     }
 
@@ -131,7 +141,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     func loadHomePage() {
-        loadURL(Self.defaultURL)
+        loadURL(defaultURL)
     }
 
     func clearPageState() {
@@ -158,7 +168,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         return parts.isEmpty ? "No threats detected" : parts.joined(separator: ", ")
     }
 
-    static func classifyInput(_ input: String) -> URL {
+    func classifyInput(_ input: String) -> URL {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return defaultURL }
 
