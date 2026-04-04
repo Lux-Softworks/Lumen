@@ -390,7 +390,7 @@ struct SettingsPage: View {
 
     private var privacyPolicyContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Last updated: 2025")
+            Text("Last updated: 2026")
                 .font(.system(size: 13))
                 .foregroundColor(AppTheme.Colors.text.opacity(0.45))
 

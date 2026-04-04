@@ -1,10 +1,3 @@
-//
-//  LumenUITestsLaunchTests.swift
-//  LumenUITests
-//
-//  Created by Daniel Kosukhin on 12/22/25.
-//
-
 import XCTest
 
 final class LumenUITestsLaunchTests: XCTestCase {

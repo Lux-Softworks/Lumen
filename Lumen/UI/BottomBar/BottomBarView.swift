@@ -31,12 +31,13 @@ struct BottomBarView: View {
     @State private var suggestionsOpacity: Double = 0
 
     var isExpanded: Bool { state != .collapsed }
-    var showSearchBar: Bool { state == .search || state == .browserSettings || state == .siteSettings }
+    var showSearchBar: Bool { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge }
+    var expandedHeightRatio: CGFloat { state == .knowledge ? 0.9 : 0.67 }
 
     var body: some View {
         ResizableSheetContainer(
             isExpanded: Binding(
-                get: { state == .search || state == .browserSettings || state == .siteSettings },
+                get: { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge },
                 set: { expanded in
                     if expanded {
                         if state == .collapsed || state == .hidden {
@@ -60,6 +61,7 @@ struct BottomBarView: View {
             ),
             isLoading: isLoading,
             progress: progress,
+            expandedHeightRatio: expandedHeightRatio,
             themeColor: themeColor,
             onDragStart: {
                 if state == .collapsed || state == .hidden {}
@@ -84,7 +86,7 @@ struct BottomBarView: View {
             },
             onDragProgress: { fraction in
                 if fraction == 0 {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                         toolbarDragFraction = 0
                     }
                 } else {
@@ -103,7 +105,15 @@ struct BottomBarView: View {
                         .allowsHitTesting(showSearchBar)
                 }
 
-                if state == .browserSettings || state == .siteSettings {
+                if state == .knowledge {
+                    knowledgeContent
+                        .transition(
+                            .asymmetric(
+                                insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
+                                removal: .opacity.animation(.smooth(duration: 0.15))
+                            )
+                        )
+                } else if state == .browserSettings || state == .siteSettings {
                     SettingsPage(
                         type: state == .browserSettings ? .browser : .site,
                         currentURL: currentURL,
@@ -123,14 +133,13 @@ struct BottomBarView: View {
                         .allowsHitTesting(state == .search)
                         .frame(maxHeight: suggestionsExpanded ? .infinity : 0, alignment: .top)
                         .clipped()
-                        .safeAreaPadding(.bottom, (state == .search && isFocused) ? keyboardHeight : 0)
                 }
 
-                if state != .search && state != .browserSettings && state != .siteSettings {
+                if state != .search && state != .browserSettings && state != .siteSettings && state != .knowledge {
                     dragRevealedHistory
                 }
 
-                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings {
+                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings || state == .knowledge {
                     Spacer(minLength: 0)
                 }
             }
@@ -181,7 +190,7 @@ struct BottomBarView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                keyboardHeight = frame.height - 10
+                keyboardHeight = frame.height
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
@@ -202,6 +211,11 @@ struct BottomBarView: View {
                     .foregroundColor(AppTheme.Colors.text.opacity(0.6))
                     .opacity(state == .browserSettings ? 1 : 0)
 
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .opacity(state == .knowledge ? 1 : 0)
+
                 Button(action: onCopyUrl) {
                     Image(systemName: "link")
                         .font(.system(size: 18, weight: .bold))
@@ -218,7 +232,7 @@ struct BottomBarView: View {
                 text: displayBinding
             )
             .font(
-                (state == .browserSettings || state == .siteSettings)
+                (state == .browserSettings || state == .siteSettings || state == .knowledge)
                     ? AppTheme.Typography.serifDisplay(size: 17, weight: .bold)
                     : AppTheme.Typography.sansBody(size: 17, weight: .bold)
             )
@@ -227,11 +241,10 @@ struct BottomBarView: View {
             .submitLabel(.go)
             .onSubmit(onSubmit)
             .frame(height: 44)
-            .disabled(state == .siteSettings || state == .browserSettings)
+            .disabled(state == .siteSettings || state == .browserSettings || state == .knowledge)
             .truncationMode(
-                (state == .siteSettings || state == .browserSettings) ? .tail : .head
+                (state == .siteSettings || state == .browserSettings || state == .knowledge) ? .tail : .head
             )
-            .matchedGeometryEffect(id: "searchField", in: animation, isSource: showSearchBar)
 
             Button(action: { text = "" }) {
                 Image(systemName: "xmark.circle.fill")
@@ -385,7 +398,9 @@ struct BottomBarView: View {
                 .frame(minHeight: 10)
             }
         }
-        .padding(.top, 12)
+        .padding(.top, state == .search ? 0 : 12)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, (state == .search && isFocused) ? keyboardHeight : 0, for: .scrollContent)
     }
 
     @State private var keyboardHeight: CGFloat = 0
@@ -507,7 +522,6 @@ struct BottomBarView: View {
                             .labelsHidden()
                             .frame(width: 0, height: 0)
                             .opacity(0)
-                            .matchedGeometryEffect(id: "searchField", in: animation, isSource: !showSearchBar)
                     }
                 }
             }
@@ -515,7 +529,7 @@ struct BottomBarView: View {
             Spacer()
 
             Button(action: onSettingsPressed) {
-                Image(systemName: "chevron.up")
+                Image(systemName: "gearshape")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(AppTheme.Colors.text)
                     .frame(width: 44, height: 44)
@@ -531,6 +545,23 @@ struct BottomBarView: View {
             .offset(x: sideSlide)
         }
         .frame(height: 80)
+        .overlay(alignment: .topTrailing) {
+            KnowledgeButton {
+                withAnimation(.smooth(duration: 0.25)) {
+                    state = .knowledge
+                }
+            }
+            .padding(.trailing, 16)
+            .alignmentGuide(.top) { d in d[.bottom] }
+        }
+    }
+
+    private var knowledgeContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer()
+        }
+        
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var displayBinding: Binding<String> {
@@ -541,6 +572,8 @@ struct BottomBarView: View {
                     return "Browser Settings"
                 case .siteSettings:
                     return neaten(url: currentURL?.absoluteString ?? text)
+                case .knowledge:
+                    return "Knowledge"
                 default:
                     return text
                 }

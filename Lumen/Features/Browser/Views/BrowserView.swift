@@ -56,7 +56,7 @@ struct BrowserView: View {
                 HardenedWebView(
                     viewModel: viewModel,
                     bottomInset: (bottomBarState == .search || bottomBarState == .browserSettings
-                        || bottomBarState == .siteSettings)
+                        || bottomBarState == .siteSettings || bottomBarState == .knowledge)
                         ? 0 : (bottomBarState == .hidden ? 20 : 80)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

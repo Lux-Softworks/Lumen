@@ -19,7 +19,7 @@ struct ResizableSheetContainer<Content: View>: View {
     @State private var cachedScreenHeight: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
 
-    private let expandedHeightRatio: CGFloat = 0.65
+    var expandedHeightRatio: CGFloat
     private let collapsedHeight: CGFloat = 80
     private let sliverHeight: CGFloat = 20
 
@@ -28,6 +28,7 @@ struct ResizableSheetContainer<Content: View>: View {
         isCollapsed: Binding<Bool>,
         isLoading: Bool,
         progress: Double,
+        expandedHeightRatio: CGFloat = 0.67,
         themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
@@ -40,6 +41,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self._isCollapsed = isCollapsed
         self.isLoading = isLoading
         self.progress = progress
+        self.expandedHeightRatio = expandedHeightRatio
         self.themeColor = themeColor
         self.onDragStart = onDragStart
         self.onExpand = onExpand
@@ -74,7 +76,6 @@ struct ResizableSheetContainer<Content: View>: View {
                         alignment: .top
                     )
                     .opacity(isCollapsed ? 0 : 1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isCollapsed)
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)

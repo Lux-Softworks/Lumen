@@ -84,7 +84,6 @@ final class BrowserEngineTests: XCTestCase {
         let policy = PrivacyPolicy()
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        // Using KVC to check the value as it's not a direct property in some versions
         let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
         let universalAccess =
             config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
