@@ -233,15 +233,25 @@ struct BottomBarView: View {
             )
             .matchedGeometryEffect(id: "searchField", in: animation, isSource: showSearchBar)
 
-            // Clear button — opacity only, no insertion/removal
             Button(action: { text = "" }) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundColor(AppTheme.Colors.text.opacity(0.6))
             }
             .opacity(state == .search && !text.isEmpty ? 1 : 0)
             .allowsHitTesting(state == .search && !text.isEmpty)
-
-            // Reload button — always in hierarchy
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .background(
+            frostedBackground
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                )
+                .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: showSearchBar)
+        )
+        .overlay(alignment: .trailing) {
             Button(action: onReload) {
                 Image(systemName: "arrow.clockwise")
                     .resizable()
@@ -268,17 +278,6 @@ struct BottomBarView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 44)
-        .background(
-            frostedBackground
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
-                )
-                .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: showSearchBar)
-        )
         .padding(.top, 16)
     }
 
