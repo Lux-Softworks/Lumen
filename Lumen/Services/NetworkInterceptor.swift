@@ -15,6 +15,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
     private(set) var detectedThreats: [ThreatEvent] = []
 
     var onThreatDetected: ((ThreatEvent) -> Void)?
+    var onDidCommit: ((WKWebView) -> Void)?
 
     init(detector: ThreatDetector, httpsOnly: Bool = true) {
         self.detector = detector
@@ -122,6 +123,10 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        onDidCommit?(webView)
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

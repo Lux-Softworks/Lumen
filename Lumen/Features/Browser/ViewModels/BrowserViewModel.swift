@@ -9,6 +9,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published var urlString: String = ""
     @Published var currentURL: URL?
     @Published var pageTitle: String = ""
+    @Published var pageReadyToken: Int = 0
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
@@ -22,6 +23,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private(set) var webView: WKWebView?
     private var interceptor: NetworkInterceptor?
+    private var pendingRequest: URLRequest?
 
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(
@@ -40,7 +42,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeKnowledgeProvider() {
         /* if knowledgeProvider == nil {
             knowledgeProvider = LocalKnowledgeProvider()
-
+        
             Task {
                 try? await knowledgeProvider?.loadModel()
             }
@@ -51,6 +53,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
         await MainActor.run {
             navigate(to: input)
         }
+    }
+
+    init(url: URL? = nil) {
+        super.init()
+        self.currentURL = url
+        self.urlString = url?.absoluteString ?? defaultURL.absoluteString
     }
 
     func attachWebView(_ webView: WKWebView) {
@@ -69,6 +77,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observeWebView(webView)
         observeSearch()
+
+        if let pending = pendingRequest {
+            webView.load(pending)
+            pendingRequest = nil
+        }
     }
 
     private func observeSearch() {
@@ -106,6 +119,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
             }
     }
 
+    func captureSnapshot() async -> UIImage? {
+        guard let webView = webView else { return nil }
+        let config = WKSnapshotConfiguration()
+        config.rect = webView.bounds
+        return try? await webView.takeSnapshot(configuration: config)
+    }
+
     func navigate(to input: String) {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -119,7 +139,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
         urlString = url.absoluteString
 
         let request = BrowserEngine.makeRequest(url: url)
-        webView?.load(request)
+        if let webView = webView {
+            webView.load(request)
+        } else {
+            pendingRequest = request
+        }
 
         logger.info("Loading: \(url.absoluteString)")
     }
@@ -213,6 +237,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
                     self?.isLoading = webView.isLoading
 
                     if !webView.isLoading {
+                        self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
 
                         if let url = webView.url?.absoluteString,
@@ -321,25 +346,22 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private func startScrollObservation(_ webView: WKWebView) {
         observations.append(
-            webView.scrollView.observe(\.contentOffset, options: [.new]) {
-                [weak self] scrollView, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-
-                    let currentOffset = scrollView.contentOffset.y
-
-                    let maxOffset = scrollView.contentSize.height - scrollView.frame.height
-
-                    if currentOffset < 0 || currentOffset > maxOffset {
-                        return
+            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] scrollView, change in
+                guard let self = self, let newOffset = change.newValue?.y, let oldOffset = change.oldValue?.y else { return }
+                
+                Task { @MainActor in
+                    self.scrollOffset = newOffset
+                    let delta = newOffset - oldOffset
+                    if abs(delta) > 0.5 {
+                        self.scrollDelta = delta
                     }
-
-                    let delta = currentOffset - self.lastContentOffset
-                    self.scrollDelta = delta
-                    self.scrollOffset = currentOffset
-                    self.lastContentOffset = currentOffset
+                    self.lastContentOffset = newOffset
                 }
             }
         )
+    }
+
+    deinit {
+        observations.forEach { $0.invalidate() }
     }
 }

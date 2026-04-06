@@ -3,7 +3,6 @@ import SwiftUI
 import UIKit
 import WebKit
 
-
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -39,6 +38,8 @@ enum BrowserEngine {
                 (function() {
                     var toolbarHeight = 80;
                     var statusBarHeight = 0;
+                    var topStickyElements = [];
+                    var topElementsNeedRefresh = true;
 
                     document.documentElement.style.setProperty(
                         '--toolbar-height', toolbarHeight + 'px');
@@ -48,7 +49,8 @@ enum BrowserEngine {
                     var style = document.createElement('style');
                     style.textContent =
                         '[data-kr-bumped-bottom] { transition: bottom 0.2s ease !important; }' +
-                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }';
+                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }' +
+                        '[data-kr-bounce-track] { will-change: transform; }';
                     document.head.appendChild(style);
 
                     var meta = document.querySelector('meta[name="viewport"]');
@@ -64,7 +66,25 @@ enum BrowserEngine {
                         document.head.appendChild(meta);
                     }
 
+                    function refreshTopStickyElements() {
+                        topStickyElements = [];
+                        var all = document.querySelectorAll('*');
+                        for (var i = 0; i < all.length; i++) {
+                            var el = all[i];
+                            var s = getComputedStyle(el);
+                            if (s.position !== 'fixed' && s.position !== 'sticky') continue;
+
+                            var rect = el.getBoundingClientRect();
+                            if (rect.top < window.innerHeight / 2) {
+                                el.setAttribute('data-kr-bounce-track', '1');
+                                topStickyElements.push(el);
+                            }
+                        }
+                        topElementsNeedRefresh = false;
+                    }
+
                     function bumpElements() {
+                        topElementsNeedRefresh = true;
                         var all = document.querySelectorAll('*');
                         for (var i = 0; i < all.length; i++) {
                             var el = all[i];
@@ -100,6 +120,39 @@ enum BrowserEngine {
                             }
                         }
                     }
+
+                    var lastBounceOffset = -1;
+
+                    function handleBounceScroll() {
+                        var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                        if (scrollY < 0) {
+                            var bounceOffset = Math.abs(scrollY);
+
+                            if (bounceOffset !== lastBounceOffset) {
+                                if (topElementsNeedRefresh) {
+                                    refreshTopStickyElements();
+                                }
+
+                                var transform = 'translateY(' + bounceOffset + 'px)';
+                                for (var i = 0; i < topStickyElements.length; i++) {
+                                    topStickyElements[i].style.transform = transform;
+                                }
+                                lastBounceOffset = bounceOffset;
+                            }
+                        } else if (lastBounceOffset >= 0) {
+                            for (var i = 0; i < topStickyElements.length; i++) {
+                                topStickyElements[i].style.transform = '';
+                            }
+                            lastBounceOffset = -1;
+                        }
+                    }
+
+                    window.addEventListener('scroll', handleBounceScroll, { passive: true });
+
+                    document.addEventListener('touchmove', function() {
+                        handleBounceScroll();
+                    }, { passive: true });
 
                     window.__updateToolbarHeight = function(h) {
                         toolbarHeight = h;
@@ -254,12 +307,20 @@ enum BrowserEngine {
         webView.scrollView.backgroundColor = .clear
 
         let detector = ThreatDetector()
-        detector.loadTrackerDatabase(TrackerDatabase.shared.allEntries())
-
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
+
+        Task.detached(priority: .utility) {
+            let entries = TrackerDatabase.shared.allEntries()
+            detector.loadTrackerDatabase(entries)
+
+            await MainActor.run {
+                webView.navigationDelegate = interceptor
+                webView.retainedDelegate = interceptor
+            }
+        }
 
         if let handler = objc_getAssociatedObject(
             config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler

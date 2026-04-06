@@ -510,8 +510,10 @@ actor KnowledgeStorage {
             let blobData = sqlite3_column_blob(statement, 1)
             let blobSize = Int(sqlite3_column_bytes(statement, 1))
 
+            guard let rawPtr = blobData, blobSize > 0 else { continue }
             let count = blobSize / MemoryLayout<Double>.size
-            let vector = Array(UnsafeBufferPointer(start: blobData?.assumingMemoryBound(to: Double.self), count: count))
+            guard count > 0 else { continue }
+            let vector = Array(UnsafeBufferPointer(start: rawPtr.assumingMemoryBound(to: Double.self), count: count))
 
             let score = VectorMath.cosineSimilarity(queryVector, vector)
             similarities.append((pageID: pageID, score: score))

@@ -6,6 +6,7 @@ struct ResizableSheetContainer<Content: View>: View {
     @Binding var isCollapsed: Bool
     var isLoading: Bool
     var progress: Double
+    var expandedHeightRatio: CGFloat
     var themeColor: UIColor?
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
@@ -16,19 +17,18 @@ struct ResizableSheetContainer<Content: View>: View {
 
     @GestureState private var activeDragTranslation: CGFloat = 0
     @State private var releaseOffset: CGFloat = 0
-    @State private var cachedScreenHeight: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
 
-    var expandedHeightRatio: CGFloat
     private let collapsedHeight: CGFloat = 80
     private let sliverHeight: CGFloat = 20
+    private let handleHeight: CGFloat = 60
 
     init(
         isExpanded: Binding<Bool>,
         isCollapsed: Binding<Bool>,
         isLoading: Bool,
         progress: Double,
-        expandedHeightRatio: CGFloat = 0.67,
+        expandedHeightRatio: CGFloat = 0.65,
         themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
@@ -52,14 +52,14 @@ struct ResizableSheetContainer<Content: View>: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { outerGeometry in
             ZStack(alignment: .bottom) {
                 Color.black.opacity(0.3)
                     .background(.ultraThinMaterial)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             isExpanded = false
                         }
                         onCollapse?()
@@ -72,10 +72,12 @@ struct ResizableSheetContainer<Content: View>: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16)
                     .frame(
-                        height: currentHeight(screenHeight: geometry.size.height),
+                        height: currentHeight(screenHeight: outerGeometry.size.height),
                         alignment: .top
                     )
+                    .animation(.smooth(duration: 0.3), value: expandedHeightRatio)
                     .opacity(isCollapsed ? 0 : 1)
+                    .animation(.smooth(duration: 0.3), value: isCollapsed)
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)
@@ -91,13 +93,13 @@ struct ResizableSheetContainer<Content: View>: View {
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 )
                                 .cornerRadius(
-                                    animatedCornerRadius(screenHeight: geometry.size.height),
+                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
                                     corners: [.topLeft, .topRight]
                                 )
                                 .overlay(
                                     RoundedCorner(
                                         radius: animatedCornerRadius(
-                                            screenHeight: geometry.size.height),
+                                            screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
                                     .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
@@ -107,16 +109,41 @@ struct ResizableSheetContainer<Content: View>: View {
                             ProgressView(
                                 progress: progress,
                                 isLoading: isLoading,
-                                width: geometry.size.width,
+                                width: outerGeometry.size.width,
                                 cornerRadius: animatedCornerRadius(
-                                    screenHeight: geometry.size.height),
+                                    screenHeight: outerGeometry.size.height),
                             )
                         }
                     )
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .global)
                             .updating($activeDragTranslation) { value, state, _ in
-                                state = value.translation.height
+                                let translation = value.translation.height
+                                let rubberBanded: CGFloat
+
+                                if isExpanded {
+                                    if translation > 0 {
+                                        rubberBanded = translation
+                                    } else {
+                                        rubberBanded = 0
+                                    }
+                                } else {
+                                    if translation < 0 {
+                                        rubberBanded = translation
+                                    } else {
+                                        rubberBanded = translation * 0.1
+                                    }
+                                }
+                                state = rubberBanded
+
+                                let screenHeight = outerGeometry.size.height
+                                let currentHeight = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
+                                let targetHeight = isExpanded ? collapsedHeight : screenHeight * expandedHeightRatio
+                                let diff = abs(targetHeight - currentHeight)
+                                if diff > 0 {
+                                    let progress = abs(rubberBanded) / diff
+                                    onDragProgress?(max(0, min(progress, 1)))
+                                }
                             }
                             .onChanged { value in
                                 onDragStart?()
@@ -124,30 +151,30 @@ struct ResizableSheetContainer<Content: View>: View {
                                 if abs(value.translation.height) > 10 {
                                     onDismissFocused?()
                                 }
-
-                                if !isExpanded && !isCollapsed && geometry.size.height > 0 {
-                                    let upDrag = max(0, -value.translation.height)
-                                    let resistedHeight = logarithmicResistance(upDrag)
-                                    let totalTravel =
-                                        geometry.size.height * expandedHeightRatio - collapsedHeight
-                                    let fraction = min(1.0, resistedHeight / totalTravel)
-                                    onDragProgress?(fraction)
-                                }
                             }
                             .onEnded { value in
                                 let translation = value.translation.height
                                 let velocity = value.velocity.height
-
                                 let finalOffset: CGFloat
+
                                 if isExpanded {
-                                    finalOffset = translation > 0 ? translation : 0
+                                    if translation > 0 {
+                                        finalOffset = translation
+                                    } else {
+                                        finalOffset = 0
+                                    }
                                 } else {
-                                    finalOffset = translation < 0 ? translation : 0
+                                    if translation < 0 {
+                                        finalOffset = translation
+                                    } else {
+                                        finalOffset = 0
+                                    }
                                 }
 
                                 releaseOffset = finalOffset
 
                                 let shouldExpand: Bool
+
                                 if isExpanded {
                                     shouldExpand = translation < 100 && velocity < 500
                                 } else {
@@ -164,47 +191,31 @@ struct ResizableSheetContainer<Content: View>: View {
                                 } else if isExpanded && !shouldExpand {
                                     onCollapse?()
                                 }
-
-                                if !shouldExpand {
-                                    onDragProgress?(0)
-                                }
                             }
                     )
                     .zIndex(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
-            .onAppear { cachedScreenHeight = geometry.size.height }
-            .onChange(of: geometry.size.height) { _, h in cachedScreenHeight = h }
         }
     }
 
     private var effectiveDrag: CGFloat {
-        activeDragTranslation != 0 ? activeDragTranslation : releaseOffset
-    }
+        if activeDragTranslation != 0 {
+            return activeDragTranslation
+        }
 
-    private func logarithmicResistance(_ raw: CGFloat) -> CGFloat {
-        guard raw > 0 else { return 0 }
-        let k: CGFloat = 600
-        return k * (1 - exp(-raw / k))
+        return releaseOffset
     }
 
     private func currentHeight(screenHeight: CGFloat) -> CGFloat {
-        if isCollapsed { return sliverHeight }
-
-        let expandedH = screenHeight * expandedHeightRatio
-
-        if isExpanded {
-            if effectiveDrag < 0 {
-                return expandedH + logarithmicResistance(-effectiveDrag)
-            }
-            return max(expandedH - effectiveDrag, sliverHeight)
-        } else {
-            if effectiveDrag < 0 {
-                return min(collapsedHeight + logarithmicResistance(-effectiveDrag), expandedH)
-            }
-            return max(collapsedHeight - effectiveDrag * 0.1, sliverHeight)
+        if isCollapsed {
+            return sliverHeight
         }
+        let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
+        let calculatedHeight = baseHeight - effectiveDrag
+
+        return min(calculatedHeight, screenHeight * expandedHeightRatio)
     }
 
     private func animatedCornerRadius(screenHeight: CGFloat) -> CGFloat {
@@ -212,6 +223,7 @@ struct ResizableSheetContainer<Content: View>: View {
         let currentH = currentHeight(screenHeight: screenHeight)
         let expandedH = screenHeight * expandedHeightRatio
         let fraction = max(0, min(1, (currentH - collapsedHeight) / (expandedH - collapsedHeight)))
+
         return expandedRadius * fraction
     }
 }

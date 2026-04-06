@@ -7,4 +7,5 @@ enum BottomBarState: Equatable {
     case browserSettings
     case siteSettings
     case knowledge
+    case submittingSearch
 }

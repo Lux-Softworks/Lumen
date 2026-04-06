@@ -6,7 +6,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
     @StateObject private var settings = BrowserSettings.shared
     var bottomInset: CGFloat = 0
-    
+
     var policy: PrivacyPolicy {
         settings.policy(for: viewModel.currentURL)
     }
@@ -85,9 +85,9 @@ struct HardenedWebView: UIViewControllerRepresentable {
         context.coordinator.updateTintColor(viewModel.themeColor)
 
         if controller.additionalSafeAreaInsets.bottom != bottomInset {
-            UIView.animate(withDuration: 0.2) {
-                controller.additionalSafeAreaInsets.bottom = bottomInset
-            }
+            controller.additionalSafeAreaInsets.bottom = bottomInset
+            webView.scrollView.contentInset.bottom = bottomInset
+            webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
 
             webView.evaluateJavaScript(
                 "window.__updateToolbarHeight && window.__updateToolbarHeight(\(Int(bottomInset)))"
@@ -109,10 +109,13 @@ final class WebViewHostController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .clear
 
         guard let webView = webView else { return }
 
         webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.backgroundColor = .clear
+        webView.isOpaque = false
         view.addSubview(webView)
 
         NSLayoutConstraint.activate([

@@ -19,7 +19,7 @@ struct KnowledgeButton: View {
                 FolderTabShape(isFill: false)
                     .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
             }
-            .frame(width: 90, height: 18)
+            .frame(width: 85, height: 18)
         }
         .buttonStyle(.plain)
     }

@@ -74,7 +74,7 @@ struct ProgressView: View {
         .scaleEffect(x: displayedProgress, anchor: .leading)
         .frame(maxWidth: width - cornerRadius * 2, maxHeight: .infinity, alignment: .topLeading)
         .opacity(visible ? 1 : 0)
-        .offset(y: -18.95)  // necessary offset for progress bar to be aligned. DO NOT CHANGE
+        .offset(y: -18.95)
         .onChange(of: isLoading) { _, loading in
             if loading {
                 isFinishing = false

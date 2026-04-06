@@ -14,12 +14,6 @@ struct KnowledgePanelView: View {
             .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("Knowledge")
-                    .font(AppTheme.Typography.serifDisplay(size: 28, weight: .bold))
-                    .foregroundColor(AppTheme.Colors.text)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
-
                 Spacer()
             }
         }

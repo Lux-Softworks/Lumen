@@ -12,13 +12,17 @@ struct BottomBarView: View {
     var themeColor: UIColor?
     var currentURL: URL? = nil
 
+    var tabCount: Int = 1
+    var isTabOverlayVisible: Bool = false
     var onTabsPressed: () -> Void
     var onSettingsPressed: () -> Void
     var onSubmit: () -> Void
     var onHistoryTap: (String) -> Void
+    var onSearchPressedInTabOverlay: (() -> Void)? = nil
 
     var onCopyUrl: () -> Void
     var onReload: () -> Void
+    var onSuggestionTap: (String) -> Void
 
     @ObservedObject private var historyStore = HistoryStore.shared
 
@@ -30,14 +34,18 @@ struct BottomBarView: View {
     @State private var suggestionsExpanded = false
     @State private var suggestionsOpacity: Double = 0
 
-    var isExpanded: Bool { state != .collapsed }
-    var showSearchBar: Bool { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge }
-    var expandedHeightRatio: CGFloat { state == .knowledge ? 0.9 : 0.67 }
+    var isExpanded: Bool {
+        state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge || state == .submittingSearch
+    }
+    var expandedHeightRatio: CGFloat {
+        if state == .submittingSearch { return 1.0 }
+        return state == .knowledge ? 0.9 : 0.67
+    }
 
     var body: some View {
         ResizableSheetContainer(
             isExpanded: Binding(
-                get: { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge },
+                get: { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge || state == .submittingSearch },
                 set: { expanded in
                     if expanded {
                         if state == .collapsed || state == .hidden {
@@ -86,7 +94,7 @@ struct BottomBarView: View {
             },
             onDragProgress: { fraction in
                 if fraction == 0 {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         toolbarDragFraction = 0
                     }
                 } else {
@@ -97,12 +105,12 @@ struct BottomBarView: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
                     collapsedContent
-                        .opacity(showSearchBar ? 0 : 1)
-                        .allowsHitTesting(!showSearchBar)
+                        .opacity(isExpanded ? 0 : 1)
+                        .allowsHitTesting(!isExpanded)
 
                     searchBarRow
-                        .opacity(showSearchBar ? 1 : 0)
-                        .allowsHitTesting(showSearchBar)
+                        .opacity(isExpanded ? 1 : 0)
+                        .allowsHitTesting(isExpanded)
                 }
 
                 if state == .knowledge {
@@ -225,7 +233,7 @@ struct BottomBarView: View {
                 .allowsHitTesting(state == .siteSettings)
             }
             .frame(width: 44, height: 44)
-            .matchedGeometryEffect(id: "magnifyingGlass", in: animation, isSource: showSearchBar)
+            .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: isExpanded)
 
             TextField(
                 state == .browserSettings ? "Browser Settings" : "Search...",
@@ -262,7 +270,7 @@ struct BottomBarView: View {
                     Capsule()
                         .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                 )
-                .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: showSearchBar)
+                .matchedGeometryEffect(id: "searchBackground_fill", in: animation, isSource: isExpanded)
         )
         .overlay(alignment: .trailing) {
             Button(action: onReload) {
@@ -279,7 +287,7 @@ struct BottomBarView: View {
             }
             .opacity(state == .siteSettings ? 1 : 0)
             .allowsHitTesting(state == .siteSettings)
-            .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: showSearchBar)
+            .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
             .onChange(of: isLoading) { _, loading in
                 if loading {
                     if !isSpinning {
@@ -301,8 +309,7 @@ struct BottomBarView: View {
                     ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
                         index, suggestion in
                         Button {
-                            text = suggestion.text
-                            onSubmit()
+                            onSuggestionTap(suggestion.text)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "plus")
@@ -448,7 +455,6 @@ struct BottomBarView: View {
         }
     }
 
-    // TODO: make this smooth at one point but one rotation is good enough for now
     private func triggerSpin() {
         guard isSpinning else { return }
 
@@ -458,35 +464,41 @@ struct BottomBarView: View {
     }
 
     var collapsedContent: some View {
-        let sideOpacity = max(0, 1 - toolbarDragFraction * 3.0)
+        let dragFade = max(0, 1 - toolbarDragFraction * 3.0)
+        let sideOpacity = isTabOverlayVisible ? 0.0 : dragFade
         let sideSlide: CGFloat = toolbarDragFraction * 14
 
         return HStack(spacing: 0) {
             Button(action: onTabsPressed) {
-                Image(systemName: "square.on.square")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(AppTheme.Colors.text)
-                    .frame(width: 44, height: 44)
-                    .background(frostedBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
-                    )
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "square.on.square")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(AppTheme.Colors.text.opacity(tabCount == 0 ? 0.35 : 1.0))
+                        .frame(width: 44, height: 44)
+                        .background(frostedBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                        )
+                }
             }
+            .disabled(tabCount == 0)
             .padding(.leading, 8)
             .opacity(sideOpacity)
             .offset(x: -sideSlide)
+            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
 
             Spacer()
 
             Button(action: {
-                text = ""
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    state = .search
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    isFocused = true
+                if isTabOverlayVisible, let handler = onSearchPressedInTabOverlay {
+                    handler()
+                } else {
+                    text = ""
+                    withAnimation(.smooth(duration: 0.3)) {
+                        state = .search
+                    }
                 }
             }) {
                 ZStack {
@@ -496,7 +508,7 @@ struct BottomBarView: View {
                             Capsule()
                                 .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                         )
-                        .matchedGeometryEffect(id: "searchBackground", in: animation, isSource: !showSearchBar)
+                        .matchedGeometryEffect(id: "searchBackground_fill", in: animation, isSource: !isExpanded)
                         .frame(width: 80, height: 44)
 
                     HStack(spacing: 0) {
@@ -504,7 +516,7 @@ struct BottomBarView: View {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(AppTheme.Colors.text)
-                                .matchedGeometryEffect(id: "magnifyingGlass", in: animation, isSource: !showSearchBar)
+                                .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded)
 
                             Image(systemName: "arrow.clockwise")
                                 .resizable()
@@ -514,7 +526,7 @@ struct BottomBarView: View {
                                 .frame(width: 18, height: 18)
                                 .rotationEffect(.degrees(0))
                                 .opacity(0)
-                                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: !showSearchBar)
+                                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: !isExpanded)
                         }
                         .frame(width: 80, height: 44)
 
@@ -543,6 +555,7 @@ struct BottomBarView: View {
             .padding(.trailing, 8)
             .opacity(sideOpacity)
             .offset(x: sideSlide)
+            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
         }
         .frame(height: 80)
         .overlay(alignment: .topTrailing) {
@@ -553,15 +566,13 @@ struct BottomBarView: View {
             }
             .padding(.trailing, 16)
             .alignmentGuide(.top) { d in d[.bottom] }
+            .opacity(isTabOverlayVisible ? 0 : 1)
+            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
         }
     }
 
     private var knowledgeContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer()
-        }
-        
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Spacer()
     }
 
     private var displayBinding: Binding<String> {

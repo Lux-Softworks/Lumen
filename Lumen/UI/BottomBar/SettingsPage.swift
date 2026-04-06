@@ -38,7 +38,7 @@ struct SettingsPage: View {
             }
             .frame(width: geometry.size.width * 2, alignment: .leading)
             .offset(x: navigationPath.isEmpty ? 0 : -geometry.size.width)
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: navigationPath)
+            .animation(.smooth(duration: 0.3), value: navigationPath)
         }
         .clipped()
         .ignoresSafeArea(.keyboard)
@@ -169,7 +169,7 @@ struct SettingsPage: View {
                 let isSelected = settings.searchEngine == engine
 
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         settings.searchEngine = engine
                     }
                 } label: {
@@ -210,7 +210,7 @@ struct SettingsPage: View {
                 let isSelected = settings.nativeAppsPolicy == policy
 
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         settings.nativeAppsPolicy = policy
                     }
                 } label: {
