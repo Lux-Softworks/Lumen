@@ -3,7 +3,7 @@ import UIKit
 
 struct TabOverlayView: View {
     @ObservedObject var tabManager: TabManager
-    var hideActiveTabCard: Bool = false
+    var hiddenTabId: UUID? = nil
     var shrinkProgress: CGFloat = 1
     var onSelectTab: (UUID) -> Void
 
@@ -12,10 +12,24 @@ struct TabOverlayView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let cardWidth = geo.size.width * scale
-            let cardHeight = geo.size.height * scale
-            let headerHeight = max(0, geo.size.height - cardHeight - toolbarHeight)
-            let hPadding = (geo.size.width - cardWidth) / 2
+            let safeWidth = safe(geo.size.width)
+            let safeHeight = safe(geo.size.height)
+
+            let toolbarYPosition = safe(safeHeight - toolbarHeight)
+
+            let desiredCardWidth = safe(safeWidth * scale)
+            let desiredCardHeight = safe(safeHeight * scale)
+
+            let maxCardHeight = safe(toolbarYPosition)
+            let cardHeight = safe(min(desiredCardHeight, maxCardHeight))
+
+            let cardWidth = safe(min(desiredCardWidth, safeWidth))
+
+            let rawHeaderHeight = (toolbarYPosition - cardHeight) / 2
+            let headerHeight = safe(rawHeaderHeight)
+
+            let rawHPadding = (safeWidth - cardWidth) / 2
+            let hPadding = safe(rawHPadding)
 
             VStack(spacing: 0) {
                 Color.clear.frame(height: headerHeight)
@@ -25,7 +39,7 @@ struct TabOverlayView: View {
                         LazyHStack(spacing: 16) {
                             ForEach(tabManager.tabs) { tab in
                                 let isActive = tab.id == tabManager.activeTabId
-                                let hidden = hideActiveTabCard && isActive
+                                let hidden = tab.id == hiddenTabId
                                 TabCardItemView(
                                     tab: tab,
                                     onClose: {
@@ -35,7 +49,7 @@ struct TabOverlayView: View {
                                     },
                                     onTap: { onSelectTab(tab.id) }
                                 )
-                                .frame(width: cardWidth, height: cardHeight)
+                                .frame(width: safe(cardWidth), height: safe(cardHeight))
                                 .id(tab.id)
                                 .opacity(hidden ? 0 : 1)
                                 .allowsHitTesting(!hidden)
@@ -46,7 +60,7 @@ struct TabOverlayView: View {
                     }
                     .scrollTargetBehavior(.viewAligned)
                     .scrollClipDisabled()
-                    .frame(height: cardHeight)
+                    .frame(height: safe(cardHeight))
                     .onAppear {
                         proxy.scrollTo(tabManager.activeTabId, anchor: .center)
                     }
@@ -60,6 +74,11 @@ struct TabOverlayView: View {
                 Color.clear.frame(height: toolbarHeight)
             }
         }
+    }
+    
+    private func safe(_ value: CGFloat) -> CGFloat {
+        guard value.isFinite else { return 0 }
+        return max(0, value)
     }
 }
 

@@ -39,7 +39,6 @@ enum BrowserEngine {
                     var toolbarHeight = 80;
                     var statusBarHeight = 0;
                     var topStickyElements = [];
-                    var topElementsNeedRefresh = true;
 
                     document.documentElement.style.setProperty(
                         '--toolbar-height', toolbarHeight + 'px');
@@ -80,11 +79,9 @@ enum BrowserEngine {
                                 topStickyElements.push(el);
                             }
                         }
-                        topElementsNeedRefresh = false;
                     }
 
                     function bumpElements() {
-                        topElementsNeedRefresh = true;
                         var all = document.querySelectorAll('*');
                         for (var i = 0; i < all.length; i++) {
                             var el = all[i];
@@ -119,40 +116,25 @@ enum BrowserEngine {
                                 }
                             }
                         }
+                        requestAnimationFrame(refreshTopStickyElements);
                     }
 
-                    var lastBounceOffset = -1;
+                    var lastBounceOffset = 0;
 
-                    function handleBounceScroll() {
-                        var scrollY = window.pageYOffset || document.documentElement.scrollTop;
-
-                        if (scrollY < 0) {
-                            var bounceOffset = Math.abs(scrollY);
-
-                            if (bounceOffset !== lastBounceOffset) {
-                                if (topElementsNeedRefresh) {
-                                    refreshTopStickyElements();
-                                }
-
-                                var transform = 'translateY(' + bounceOffset + 'px)';
-                                for (var i = 0; i < topStickyElements.length; i++) {
-                                    topStickyElements[i].style.transform = transform;
-                                }
-                                lastBounceOffset = bounceOffset;
+                    window.__nativeBounce = function(offset) {
+                        if (offset > 0) {
+                            var transform = 'translateY(' + offset + 'px)';
+                            for (var i = 0; i < topStickyElements.length; i++) {
+                                topStickyElements[i].style.transform = transform;
                             }
-                        } else if (lastBounceOffset >= 0) {
+                            lastBounceOffset = offset;
+                        } else if (lastBounceOffset > 0) {
                             for (var i = 0; i < topStickyElements.length; i++) {
                                 topStickyElements[i].style.transform = '';
                             }
-                            lastBounceOffset = -1;
+                            lastBounceOffset = 0;
                         }
-                    }
-
-                    window.addEventListener('scroll', handleBounceScroll, { passive: true });
-
-                    document.addEventListener('touchmove', function() {
-                        handleBounceScroll();
-                    }, { passive: true });
+                    };
 
                     window.__updateToolbarHeight = function(h) {
                         toolbarHeight = h;

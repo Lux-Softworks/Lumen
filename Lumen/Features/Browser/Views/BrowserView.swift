@@ -8,7 +8,8 @@ struct BrowserView: View {
     @State private var isReady = false
     @State private var activeTabViewState: TabViewState = .fullScreen
     @State private var shrinkProgress: CGFloat = 0
-    @State private var scrollAccumulator: CGFloat = 0
+    @State private var scrollAnchor: CGFloat = 0
+    @State private var wasScrollingDown: Bool = false
     @State private var urlText: String = ""
 
     @State private var webViewReady = true
@@ -68,10 +69,6 @@ struct BrowserView: View {
                 pageCommitted: $pageCommitted,
                 onFadeIn: fadeInWebView
             )
-            .applyShrinkStateHandlers(
-                activeTabViewState: $activeTabViewState,
-                shrinkProgress: $shrinkProgress
-            )
             .applyPageLoadHandlers(
                 pageReadyToken: pageReadyToken,
                 isActiveTabLoading: isActiveTabLoading,
@@ -129,7 +126,9 @@ struct BrowserView: View {
                 .zIndex(3)
             navigationLayer(geometry: geometry)
                 .zIndex(10)
-            if !isReady { launchScreen.zIndex(200) }
+            if !isReady {
+                launchScreen.zIndex(200)
+            }
         }
     }
 
@@ -176,38 +175,70 @@ struct BrowserView: View {
 
     @ViewBuilder
     private func tabOverlayLayer() -> some View {
+        let opacity: Double = {
+            switch activeTabViewState {
+            case .shrinking:
+                return 0
+            case .expanding:
+                return 0
+            case .shrunk:
+                return 1
+            case .fullScreen:
+                return 0
+            }
+        }()
+
         TabOverlayView(
             tabManager: tabManager,
-            hideActiveTabCard: activeTabViewState == .fullScreen,
+            hiddenTabId: (activeTabViewState == .fullScreen || activeTabViewState.isTransitioning) ? activeTab?.id : nil,
             shrinkProgress: shrinkProgress,
             onSelectTab: { id in handleSelectTab(id: id) }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
+        .opacity(opacity)
+        .animation(.linear(duration: 0.01), value: opacity)
+        .allowsHitTesting(!activeTabViewState.isTransitioning)
     }
 
     @ViewBuilder
     private func activeTabLayer(geometry: GeometryProxy) -> some View {
-        if let tab = activeTab {
-            ZStack {
-                if activeTabViewState == .fullScreen {
-                    Color.black
-                        .ignoresSafeArea()
-                }
-
-                let showLive = (activeTabViewState == .fullScreen || activeTabViewState.isTransitioning) && webViewReady
+        ZStack {
+            if activeTabViewState == .fullScreen && !webViewReady {
+                Color.black
+                    .ignoresSafeArea()
+            }
+            if let tab = activeTab {
+                let showLive = activeTabViewState == .fullScreen && webViewReady
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
-                    .animation(.smooth(duration: 0.2), value: webViewReady)
+                    .animation(.linear(duration: 0.01), value: showLive)
             }
         }
     }
 
     @ViewBuilder
     private func transitionLayer(geometry: GeometryProxy) -> some View {
-        if activeTab != nil, activeTabViewState.isTransitioning {
-            transitionOverlay(geometry: geometry)
+        let opacity: Double = {
+            guard activeTab != nil else { return 0 }
+            switch activeTabViewState {
+            case .shrinking:
+                return 1
+            case .expanding:
+                return 1
+            case .shrunk:
+                return 0
+            case .fullScreen:
+                return 0
+            }
+        }()
+
+        ZStack(alignment: .top) {
+            transitionOverlay(geometry: geometry, progress: shrinkProgress)
         }
+        .opacity(opacity)
+        .animation(.easeOut(duration: 0.12), value: opacity)
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -255,56 +286,89 @@ struct BrowserView: View {
     }
 
     @ViewBuilder
-    private func transitionOverlay(geometry: GeometryProxy) -> some View {
-        if let tab = activeTab, activeTabViewState.isTransitioning {
-            let toolbarHeight: CGFloat = 80
-            let scale: CGFloat = 0.72
-            let anchorY = 1.0 - toolbarHeight / ((1.0 - scale) * geometry.size.height)
-            let s = lerp(1.0, scale, shrinkProgress)
-            let cardTopY = anchorY * geometry.size.height * (1.0 - s)
+    private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
+        let toolbarHeight: CGFloat = 80
+        let targetScale: CGFloat = 0.72
+        let cornerRadius: CGFloat = 16
+        let headerHeight: CGFloat = 36
 
-            ZStack(alignment: .top) {
+        let toolbarYPosition = geometry.size.height - toolbarHeight
+        let cardHeight = min(geometry.size.height * targetScale, toolbarYPosition)
+        let headerSpace = max(0, (toolbarYPosition - cardHeight) / 2)
+        let cardCenterY = headerSpace + cardHeight / 2
+
+        let currentY = lerp(geometry.size.height / 2, cardCenterY, progress)
+        let currentScale = lerp(1.0, targetScale, progress)
+
+        let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
+        let lerpCornerRadius = lerp(0, cornerRadius, progress)
+
+        let currentCardWidth = geometry.size.width * currentScale
+        let currentCardHeight = geometry.size.height * currentScale
+        let cardTopEdgeY = currentY - (currentCardHeight / 2)
+
+        let visualGapHeight = currentHeaderTranslate * currentScale
+
+        let titleOpacity: CGFloat = {
+            switch activeTabViewState {
+            case .shrinking:
+                return lerp(0, 1, progress)
+            case .expanding:
+                return lerp(1, 0, progress)
+            default:
+                return 0
+            }
+        }()
+
+        ZStack(alignment: .top) {
+            if let tab = activeTab {
+                tabCardHeader(tab: tab)
+                    .frame(width: currentCardWidth, height: 36, alignment: .top)
+                    .frame(height: max(0, visualGapHeight), alignment: .top)
+                    .clipped()
+                    .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
+                    .zIndex(1)
+                    .opacity(titleOpacity)
+            }
+
+            VStack(spacing: 0) {
                 ZStack(alignment: .top) {
+
+                    Color.clear
+                        .frame(height: 36)
+                        .frame(maxWidth: .infinity)
+
                     Group {
-                        if let snapshot = tab.snapshot {
-                            Image(uiImage: snapshot)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
+                        if let backgroundColor = activeTab?.viewModel.themeColor {
+                            Color(backgroundColor)
                         } else {
-                            Color(white: 0.08)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
+                            Color.black
                         }
                     }
+                    .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0, topTrailing: lerpCornerRadius)))
+                    .offset(y: currentHeaderTranslate)
+                }
 
-                    if let color = tab.viewModel.themeColor {
-                        Color(color)
-                            .frame(height: getStatusBarHeight(geometry))
-                            .opacity(Double(1.0 - shrinkProgress))
+                Group {
+                    if let tab = activeTab, let snapshot = tab.snapshot {
+                        Image(uiImage: snapshot)
+                            .resizable()
+                            .scaledToFill()
+                            .clipped()
+                    } else {
+                        Color(white: 0.08)
                     }
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .mask(RoundedRectangle(cornerRadius: lerp(0, 24, shrinkProgress), style: .continuous))
-                .scaleEffect(s, anchor: UnitPoint(x: 0.5, y: anchorY))
-
-                tabCardHeader(tab: tab)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0.45), Color.clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: geometry.size.width * s)
-                    .opacity(Double(shrinkProgress))
-                    .offset(y: cardTopY)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .mask(RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous))
+                .clipped()
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .allowsHitTesting(false)
-        } else {
-            EmptyView()
+            .scaleEffect(currentScale, anchor: .center)
+            .position(x: geometry.size.width / 2, y: currentY)
+            .zIndex(2)
         }
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -332,7 +396,7 @@ struct BrowserView: View {
     }
 
     @ViewBuilder
-    private func tabCardHeader(tab: Tab) -> some View {
+    private func tabHeaderContent(tab: Tab) -> some View {
         HStack(spacing: 8) {
             let url = tab.viewModel.currentURL ?? tab.url
             if let url, let faviconURL = FaviconService.faviconURL(for: url) {
@@ -360,8 +424,12 @@ struct BrowserView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 36)
+    }
+
+    private func tabCardHeader(tab: Tab) -> some View {
+        tabHeaderContent(tab: tab)
+            .padding(.horizontal, 10)
+            .frame(height: 36)
     }
 
     @ViewBuilder
@@ -397,22 +465,30 @@ struct BrowserView: View {
 
         Task { @MainActor in
             let image = await activeTab.viewModel.captureSnapshot()
-            if let image { activeTab.snapshot = image }
+            if let image {
+                activeTab.snapshot = image
+            }
+
             activeTabViewState = .shrinking
-            withAnimation(.smooth(duration: 0.15)) {
+            withAnimation(.smooth(duration: 0.28)) {
                 self.shrinkProgress = 1.0
+            } completion: {
+                self.activeTabViewState = .shrunk
             }
         }
     }
 
     private func handleSelectTab(id: UUID) {
         guard !isTransitioning else { return }
+        guard activeTabViewState == .shrunk else { return }
         guard tabManager.tabs.contains(where: { $0.id == id }) else { return }
 
         tabManager.switchTab(id: id)
         activeTabViewState = .expanding
-        withAnimation(.smooth(duration: 0.15)) {
+        withAnimation(.smooth(duration: 0.28)) {
             self.shrinkProgress = 0.0
+        } completion: {
+            self.activeTabViewState = .fullScreen
         }
     }
 
@@ -478,10 +554,16 @@ struct BrowserView: View {
                 self.bottomBarState = .collapsed
             }
 
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            if tabsEmpty {
+                coverFinished = true
+            }
 
-            withAnimation(.smooth(duration: 0.4)) {
-                self.webViewReady = true
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            if !webViewReady {
+                withAnimation(.smooth(duration: 0.4)) {
+                    self.webViewReady = true
+                }
             }
         }
     }
@@ -528,31 +610,33 @@ struct BrowserView: View {
 
     private func updateScrollState(delta: CGFloat) {
         guard let viewModel = activeTab?.viewModel else { return }
+        let offset = viewModel.scrollOffset
 
-        if viewModel.scrollOffset < 50 {
+        if offset < 80 {
+            scrollAnchor = offset
+            wasScrollingDown = false
             if bottomBarState == .hidden {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .collapsed
                 }
             }
-            scrollAccumulator = 0
             return
         }
 
         if delta > 0 {
-            if scrollAccumulator < 0 { scrollAccumulator = 0 }
-            scrollAccumulator += delta
-
-            if scrollAccumulator > 60 && bottomBarState == .collapsed {
+            if !wasScrollingDown {
+                scrollAnchor = offset
+                wasScrollingDown = true
+            }
+            if offset - scrollAnchor >= 80 && bottomBarState == .collapsed {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .hidden
                 }
             }
-        } else {
-            if scrollAccumulator > 0 { scrollAccumulator = 0 }
-            scrollAccumulator += delta
-
-            if scrollAccumulator < -20 && bottomBarState == .hidden {
+        } else if delta < -1 {
+            wasScrollingDown = false
+            scrollAnchor = offset
+            if bottomBarState == .hidden {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .collapsed
                 }
@@ -590,22 +674,6 @@ fileprivate struct NavigationCoverChangeHandlers: ViewModifier {
     }
 }
 
-fileprivate struct ShrinkStateHandlers: ViewModifier {
-    @Binding var activeTabViewState: TabViewState
-    @Binding var shrinkProgress: CGFloat
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: shrinkProgress) { _, newValue in
-                if activeTabViewState == .shrinking && newValue >= 0.99 {
-                    activeTabViewState = .shrunk
-                } else if activeTabViewState == .expanding && newValue <= 0.01 {
-                    activeTabViewState = .fullScreen
-                }
-            }
-    }
-}
-
 fileprivate struct PageLoadHandlers: ViewModifier {
     let pageReadyToken: Int
     let isActiveTabLoading: Bool
@@ -637,6 +705,11 @@ fileprivate struct PageLoadHandlers: ViewModifier {
                     if coverFinished { onFadeIn() }
                 }
             }
+            .onChange(of: coverFinished) { _, finished in
+                guard finished && pageCommitted && !webViewReady else { return }
+                guard bottomBarState != .submittingSearch else { return }
+                onFadeIn()
+            }
     }
 }
 
@@ -655,7 +728,7 @@ fileprivate struct TabManagerHandlers: ViewModifier {
                     shrinkProgress = 0
                     webViewReady = true
                     withAnimation(.smooth(duration: 0.3)) {
-                        bottomBarState = .collapsed
+                        bottomBarState = .search
                     }
                 }
             }
@@ -684,7 +757,9 @@ fileprivate struct ActiveTabChangedHandlers: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: tabManager.activeTabId) { _, newId in
-                isAddressBarFocused.wrappedValue = false
+                if !tabManager.tabs.isEmpty {
+                    isAddressBarFocused.wrappedValue = false
+                }
 
                 if bottomBarState == .submittingSearch { return }
 
@@ -724,16 +799,6 @@ fileprivate extension View {
             coverFinished: coverFinished,
             pageCommitted: pageCommitted,
             onFadeIn: onFadeIn
-        ))
-    }
-
-    func applyShrinkStateHandlers(
-        activeTabViewState: Binding<TabViewState>,
-        shrinkProgress: Binding<CGFloat>
-    ) -> some View {
-        modifier(ShrinkStateHandlers(
-            activeTabViewState: activeTabViewState,
-            shrinkProgress: shrinkProgress
         ))
     }
 
