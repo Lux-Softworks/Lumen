@@ -9,6 +9,8 @@ struct TabOverlayView: View {
 
     private let scale: CGFloat = 0.72
     private let toolbarHeight: CGFloat = 80
+    
+    @State private var lastScrolledToId: UUID? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -47,7 +49,10 @@ struct TabOverlayView: View {
                                             tabManager.closeTab(id: tab.id)
                                         }
                                     },
-                                    onTap: { onSelectTab(tab.id) }
+                                    onTap: {
+                                        lastScrolledToId = tab.id
+                                        onSelectTab(tab.id)
+                                    }
                                 )
                                 .frame(width: safe(cardWidth), height: safe(cardHeight))
                                 .id(tab.id)
@@ -63,11 +68,14 @@ struct TabOverlayView: View {
                     .frame(height: safe(cardHeight))
                     .onAppear {
                         proxy.scrollTo(tabManager.activeTabId, anchor: .center)
+                        lastScrolledToId = tabManager.activeTabId
                     }
                     .onChange(of: tabManager.activeTabId) { _, id in
+                        guard id != lastScrolledToId else { return }
                         withAnimation(.easeInOut(duration: 0.3)) {
                             proxy.scrollTo(id, anchor: .center)
                         }
+                        lastScrolledToId = id
                     }
                 }
 
@@ -75,7 +83,7 @@ struct TabOverlayView: View {
             }
         }
     }
-    
+
     private func safe(_ value: CGFloat) -> CGFloat {
         guard value.isFinite else { return 0 }
         return max(0, value)
@@ -192,7 +200,6 @@ private struct TabCardItemView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.35), radius: 14, x: 0, y: 6)
         }
         .offset(y: min(0, dragOffset))
         .opacity(dragOffset < 0 ? Double(max(0.0, 1 + dragOffset / 160)) : 1)

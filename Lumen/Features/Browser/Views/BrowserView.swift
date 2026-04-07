@@ -22,7 +22,6 @@ struct BrowserView: View {
 
     @FocusState private var isAddressBarFocused: Bool
 
-
     private var isTransitioning: Bool { activeTabViewState.isTransitioning }
     private var activeTab: Tab? { tabManager.activeTab }
 
@@ -190,7 +189,8 @@ struct BrowserView: View {
 
         TabOverlayView(
             tabManager: tabManager,
-            hiddenTabId: (activeTabViewState == .fullScreen || activeTabViewState.isTransitioning) ? activeTab?.id : nil,
+            hiddenTabId: (activeTabViewState == .fullScreen || activeTabViewState.isTransitioning)
+                ? activeTab?.id : nil,
             shrinkProgress: shrinkProgress,
             onSelectTab: { id in handleSelectTab(id: id) }
         )
@@ -237,7 +237,7 @@ struct BrowserView: View {
             transitionOverlay(geometry: geometry, progress: shrinkProgress)
         }
         .opacity(opacity)
-        .animation(.easeOut(duration: 0.12), value: opacity)
+        .animation(.linear(duration: 0.01), value: opacity)
         .allowsHitTesting(false)
     }
 
@@ -299,14 +299,13 @@ struct BrowserView: View {
 
         let currentY = lerp(geometry.size.height / 2, cardCenterY, progress)
         let currentScale = lerp(1.0, targetScale, progress)
-
-        let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
-        let lerpCornerRadius = lerp(0, cornerRadius, progress)
+        let lerpCornerRadius = lerp(0, cornerRadius / targetScale, progress)
 
         let currentCardWidth = geometry.size.width * currentScale
         let currentCardHeight = geometry.size.height * currentScale
         let cardTopEdgeY = currentY - (currentCardHeight / 2)
 
+        let currentHeaderTranslate = lerp(0, (headerHeight + 18) / targetScale, progress)
         let visualGapHeight = currentHeaderTranslate * currentScale
 
         let titleOpacity: CGFloat = {
@@ -333,9 +332,8 @@ struct BrowserView: View {
 
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
-
                     Color.clear
-                        .frame(height: 36)
+                        .frame(height: headerHeight)
                         .frame(maxWidth: .infinity)
 
                     Group {
@@ -349,19 +347,17 @@ struct BrowserView: View {
                     .offset(y: currentHeaderTranslate)
                 }
 
-                Group {
+                ZStack {
                     if let tab = activeTab, let snapshot = tab.snapshot {
                         Image(uiImage: snapshot)
                             .resizable()
                             .scaledToFill()
-                            .clipped()
                     } else {
                         Color(white: 0.08)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .mask(RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous))
-                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous))
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .scaleEffect(currentScale, anchor: .center)
@@ -454,7 +450,9 @@ struct BrowserView: View {
             onSearchPressedInTabOverlay: { Task { @MainActor in handleSearchFromCarousel() } },
             onCopyUrl: { Task { @MainActor in handleCopyUrl() } },
             onReload: { Task { @MainActor in vm?.reload() } },
-            onSuggestionTap: { suggestion in Task { @MainActor in handleSubmit(queryOverride: suggestion) } }
+            onSuggestionTap: { suggestion in
+                Task { @MainActor in handleSubmit(queryOverride: suggestion) }
+            }
         )
     }
 
@@ -507,8 +505,9 @@ struct BrowserView: View {
                 if activeTabViewState != .fullScreen {
                     bottomBarState = .browserSettings
                 } else if let url = activeTab?.viewModel.currentURL,
-                   !url.absoluteString.isEmpty,
-                   url.absoluteString != "about:blank" {
+                    !url.absoluteString.isEmpty,
+                    url.absoluteString != "about:blank"
+                {
                     bottomBarState = .siteSettings
                 } else {
                     bottomBarState = .browserSettings
@@ -521,7 +520,8 @@ struct BrowserView: View {
         let query = queryOverride ?? urlBinding.wrappedValue
         let tabsEmpty = tabManager.tabs.isEmpty
         let currentURLString = activeTab?.viewModel.currentURL?.absoluteString
-        let hasValidPage = !tabsEmpty && (currentURLString != nil) && (currentURLString != "about:blank")
+        let hasValidPage =
+            !tabsEmpty && (currentURLString != nil) && (currentURLString != "about:blank")
 
         isAddressBarFocused = false
         urlText = query
@@ -532,9 +532,9 @@ struct BrowserView: View {
         }
 
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(for: .seconds(0.3))
 
-            if (tabsEmpty || hasValidPage), let oldTab = activeTab {
+            if tabsEmpty || hasValidPage, let oldTab = activeTab {
                 let image = await oldTab.viewModel.captureSnapshot()
                 if let image { oldTab.snapshot = image }
             }
@@ -558,7 +558,7 @@ struct BrowserView: View {
                 coverFinished = true
             }
 
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(for: .seconds(10))
 
             if !webViewReady {
                 withAnimation(.smooth(duration: 0.4)) {
@@ -574,7 +574,8 @@ struct BrowserView: View {
 
     private func handleCopyUrl() {
         if let validURL = activeTab?.viewModel.currentURL?.absoluteString,
-           !validURL.isEmpty, validURL != "about:blank" {
+            !validURL.isEmpty, validURL != "about:blank"
+        {
             UIPasteboard.general.string = validURL
         } else {
             UIPasteboard.general.string = urlText
@@ -645,7 +646,7 @@ struct BrowserView: View {
     }
 }
 
-fileprivate struct NavigationCoverChangeHandlers: ViewModifier {
+private struct NavigationCoverChangeHandlers: ViewModifier {
     @Binding var showNavigationCover: Bool
     @Binding var navigationCoverOpacity: CGFloat
     @Binding var navigationCoverProgress: CGFloat
@@ -665,7 +666,9 @@ fileprivate struct NavigationCoverChangeHandlers: ViewModifier {
                 }
             }
             .onChange(of: pageCommitted) { _, committed in
-                if committed && showNavigationCover && navigationCoverOpacity > 0.9 && navigationCoverProgress >= 0.99 {
+                if committed && showNavigationCover && navigationCoverOpacity > 0.9
+                    && navigationCoverProgress >= 0.99
+                {
                     withAnimation(.smooth(duration: 0.3)) {
                         navigationCoverOpacity = 0
                     }
@@ -674,7 +677,7 @@ fileprivate struct NavigationCoverChangeHandlers: ViewModifier {
     }
 }
 
-fileprivate struct PageLoadHandlers: ViewModifier {
+private struct PageLoadHandlers: ViewModifier {
     let pageReadyToken: Int
     let isActiveTabLoading: Bool
     let activeTabProgress: Double
@@ -713,7 +716,7 @@ fileprivate struct PageLoadHandlers: ViewModifier {
     }
 }
 
-fileprivate struct TabManagerHandlers: ViewModifier {
+private struct TabManagerHandlers: ViewModifier {
     let tabManager: TabManager
     @Binding var activeTabViewState: TabViewState
     @Binding var shrinkProgress: CGFloat
@@ -735,7 +738,7 @@ fileprivate struct TabManagerHandlers: ViewModifier {
     }
 }
 
-fileprivate struct BottomBarFocusHandlers: ViewModifier {
+private struct BottomBarFocusHandlers: ViewModifier {
     @Binding var bottomBarState: BottomBarState
     var isAddressBarFocused: FocusState<Bool>.Binding
 
@@ -749,7 +752,7 @@ fileprivate struct BottomBarFocusHandlers: ViewModifier {
     }
 }
 
-fileprivate struct ActiveTabChangedHandlers: ViewModifier {
+private struct ActiveTabChangedHandlers: ViewModifier {
     let tabManager: TabManager
     @Binding var bottomBarState: BottomBarState
     var isAddressBarFocused: FocusState<Bool>.Binding
@@ -783,8 +786,8 @@ fileprivate struct ActiveTabChangedHandlers: ViewModifier {
     }
 }
 
-fileprivate extension View {
-    func applyNavigationCoverChangeHandlers(
+extension View {
+    fileprivate func applyNavigationCoverChangeHandlers(
         showNavigationCover: Binding<Bool>,
         navigationCoverOpacity: Binding<CGFloat>,
         navigationCoverProgress: Binding<CGFloat>,
@@ -792,17 +795,18 @@ fileprivate extension View {
         pageCommitted: Binding<Bool>,
         onFadeIn: @escaping () -> Void
     ) -> some View {
-        modifier(NavigationCoverChangeHandlers(
-            showNavigationCover: showNavigationCover,
-            navigationCoverOpacity: navigationCoverOpacity,
-            navigationCoverProgress: navigationCoverProgress,
-            coverFinished: coverFinished,
-            pageCommitted: pageCommitted,
-            onFadeIn: onFadeIn
-        ))
+        modifier(
+            NavigationCoverChangeHandlers(
+                showNavigationCover: showNavigationCover,
+                navigationCoverOpacity: navigationCoverOpacity,
+                navigationCoverProgress: navigationCoverProgress,
+                coverFinished: coverFinished,
+                pageCommitted: pageCommitted,
+                onFadeIn: onFadeIn
+            ))
     }
 
-    func applyPageLoadHandlers(
+    fileprivate func applyPageLoadHandlers(
         pageReadyToken: Int,
         isActiveTabLoading: Bool,
         activeTabProgress: Double,
@@ -812,54 +816,58 @@ fileprivate extension View {
         bottomBarState: Binding<BottomBarState>,
         onFadeIn: @escaping () -> Void
     ) -> some View {
-        modifier(PageLoadHandlers(
-            pageReadyToken: pageReadyToken,
-            isActiveTabLoading: isActiveTabLoading,
-            activeTabProgress: activeTabProgress,
-            webViewReady: webViewReady,
-            coverFinished: coverFinished,
-            pageCommitted: pageCommitted,
-            bottomBarState: bottomBarState,
-            onFadeIn: onFadeIn
-        ))
+        modifier(
+            PageLoadHandlers(
+                pageReadyToken: pageReadyToken,
+                isActiveTabLoading: isActiveTabLoading,
+                activeTabProgress: activeTabProgress,
+                webViewReady: webViewReady,
+                coverFinished: coverFinished,
+                pageCommitted: pageCommitted,
+                bottomBarState: bottomBarState,
+                onFadeIn: onFadeIn
+            ))
     }
 
-    func applyTabManagerHandlers(
+    fileprivate func applyTabManagerHandlers(
         tabManager: TabManager,
         activeTabViewState: Binding<TabViewState>,
         shrinkProgress: Binding<CGFloat>,
         webViewReady: Binding<Bool>,
         bottomBarState: Binding<BottomBarState>
     ) -> some View {
-        modifier(TabManagerHandlers(
-            tabManager: tabManager,
-            activeTabViewState: activeTabViewState,
-            shrinkProgress: shrinkProgress,
-            webViewReady: webViewReady,
-            bottomBarState: bottomBarState
-        ))
+        modifier(
+            TabManagerHandlers(
+                tabManager: tabManager,
+                activeTabViewState: activeTabViewState,
+                shrinkProgress: shrinkProgress,
+                webViewReady: webViewReady,
+                bottomBarState: bottomBarState
+            ))
     }
 
-    func applyBottomBarFocusHandlers(
+    fileprivate func applyBottomBarFocusHandlers(
         bottomBarState: Binding<BottomBarState>,
         isAddressBarFocused: FocusState<Bool>.Binding
     ) -> some View {
-        modifier(BottomBarFocusHandlers(
-            bottomBarState: bottomBarState,
-            isAddressBarFocused: isAddressBarFocused
-        ))
+        modifier(
+            BottomBarFocusHandlers(
+                bottomBarState: bottomBarState,
+                isAddressBarFocused: isAddressBarFocused
+            ))
     }
 
-    func applyActiveTabChangedHandlers(
+    fileprivate func applyActiveTabChangedHandlers(
         tabManager: TabManager,
         bottomBarState: Binding<BottomBarState>,
         isAddressBarFocused: FocusState<Bool>.Binding
     ) -> some View {
-        modifier(ActiveTabChangedHandlers(
-            tabManager: tabManager,
-            bottomBarState: bottomBarState,
-            isAddressBarFocused: isAddressBarFocused
-        ))
+        modifier(
+            ActiveTabChangedHandlers(
+                tabManager: tabManager,
+                bottomBarState: bottomBarState,
+                isAddressBarFocused: isAddressBarFocused
+            ))
     }
 }
 
