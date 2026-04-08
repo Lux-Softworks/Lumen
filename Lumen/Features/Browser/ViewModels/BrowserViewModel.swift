@@ -10,6 +10,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published var currentURL: URL?
     @Published var pageTitle: String = ""
     @Published var pageReadyToken: Int = 0
+    @Published var firstPaintToken: Int = 0
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
@@ -42,7 +43,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func initializeKnowledgeProvider() {
         /* if knowledgeProvider == nil {
             knowledgeProvider = LocalKnowledgeProvider()
-        
+
             Task {
                 try? await knowledgeProvider?.loadModel()
             }
@@ -64,6 +65,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
     func attachWebView(_ webView: WKWebView) {
         observations.removeAll()
         self.webView = webView
+
+        webView.configuration.userContentController.add(FirstPaintHandler(viewModel: self), name: "firstPaint")
 
         if let nav = webView.navigationDelegate as? NetworkInterceptor {
             self.interceptor = nav
@@ -239,6 +242,14 @@ final class BrowserViewModel: NSObject, ObservableObject {
                     if !webView.isLoading {
                         self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
+                        
+                        webView.evaluateJavaScript("""
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    window.webkit.messageHandlers.firstPaint.postMessage({});
+                                });
+                            });
+                        """, completionHandler: nil)
 
                         if let url = webView.url?.absoluteString,
                             let title = webView.title, !title.isEmpty
@@ -348,7 +359,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         observations.append(
             webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] scrollView, change in
                 guard let self = self, let newOffset = change.newValue?.y, let oldOffset = change.oldValue?.y else { return }
-                
+
                 Task { @MainActor in
                     self.scrollOffset = newOffset
                     let delta = newOffset - oldOffset

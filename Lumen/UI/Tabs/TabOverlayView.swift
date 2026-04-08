@@ -9,63 +9,52 @@ struct TabOverlayView: View {
 
     private let scale: CGFloat = 0.72
     private let toolbarHeight: CGFloat = 80
-    
+
+    private let kShrink: CGFloat = 0.15
+    private let sMin: CGFloat = 0.75
+    private let baseSpacing: CGFloat = 80
+    private let overlapCompensation: CGFloat = 40
+    private let wideSpacing: CGFloat = 320
+    private let kDepth: CGFloat = 20
+
     @State private var lastScrolledToId: UUID? = nil
+    @State private var scrollOffset: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
-            let safeWidth = safe(geo.size.width)
-            let safeHeight = safe(geo.size.height)
-
-            let toolbarYPosition = safe(safeHeight - toolbarHeight)
-
-            let desiredCardWidth = safe(safeWidth * scale)
-            let desiredCardHeight = safe(safeHeight * scale)
-
-            let maxCardHeight = safe(toolbarYPosition)
-            let cardHeight = safe(min(desiredCardHeight, maxCardHeight))
-
-            let cardWidth = safe(min(desiredCardWidth, safeWidth))
-
-            let rawHeaderHeight = (toolbarYPosition - cardHeight) / 2
-            let headerHeight = safe(rawHeaderHeight)
-
-            let rawHPadding = (safeWidth - cardWidth) / 2
-            let hPadding = safe(rawHPadding)
+            let config = calculateLayout(in: geo)
 
             VStack(spacing: 0) {
-                Color.clear.frame(height: headerHeight)
+                Color.clear.frame(height: config.headerHeight)
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 16) {
-                            ForEach(tabManager.tabs) { tab in
-                                let isActive = tab.id == tabManager.activeTabId
-                                let hidden = tab.id == hiddenTabId
-                                TabCardItemView(
+                        LazyHStack(spacing: 0) {
+                            ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
+                                TabCardWrapper(
+                                    index: index,
                                     tab: tab,
-                                    onClose: {
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                            tabManager.closeTab(id: tab.id)
-                                        }
-                                    },
-                                    onTap: {
-                                        lastScrolledToId = tab.id
-                                        onSelectTab(tab.id)
-                                    }
+                                    config: config,
+                                    tabManager: tabManager,
+                                    hiddenTabId: hiddenTabId,
+                                    kShrink: kShrink,
+                                    sMin: sMin,
+                                    baseSpacing: baseSpacing,
+                                    overlapCompensation: overlapCompensation,
+                                    wideSpacing: wideSpacing,
+                                    kDepth: kDepth,
+                                    onSelectTab: onSelectTab,
+                                    lastScrolledToId: $lastScrolledToId
                                 )
-                                .frame(width: safe(cardWidth), height: safe(cardHeight))
-                                .id(tab.id)
-                                .opacity(hidden ? 0 : 1)
-                                .allowsHitTesting(!hidden)
                             }
                         }
                         .scrollTargetLayout()
-                        .padding(.horizontal, hPadding)
+                        .padding(.horizontal, config.hPadding)
                     }
+                    .coordinateSpace(name: "scrollView")
                     .scrollTargetBehavior(.viewAligned)
                     .scrollClipDisabled()
-                    .frame(height: safe(cardHeight))
+                    .frame(height: config.cardHeight)
                     .onAppear {
                         proxy.scrollTo(tabManager.activeTabId, anchor: .center)
                         lastScrolledToId = tabManager.activeTabId
@@ -84,9 +73,105 @@ struct TabOverlayView: View {
         }
     }
 
+    internal struct LayoutConfig {
+        let safeWidth: CGFloat
+        let safeHeight: CGFloat
+        let cardWidth: CGFloat
+        let cardHeight: CGFloat
+        let headerHeight: CGFloat
+        let hPadding: CGFloat
+    }
+
+    private func calculateLayout(in geo: GeometryProxy) -> LayoutConfig {
+        let safeWidth = safe(geo.size.width)
+        let safeHeight = safe(geo.size.height)
+        let toolbarYPosition = safe(safeHeight - toolbarHeight)
+        let desiredCardWidth = safe(safeWidth * scale)
+        let desiredCardHeight = safe(safeHeight * scale)
+        let maxCardHeight = safe(toolbarYPosition)
+        let cardHeight = safe(min(desiredCardHeight, maxCardHeight))
+        let cardWidth = safe(min(desiredCardWidth, safeWidth))
+        let headerHeight = safe((toolbarYPosition - cardHeight) / 2)
+        let hPadding = safe((safeWidth - cardWidth) / 2)
+
+        return LayoutConfig(
+            safeWidth: safeWidth,
+            safeHeight: safeHeight,
+            cardWidth: cardWidth,
+            cardHeight: cardHeight,
+            headerHeight: headerHeight,
+            hPadding: hPadding
+        )
+    }
+
     private func safe(_ value: CGFloat) -> CGFloat {
         guard value.isFinite else { return 0 }
         return max(0, value)
+    }
+}
+
+private struct TabCardWrapper: View {
+    let index: Int
+    @ObservedObject var tab: Tab
+    let config: TabOverlayView.LayoutConfig
+    @ObservedObject var tabManager: TabManager
+    let hiddenTabId: UUID?
+    let kShrink: CGFloat
+    let sMin: CGFloat
+    let baseSpacing: CGFloat
+    let overlapCompensation: CGFloat
+    let wideSpacing: CGFloat
+    let kDepth: CGFloat
+    let onSelectTab: (UUID) -> Void
+    @Binding var lastScrolledToId: UUID?
+
+    var body: some View {
+        let hidden = tab.id == hiddenTabId
+
+        GeometryReader { cardGeo in
+            let cardFrame = cardGeo.frame(in: .named("scrollView"))
+            let cardCenterX = cardFrame.midX
+            let containerCenterX = config.hPadding + (config.safeWidth - 2 * config.hPadding) / 2
+
+            let displacement = cardCenterX - containerCenterX
+            let normalizedDelta = displacement / config.cardWidth
+
+            let delta = normalizedDelta
+            let absDelta = abs(delta)
+
+            let cardScale: CGFloat = max(1.0 - (absDelta * kShrink), sMin)
+
+            let xOffset: CGFloat = (
+                delta < 0
+                ? (delta * baseSpacing) + ((1.0 - cardScale) * overlapCompensation * config.cardWidth)
+                : delta * wideSpacing
+            )
+
+            let cardOpacity = hidden ? 0 : max(1.0 - (absDelta * 0.3), 0)
+
+            let zDepth = -absDelta * kDepth
+
+            TabCardItemView(
+                tab: tab,
+                onClose: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        tabManager.closeTab(id: tab.id)
+                    }
+                },
+                onTap: {
+                    lastScrolledToId = tab.id
+                    onSelectTab(tab.id)
+                }
+            )
+            .frame(width: config.cardWidth, height: config.cardHeight)
+            .scaleEffect(cardScale)
+            .offset(x: xOffset)
+            .zIndex(Double(index) + zDepth)
+            .opacity(cardOpacity)
+            .allowsHitTesting(!hidden)
+        }
+        .frame(width: config.cardWidth, height: config.cardHeight)
+        .id(tab.id)
     }
 }
 

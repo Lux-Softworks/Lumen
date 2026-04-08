@@ -12,6 +12,8 @@ struct BrowserView: View {
     @State private var wasScrollingDown: Bool = false
     @State private var urlText: String = ""
 
+    @State private var bottomBarOpacity: CGFloat = 1
+
     @State private var webViewReady = true
     @State private var coverFinished = false
     @State private var pageCommitted = false
@@ -27,6 +29,10 @@ struct BrowserView: View {
 
     private var pageReadyToken: Int {
         activeTab?.viewModel.pageReadyToken ?? 0
+    }
+
+    private var firstPaintToken: Int {
+        activeTab?.viewModel.firstPaintToken ?? 0
     }
 
     private var isActiveTabLoading: Bool {
@@ -66,10 +72,12 @@ struct BrowserView: View {
                 navigationCoverProgress: $navigationCoverProgress,
                 coverFinished: $coverFinished,
                 pageCommitted: $pageCommitted,
+                webViewReady: $webViewReady,
                 onFadeIn: fadeInWebView
             )
             .applyPageLoadHandlers(
                 pageReadyToken: pageReadyToken,
+                firstPaintToken: firstPaintToken,
                 isActiveTabLoading: isActiveTabLoading,
                 activeTabProgress: activeTabProgress,
                 webViewReady: $webViewReady,
@@ -91,7 +99,9 @@ struct BrowserView: View {
             )
             .applyActiveTabChangedHandlers(
                 tabManager: tabManager,
+                activeTabViewState: $activeTabViewState,
                 bottomBarState: $bottomBarState,
+                webViewReady: $webViewReady,
                 isAddressBarFocused: $isAddressBarFocused
             )
             .onAppear {
@@ -203,18 +213,19 @@ struct BrowserView: View {
 
     @ViewBuilder
     private func activeTabLayer(geometry: GeometryProxy) -> some View {
+        let isFullScreen = activeTabViewState == .fullScreen
+
         ZStack {
-            if activeTabViewState == .fullScreen && !webViewReady {
+            if let tab = activeTab {
                 Color.black
                     .ignoresSafeArea()
-            }
-            if let tab = activeTab {
-                let showLive = activeTabViewState == .fullScreen && webViewReady
+
+                let showLive = isFullScreen && webViewReady
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
-                    .animation(.linear(duration: 0.01), value: showLive)
             }
         }
+        .opacity(isFullScreen ? 1 : 0)
     }
 
     @ViewBuilder
@@ -246,7 +257,7 @@ struct BrowserView: View {
         bottomBar()
             .frame(maxHeight: .infinity, alignment: .bottom)
             .blur(radius: isReady ? 0 : 20)
-            .opacity((bottomBarState == .submittingSearch || !webViewReady) ? 0 : 1)
+            .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
     }
 
     @ViewBuilder
@@ -343,7 +354,12 @@ struct BrowserView: View {
                             Color.black
                         }
                     }
-                    .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0, topTrailing: lerpCornerRadius)))
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            cornerRadii: .init(
+                                topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0,
+                                topTrailing: lerpCornerRadius))
+                    )
                     .offset(y: currentHeaderTranslate)
                 }
 
@@ -483,10 +499,13 @@ struct BrowserView: View {
 
         tabManager.switchTab(id: id)
         activeTabViewState = .expanding
+
         withAnimation(.smooth(duration: 0.28)) {
             self.shrinkProgress = 0.0
         } completion: {
             self.activeTabViewState = .fullScreen
+            self.tabManager.moveActiveTabToTop()
+            self.webViewReady = true
         }
     }
 
@@ -528,6 +547,7 @@ struct BrowserView: View {
 
         withAnimation(.smooth(duration: 0.3)) {
             self.bottomBarState = .submittingSearch
+            self.bottomBarOpacity = 0
             self.webViewReady = false
         }
 
@@ -546,8 +566,10 @@ struct BrowserView: View {
             activeTab?.viewModel.urlString = query
             activeTabViewState = .fullScreen
             shrinkProgress = 0
-
             let tabToLoad = activeTab
+
+            beginNavigation()
+
             await tabToLoad?.viewModel.processUserInput(query)
 
             withAnimation(.smooth(duration: 0.3)) {
@@ -558,12 +580,9 @@ struct BrowserView: View {
                 coverFinished = true
             }
 
-            try? await Task.sleep(for: .seconds(10))
-
-            if !webViewReady {
-                withAnimation(.smooth(duration: 0.4)) {
-                    self.webViewReady = true
-                }
+            try? await Task.sleep(for: .seconds(0.25))
+            withAnimation(.linear(duration: 0.15)) {
+                self.bottomBarOpacity = 1
             }
         }
     }
@@ -616,11 +635,13 @@ struct BrowserView: View {
         if offset < 80 {
             scrollAnchor = offset
             wasScrollingDown = false
+
             if bottomBarState == .hidden {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .collapsed
                 }
             }
+
             return
         }
 
@@ -637,6 +658,7 @@ struct BrowserView: View {
         } else if delta < -1 {
             wasScrollingDown = false
             scrollAnchor = offset
+
             if bottomBarState == .hidden {
                 withAnimation(.smooth(duration: 0.3)) {
                     bottomBarState = .collapsed
@@ -652,6 +674,7 @@ private struct NavigationCoverChangeHandlers: ViewModifier {
     @Binding var navigationCoverProgress: CGFloat
     @Binding var coverFinished: Bool
     @Binding var pageCommitted: Bool
+    @Binding var webViewReady: Bool
     var onFadeIn: () -> Void
 
     func body(content: Content) -> some View {
@@ -662,13 +685,12 @@ private struct NavigationCoverChangeHandlers: ViewModifier {
                     navigationCoverOpacity = 1
                     navigationCoverProgress = 0
                     coverFinished = true
-                    if pageCommitted { onFadeIn() }
                 }
             }
             .onChange(of: pageCommitted) { _, committed in
-                if committed && showNavigationCover && navigationCoverOpacity > 0.9
-                    && navigationCoverProgress >= 0.99
-                {
+            }
+            .onChange(of: webViewReady) { _, ready in
+                if ready && showNavigationCover && navigationCoverOpacity > 0.9 {
                     withAnimation(.smooth(duration: 0.3)) {
                         navigationCoverOpacity = 0
                     }
@@ -679,6 +701,7 @@ private struct NavigationCoverChangeHandlers: ViewModifier {
 
 private struct PageLoadHandlers: ViewModifier {
     let pageReadyToken: Int
+    let firstPaintToken: Int
     let isActiveTabLoading: Bool
     let activeTabProgress: Double
     @Binding var webViewReady: Bool
@@ -691,13 +714,19 @@ private struct PageLoadHandlers: ViewModifier {
         content
             .onChange(of: pageReadyToken) { _, _ in
                 pageCommitted = true
+                if !webViewReady {
+                    onFadeIn()
+                }
+            }
+            .onChange(of: firstPaintToken) { _, _ in
+                guard !webViewReady else { return }
+                onFadeIn()
             }
             .onChange(of: isActiveTabLoading) { _, isLoading in
                 guard bottomBarState != .submittingSearch else { return }
 
                 if !isLoading && activeTabProgress >= 0.99 && !webViewReady {
                     pageCommitted = true
-                    if coverFinished { onFadeIn() }
                 }
             }
             .onChange(of: activeTabProgress) { _, progress in
@@ -705,7 +734,6 @@ private struct PageLoadHandlers: ViewModifier {
 
                 if progress >= 0.99 && !isActiveTabLoading && !webViewReady {
                     pageCommitted = true
-                    if coverFinished { onFadeIn() }
                 }
             }
             .onChange(of: coverFinished) { _, finished in
@@ -754,7 +782,9 @@ private struct BottomBarFocusHandlers: ViewModifier {
 
 private struct ActiveTabChangedHandlers: ViewModifier {
     let tabManager: TabManager
+    @Binding var activeTabViewState: TabViewState
     @Binding var bottomBarState: BottomBarState
+    @Binding var webViewReady: Bool
     var isAddressBarFocused: FocusState<Bool>.Binding
 
     func body(content: Content) -> some View {
@@ -766,6 +796,10 @@ private struct ActiveTabChangedHandlers: ViewModifier {
 
                 if bottomBarState == .submittingSearch { return }
 
+                if activeTabViewState == .shrunk || activeTabViewState == .expanding {
+                    return
+                }
+
                 guard let newTab = tabManager.tabs.first(where: { $0.id == newId }) else {
                     withAnimation(.smooth(duration: 0.3)) { bottomBarState = .search }
                     return
@@ -776,6 +810,7 @@ private struct ActiveTabChangedHandlers: ViewModifier {
                 let hasPendingURL = !newTab.viewModel.urlString.isEmpty
 
                 if hasValidURL || isActivelyLoading || hasPendingURL {
+                    webViewReady = true
                     bottomBarState = .collapsed
                 } else {
                     withAnimation(.smooth(duration: 0.3)) {
@@ -793,6 +828,7 @@ extension View {
         navigationCoverProgress: Binding<CGFloat>,
         coverFinished: Binding<Bool>,
         pageCommitted: Binding<Bool>,
+        webViewReady: Binding<Bool>,
         onFadeIn: @escaping () -> Void
     ) -> some View {
         modifier(
@@ -802,12 +838,14 @@ extension View {
                 navigationCoverProgress: navigationCoverProgress,
                 coverFinished: coverFinished,
                 pageCommitted: pageCommitted,
+                webViewReady: webViewReady,
                 onFadeIn: onFadeIn
             ))
     }
 
     fileprivate func applyPageLoadHandlers(
         pageReadyToken: Int,
+        firstPaintToken: Int,
         isActiveTabLoading: Bool,
         activeTabProgress: Double,
         webViewReady: Binding<Bool>,
@@ -819,6 +857,7 @@ extension View {
         modifier(
             PageLoadHandlers(
                 pageReadyToken: pageReadyToken,
+                firstPaintToken: firstPaintToken,
                 isActiveTabLoading: isActiveTabLoading,
                 activeTabProgress: activeTabProgress,
                 webViewReady: webViewReady,
@@ -859,13 +898,17 @@ extension View {
 
     fileprivate func applyActiveTabChangedHandlers(
         tabManager: TabManager,
+        activeTabViewState: Binding<TabViewState>,
         bottomBarState: Binding<BottomBarState>,
+        webViewReady: Binding<Bool>,
         isAddressBarFocused: FocusState<Bool>.Binding
     ) -> some View {
         modifier(
             ActiveTabChangedHandlers(
                 tabManager: tabManager,
+                activeTabViewState: activeTabViewState,
                 bottomBarState: bottomBarState,
+                webViewReady: webViewReady,
                 isAddressBarFocused: isAddressBarFocused
             ))
     }

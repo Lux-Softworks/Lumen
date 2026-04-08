@@ -62,12 +62,19 @@ struct HardenedWebView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> WebViewHostController {
         let controller = WebViewHostController()
-        let webView = BrowserEngine.makeWebView(policy: policy)
+
+        let webView: WKWebView
+        if let existingWebView = viewModel.webView {
+            webView = existingWebView
+            webView.removeFromSuperview()
+        } else {
+            webView = BrowserEngine.makeWebView(policy: policy)
+            viewModel.attachWebView(webView)
+            context.coordinator.hasAttached = true
+        }
+
         controller.webView = webView
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-
-        viewModel.attachWebView(webView)
-        context.coordinator.hasAttached = true
         context.coordinator.installStatusBarTint(above: webView)
         controller.attachScrollObservation()
 
@@ -105,7 +112,12 @@ struct HardenedWebView: UIViewControllerRepresentable {
 }
 
 final class WebViewHostController: UIViewController {
-    var webView: WKWebView?
+    var webView: WKWebView? {
+        didSet {
+            guard let webView = webView, isViewLoaded else { return }
+            setupWebView(webView)
+        }
+    }
 
     private var contentOffsetObservation: NSKeyValueObservation?
     private var lastBounceOffset: CGFloat = 0
@@ -114,7 +126,17 @@ final class WebViewHostController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .clear
 
-        guard let webView = webView else { return }
+        if let webView = webView {
+            setupWebView(webView)
+        }
+    }
+
+    private func setupWebView(_ webView: WKWebView) {
+        if webView.superview == view {
+            return
+        }
+
+        webView.removeFromSuperview()
 
         webView.translatesAutoresizingMaskIntoConstraints = false
         webView.backgroundColor = .clear
