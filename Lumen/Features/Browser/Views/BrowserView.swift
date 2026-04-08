@@ -187,9 +187,9 @@ struct BrowserView: View {
         let opacity: Double = {
             switch activeTabViewState {
             case .shrinking:
-                return 0
+                return 1
             case .expanding:
-                return 0
+                return 1
             case .shrunk:
                 return 1
             case .fullScreen:
@@ -207,7 +207,6 @@ struct BrowserView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
         .opacity(opacity)
-        .animation(.linear(duration: 0.01), value: opacity)
         .allowsHitTesting(!activeTabViewState.isTransitioning)
     }
 
@@ -223,6 +222,9 @@ struct BrowserView: View {
                 let showLive = isFullScreen && webViewReady
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
+            } else if tabManager.tabs.isEmpty && bottomBarState == .submittingSearch {
+                Color.black
+                    .ignoresSafeArea()
             }
         }
         .opacity(isFullScreen ? 1 : 0)
@@ -248,7 +250,6 @@ struct BrowserView: View {
             transitionOverlay(geometry: geometry, progress: shrinkProgress)
         }
         .opacity(opacity)
-        .animation(.linear(duration: 0.01), value: opacity)
         .allowsHitTesting(false)
     }
 
@@ -299,7 +300,7 @@ struct BrowserView: View {
     @ViewBuilder
     private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
         let toolbarHeight: CGFloat = 80
-        let targetScale: CGFloat = 0.72
+        let targetScale: CGFloat = 0.65
         let cornerRadius: CGFloat = 16
         let headerHeight: CGFloat = 36
 
@@ -333,7 +334,8 @@ struct BrowserView: View {
         ZStack(alignment: .top) {
             if let tab = activeTab {
                 tabCardHeader(tab: tab)
-                    .frame(width: currentCardWidth, height: 36, alignment: .top)
+                    .padding(.top, lerp(0, 6, progress))
+                    .frame(width: currentCardWidth, height: 36 + lerp(0, 6, progress), alignment: .top)
                     .frame(height: max(0, visualGapHeight), alignment: .top)
                     .clipped()
                     .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
@@ -440,7 +442,7 @@ struct BrowserView: View {
 
     private func tabCardHeader(tab: Tab) -> some View {
         tabHeaderContent(tab: tab)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 16)
             .frame(height: 36)
     }
 
@@ -484,7 +486,7 @@ struct BrowserView: View {
             }
 
             activeTabViewState = .shrinking
-            withAnimation(.smooth(duration: 0.28)) {
+            withAnimation(.smooth(duration: 0.2)) {
                 self.shrinkProgress = 1.0
             } completion: {
                 self.activeTabViewState = .shrunk
@@ -500,11 +502,10 @@ struct BrowserView: View {
         tabManager.switchTab(id: id)
         activeTabViewState = .expanding
 
-        withAnimation(.smooth(duration: 0.28)) {
+        withAnimation(.smooth(duration: 0.2)) {
             self.shrinkProgress = 0.0
         } completion: {
             self.activeTabViewState = .fullScreen
-            self.tabManager.moveActiveTabToTop()
             self.webViewReady = true
         }
     }
@@ -551,6 +552,8 @@ struct BrowserView: View {
             self.webViewReady = false
         }
 
+        beginNavigation()
+
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.3))
 
@@ -567,8 +570,6 @@ struct BrowserView: View {
             activeTabViewState = .fullScreen
             shrinkProgress = 0
             let tabToLoad = activeTab
-
-            beginNavigation()
 
             await tabToLoad?.viewModel.processUserInput(query)
 
@@ -774,7 +775,9 @@ private struct BottomBarFocusHandlers: ViewModifier {
         content
             .onChange(of: bottomBarState) { oldState, newState in
                 if oldState != .search && newState == .search {
-                    isAddressBarFocused.wrappedValue = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isAddressBarFocused.wrappedValue = true
+                    }
                 }
             }
     }

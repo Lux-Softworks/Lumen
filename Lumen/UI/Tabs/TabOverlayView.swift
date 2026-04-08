@@ -7,15 +7,8 @@ struct TabOverlayView: View {
     var shrinkProgress: CGFloat = 1
     var onSelectTab: (UUID) -> Void
 
-    private let scale: CGFloat = 0.72
+    private let scale: CGFloat = 0.65
     private let toolbarHeight: CGFloat = 80
-
-    private let kShrink: CGFloat = 0.15
-    private let sMin: CGFloat = 0.75
-    private let baseSpacing: CGFloat = 80
-    private let overlapCompensation: CGFloat = 40
-    private let wideSpacing: CGFloat = 320
-    private let kDepth: CGFloat = 20
 
     @State private var lastScrolledToId: UUID? = nil
     @State private var scrollOffset: CGFloat = 0
@@ -29,30 +22,21 @@ struct TabOverlayView: View {
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 0) {
-                            ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
+                        HStack(spacing: 0) {
+                            ForEach(tabManager.tabs, id: \.id) { tab in
                                 TabCardWrapper(
-                                    index: index,
                                     tab: tab,
                                     config: config,
                                     tabManager: tabManager,
                                     hiddenTabId: hiddenTabId,
-                                    kShrink: kShrink,
-                                    sMin: sMin,
-                                    baseSpacing: baseSpacing,
-                                    overlapCompensation: overlapCompensation,
-                                    wideSpacing: wideSpacing,
-                                    kDepth: kDepth,
                                     onSelectTab: onSelectTab,
                                     lastScrolledToId: $lastScrolledToId
                                 )
                             }
                         }
-                        .scrollTargetLayout()
                         .padding(.horizontal, config.hPadding)
                     }
                     .coordinateSpace(name: "scrollView")
-                    .scrollTargetBehavior(.viewAligned)
                     .scrollClipDisabled()
                     .frame(height: config.cardHeight)
                     .onAppear {
@@ -61,8 +45,10 @@ struct TabOverlayView: View {
                     }
                     .onChange(of: tabManager.activeTabId) { _, id in
                         guard id != lastScrolledToId else { return }
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(id, anchor: .center)
+                        DispatchQueue.main.async {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo(id, anchor: .center)
+                            }
                         }
                         lastScrolledToId = id
                     }
@@ -111,17 +97,10 @@ struct TabOverlayView: View {
 }
 
 private struct TabCardWrapper: View {
-    let index: Int
     @ObservedObject var tab: Tab
     let config: TabOverlayView.LayoutConfig
     @ObservedObject var tabManager: TabManager
     let hiddenTabId: UUID?
-    let kShrink: CGFloat
-    let sMin: CGFloat
-    let baseSpacing: CGFloat
-    let overlapCompensation: CGFloat
-    let wideSpacing: CGFloat
-    let kDepth: CGFloat
     let onSelectTab: (UUID) -> Void
     @Binding var lastScrolledToId: UUID?
 
@@ -131,28 +110,46 @@ private struct TabCardWrapper: View {
         GeometryReader { cardGeo in
             let cardFrame = cardGeo.frame(in: .named("scrollView"))
             let cardCenterX = cardFrame.midX
-            let containerCenterX = config.hPadding + (config.safeWidth - 2 * config.hPadding) / 2
+            let containerCenterX = config.safeWidth / 2
 
             let displacement = cardCenterX - containerCenterX
-            let normalizedDelta = displacement / config.cardWidth
 
-            let delta = normalizedDelta
-            let absDelta = abs(delta)
+            let safeCardWidth = max(1.0, config.cardWidth)
+            let normalizedDelta = displacement / safeCardWidth
 
-            let cardScale: CGFloat = max(1.0 - (absDelta * kShrink), sMin)
-
-            let xOffset: CGFloat = (
-                delta < 0
-                ? (delta * baseSpacing) + ((1.0 - cardScale) * overlapCompensation * config.cardWidth)
-                : delta * wideSpacing
+            let cardScale: CGFloat = (
+                normalizedDelta >= 0
+                ? 1.0
+                : max(0.90, 1.0 + (normalizedDelta * 0.03))
             )
 
-            let cardOpacity = hidden ? 0 : max(1.0 - (absDelta * 0.3), 0)
+            let targetVisualDisplacement: CGFloat = {
+                if normalizedDelta >= 0 {
+                    return normalizedDelta * safeCardWidth * 0.90
+                } else {
+                    let maxLeftLimit = safeCardWidth * 0.55
+                    let stackCurve = 1.0 - exp(normalizedDelta * 1.2)
+                    return -maxLeftLimit * stackCurve
+                }
+            }()
+            let xOffset = targetVisualDisplacement - displacement
 
-            let zDepth = -absDelta * kDepth
+            let cardOpacity: CGFloat = {
+                if hidden {
+                    return 0
+                } else if normalizedDelta >= -1.0 {
+                    return 1.0
+                } else {
+                    let fadeDistance = abs(normalizedDelta) - 1.0
+                    return max(0, 1.0 - (fadeDistance * 0.35))
+                }
+            }()
+
+            let headerOpacity = max(0, 1.0 - abs(normalizedDelta) * 2.5)
 
             TabCardItemView(
                 tab: tab,
+                headerOpacity: headerOpacity,
                 onClose: {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         tabManager.closeTab(id: tab.id)
@@ -166,7 +163,6 @@ private struct TabCardWrapper: View {
             .frame(width: config.cardWidth, height: config.cardHeight)
             .scaleEffect(cardScale)
             .offset(x: xOffset)
-            .zIndex(Double(index) + zDepth)
             .opacity(cardOpacity)
             .allowsHitTesting(!hidden)
         }
@@ -233,6 +229,7 @@ private struct VerticalSwipeDetector: UIViewRepresentable {
 
 private struct TabCardItemView: View {
     @ObservedObject var tab: Tab
+    var headerOpacity: CGFloat = 1
     var onClose: () -> Void
     var onTap: () -> Void
 
@@ -264,6 +261,7 @@ private struct TabCardItemView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .opacity(headerOpacity)
 
                 Spacer(minLength: 0)
             }

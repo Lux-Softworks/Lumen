@@ -66,6 +66,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         observations.removeAll()
         self.webView = webView
 
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "firstPaint")
         webView.configuration.userContentController.add(FirstPaintHandler(viewModel: self), name: "firstPaint")
 
         if let nav = webView.navigationDelegate as? NetworkInterceptor {

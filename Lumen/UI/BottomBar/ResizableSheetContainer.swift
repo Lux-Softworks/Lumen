@@ -75,9 +75,7 @@ struct ResizableSheetContainer<Content: View>: View {
                         height: currentHeight(screenHeight: outerGeometry.size.height),
                         alignment: .top
                     )
-                    .animation(.smooth(duration: 0.3), value: expandedHeightRatio)
                     .opacity(isCollapsed ? 0 : 1)
-                    .animation(.smooth(duration: 0.3), value: isCollapsed)
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)
@@ -137,8 +135,12 @@ struct ResizableSheetContainer<Content: View>: View {
                                 state = rubberBanded
 
                                 let screenHeight = outerGeometry.size.height
-                                let currentHeight = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
-                                let targetHeight = isExpanded ? collapsedHeight : screenHeight * expandedHeightRatio
+                                let currentHeight =
+                                    isExpanded
+                                    ? screenHeight * expandedHeightRatio : collapsedHeight
+                                let targetHeight =
+                                    isExpanded
+                                    ? collapsedHeight : screenHeight * expandedHeightRatio
                                 let diff = abs(targetHeight - currentHeight)
                                 if diff > 0 {
                                     let progress = abs(rubberBanded) / diff
@@ -181,7 +183,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                     shouldExpand = translation < -50 || velocity < -500
                                 }
 
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                withAnimation(.smooth(duration: 0.3)) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
                                 }

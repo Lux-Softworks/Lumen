@@ -81,9 +81,9 @@ struct BottomBarView: View {
                 }
 
                 if state == .search {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        isFocused = true
-                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isFocused = true
+                }
                 }
             },
             onCollapse: {
@@ -168,15 +168,15 @@ struct BottomBarView: View {
                         suggestionsOpacity = 1
                     }
                 } else {
-                    toolbarDragFraction = 0
+                toolbarDragFraction = 0
                     withAnimation(.smooth(duration: 0.15)) {
-                        suggestionsOpacity = 1
+                    suggestionsOpacity = 1
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                         withAnimation(.smooth(duration: 0.2)) {
-                            showHistory = true
+                    showHistory = true
                         }
-                    }
+                }
                 }
             } else {
                 isFocused = false

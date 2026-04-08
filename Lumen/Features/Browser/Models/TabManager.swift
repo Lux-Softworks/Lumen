@@ -40,7 +40,7 @@ final class TabManager: ObservableObject {
         activeTabId = id
         observeActiveViewModel()
     }
-    
+
     func moveActiveTabToTop() {
         guard let index = tabs.firstIndex(where: { $0.id == activeTabId }) else { return }
         let tab = tabs.remove(at: index)
