@@ -1,16 +1,14 @@
-//
-//  LumenApp.swift
-//  Lumen
-//
-//  Created by Daniel Kosukhin on 12/22/25.
-//
-
 import SwiftUI
 import UIKit
-
 @main
 struct LumenApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    init() {
+        Task {
+            try? await KnowledgeStorage.shared.initialize()
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

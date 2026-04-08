@@ -4,8 +4,6 @@ import XCTest
 
 final class HTTPSUpgradeLogicTests: XCTestCase {
 
-    // MARK: - HTTPS Only Disabled
-
     func testHTTPSOnlyDisabled_AllowsHTTP() {
         let url = URL(string: "http://example.com")!
         let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: false)
@@ -17,8 +15,6 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
         let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: false)
         XCTAssertEqual(action, .allow)
     }
-
-    // MARK: - HTTPS Only Enabled
 
     func testHTTPSOnlyEnabled_UpgradesHTTP() {
         let url = URL(string: "http://example.com")!
@@ -91,7 +87,6 @@ final class HTTPSUpgradeLogicTests: XCTestCase {
 
     func testURLWithoutScheme_Cancels() {
         if let url = URL(string: "example.com") {
-            // scheme is nil
             let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: true)
             XCTAssertEqual(action, .cancel)
         }

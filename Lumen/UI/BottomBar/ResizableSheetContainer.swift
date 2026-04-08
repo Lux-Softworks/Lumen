@@ -6,18 +6,19 @@ struct ResizableSheetContainer<Content: View>: View {
     @Binding var isCollapsed: Bool
     var isLoading: Bool
     var progress: Double
+    var expandedHeightRatio: CGFloat
     var themeColor: UIColor?
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
     var onCollapse: (() -> Void)?
     var onDismissFocused: (() -> Void)?
+    var onDragProgress: ((CGFloat) -> Void)?
     let content: () -> Content
 
     @GestureState private var activeDragTranslation: CGFloat = 0
     @State private var releaseOffset: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
 
-    private let expandedHeightRatio: CGFloat = 0.65
     private let collapsedHeight: CGFloat = 80
     private let sliverHeight: CGFloat = 20
     private let handleHeight: CGFloat = 60
@@ -27,22 +28,26 @@ struct ResizableSheetContainer<Content: View>: View {
         isCollapsed: Binding<Bool>,
         isLoading: Bool,
         progress: Double,
+        expandedHeightRatio: CGFloat = 0.65,
         themeColor: UIColor? = nil,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
         onCollapse: (() -> Void)? = nil,
         onDismissFocused: (() -> Void)? = nil,
+        onDragProgress: ((CGFloat) -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self._isExpanded = isExpanded
         self._isCollapsed = isCollapsed
         self.isLoading = isLoading
         self.progress = progress
+        self.expandedHeightRatio = expandedHeightRatio
         self.themeColor = themeColor
         self.onDragStart = onDragStart
         self.onExpand = onExpand
         self.onCollapse = onCollapse
         self.onDismissFocused = onDismissFocused
+        self.onDragProgress = onDragProgress
         self.content = content
     }
 
@@ -54,7 +59,7 @@ struct ResizableSheetContainer<Content: View>: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             isExpanded = false
                         }
                         onCollapse?()
@@ -71,7 +76,6 @@ struct ResizableSheetContainer<Content: View>: View {
                         alignment: .top
                     )
                     .opacity(isCollapsed ? 0 : 1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isCollapsed)
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)
@@ -129,6 +133,19 @@ struct ResizableSheetContainer<Content: View>: View {
                                     }
                                 }
                                 state = rubberBanded
+
+                                let screenHeight = outerGeometry.size.height
+                                let currentHeight =
+                                    isExpanded
+                                    ? screenHeight * expandedHeightRatio : collapsedHeight
+                                let targetHeight =
+                                    isExpanded
+                                    ? collapsedHeight : screenHeight * expandedHeightRatio
+                                let diff = abs(targetHeight - currentHeight)
+                                if diff > 0 {
+                                    let progress = abs(rubberBanded) / diff
+                                    onDragProgress?(max(0, min(progress, 1)))
+                                }
                             }
                             .onChanged { value in
                                 onDragStart?()
@@ -166,7 +183,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                     shouldExpand = translation < -50 || velocity < -500
                                 }
 
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                withAnimation(.smooth(duration: 0.3)) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
                                 }

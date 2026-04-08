@@ -4,10 +4,13 @@ import UIKit
 import WebKit
 import os.log
 
+@MainActor
 final class BrowserViewModel: NSObject, ObservableObject {
     @Published var urlString: String = ""
     @Published var currentURL: URL?
     @Published var pageTitle: String = ""
+    @Published var pageReadyToken: Int = 0
+    @Published var firstPaintToken: Int = 0
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
@@ -21,22 +24,28 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private(set) var webView: WKWebView?
     private var interceptor: NetworkInterceptor?
+    private var pendingRequest: URLRequest?
 
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(
         subsystem: "com.luxsoftworks.Lumen", category: "BrowserViewModel")
 
-    static let defaultURL = URL(string: "https://www.google.com")!
-    static let searchEngineTemplate = "https://www.google.com/search?q=%@"
+    private var defaultURL: URL {
+        BrowserSettings.shared.searchEngine.homePage
+    }
 
-    private var brain: LocalBrain?
+    private var searchEngineTemplate: String {
+        BrowserSettings.shared.searchEngine.templateURL
+    }
 
-    func initializeBrain() {
-        /* if brain == nil {
-            brain = LocalBrain()
-        
+    private var knowledgeProvider: LocalKnowledgeProvider?
+
+    func initializeKnowledgeProvider() {
+        /* if knowledgeProvider == nil {
+            knowledgeProvider = LocalKnowledgeProvider()
+
             Task {
-                try? await brain?.loadModel()
+                try? await knowledgeProvider?.loadModel()
             }
         } */
     }
@@ -47,9 +56,18 @@ final class BrowserViewModel: NSObject, ObservableObject {
         }
     }
 
+    init(url: URL? = nil) {
+        super.init()
+        self.currentURL = url
+        self.urlString = url?.absoluteString ?? defaultURL.absoluteString
+    }
+
     func attachWebView(_ webView: WKWebView) {
         observations.removeAll()
         self.webView = webView
+
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "firstPaint")
+        webView.configuration.userContentController.add(FirstPaintHandler(viewModel: self), name: "firstPaint")
 
         if let nav = webView.navigationDelegate as? NetworkInterceptor {
             self.interceptor = nav
@@ -63,6 +81,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observeWebView(webView)
         observeSearch()
+
+        if let pending = pendingRequest {
+            webView.load(pending)
+            pendingRequest = nil
+        }
     }
 
     private func observeSearch() {
@@ -79,11 +102,16 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                 Task {
                     do {
-                        let results = try await SearchSuggestionService.shared.fetchSuggestions(
-                            for: query)
+                        async let googleResults = SearchSuggestionService.shared.fetchSuggestions(for: query)
+                        async let semanticResults = KnowledgeStorage.shared.searchSemantic(query: query)
+
+                        let web = try await googleResults
+                        let local = try await semanticResults
+
                         await MainActor.run {
                             if !self.urlString.isEmpty {
-                                self.searchSuggestions = results
+                                let localSuggestions = local.map { SearchSuggestion(text: $0.url) }
+                                self.searchSuggestions = localSuggestions + web
                             }
                         }
                     } catch {
@@ -95,11 +123,18 @@ final class BrowserViewModel: NSObject, ObservableObject {
             }
     }
 
+    func captureSnapshot() async -> UIImage? {
+        guard let webView = webView else { return nil }
+        let config = WKSnapshotConfiguration()
+        config.rect = webView.bounds
+        return try? await webView.takeSnapshot(configuration: config)
+    }
+
     func navigate(to input: String) {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let url = Self.classifyInput(trimmed)
+        let url = self.classifyInput(trimmed)
         loadURL(url)
     }
 
@@ -108,7 +143,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
         urlString = url.absoluteString
 
         let request = BrowserEngine.makeRequest(url: url)
-        webView?.load(request)
+        if let webView = webView {
+            webView.load(request)
+        } else {
+            pendingRequest = request
+        }
 
         logger.info("Loading: \(url.absoluteString)")
     }
@@ -130,7 +169,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     func loadHomePage() {
-        loadURL(Self.defaultURL)
+        loadURL(defaultURL)
     }
 
     func clearPageState() {
@@ -157,7 +196,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         return parts.isEmpty ? "No threats detected" : parts.joined(separator: ", ")
     }
 
-    static func classifyInput(_ input: String) -> URL {
+    func classifyInput(_ input: String) -> URL {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return defaultURL }
 
@@ -202,7 +241,16 @@ final class BrowserViewModel: NSObject, ObservableObject {
                     self?.isLoading = webView.isLoading
 
                     if !webView.isLoading {
+                        self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
+                        
+                        webView.evaluateJavaScript("""
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    window.webkit.messageHandlers.firstPaint.postMessage({});
+                                });
+                            });
+                        """, completionHandler: nil)
 
                         if let url = webView.url?.absoluteString,
                             let title = webView.title, !title.isEmpty
@@ -310,25 +358,22 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private func startScrollObservation(_ webView: WKWebView) {
         observations.append(
-            webView.scrollView.observe(\.contentOffset, options: [.new]) {
-                [weak self] scrollView, _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
+            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] scrollView, change in
+                guard let self = self, let newOffset = change.newValue?.y, let oldOffset = change.oldValue?.y else { return }
 
-                    let currentOffset = scrollView.contentOffset.y
-
-                    let maxOffset = scrollView.contentSize.height - scrollView.frame.height
-
-                    if currentOffset < 0 || currentOffset > maxOffset {
-                        return
+                Task { @MainActor in
+                    self.scrollOffset = newOffset
+                    let delta = newOffset - oldOffset
+                    if abs(delta) > 0.5 {
+                        self.scrollDelta = delta
                     }
-
-                    let delta = currentOffset - self.lastContentOffset
-                    self.scrollDelta = delta
-                    self.scrollOffset = currentOffset
-                    self.lastContentOffset = currentOffset
+                    self.lastContentOffset = newOffset
                 }
             }
         )
+    }
+
+    deinit {
+        observations.forEach { $0.invalidate() }
     }
 }

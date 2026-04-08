@@ -9,8 +9,6 @@ struct SearchSuggestion: Identifiable, Equatable {
 final class SearchSuggestionService {
     static let shared = SearchSuggestionService()
 
-    // We'll use Google's autocomplete API which is public and returns JSON array format
-    // Format is usually: ["search query", ["suggestion 1", "suggestion 2", ...]]
     private let urlTemplate =
         "https://suggestqueries.google.com/complete/search?client=firefox&q=%@"
 
@@ -24,7 +22,7 @@ final class SearchSuggestionService {
         guard let url = URL(string: String(format: urlTemplate, encodedQuery)) else { return [] }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = 3.0  // Fail fast to not hang UI
+        request.timeoutInterval = 3.0
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -32,7 +30,6 @@ final class SearchSuggestionService {
             return []
         }
 
-        // Parse the top-level array
         guard let jsonArray = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any],
             jsonArray.count >= 2,
             let suggestionsArray = jsonArray[1] as? [String]

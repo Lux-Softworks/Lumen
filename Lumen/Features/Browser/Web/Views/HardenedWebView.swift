@@ -4,8 +4,12 @@ import WebKit
 
 struct HardenedWebView: UIViewControllerRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
-    var policy: PrivacyPolicy = PrivacyPolicy()
+    @StateObject private var settings = BrowserSettings.shared
     var bottomInset: CGFloat = 0
+
+    var policy: PrivacyPolicy {
+        settings.policy(for: viewModel.currentURL)
+    }
 
     class Coordinator: NSObject {
         var parent: HardenedWebView
@@ -58,13 +62,21 @@ struct HardenedWebView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> WebViewHostController {
         let controller = WebViewHostController()
-        let webView = BrowserEngine.makeWebView(policy: policy)
-        controller.webView = webView
-        controller.additionalSafeAreaInsets.bottom = bottomInset
 
-        viewModel.attachWebView(webView)
-        context.coordinator.hasAttached = true
+        let webView: WKWebView
+        if let existingWebView = viewModel.webView {
+            webView = existingWebView
+            webView.removeFromSuperview()
+        } else {
+            webView = BrowserEngine.makeWebView(policy: policy)
+            viewModel.attachWebView(webView)
+            context.coordinator.hasAttached = true
+        }
+
+        controller.webView = webView
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         context.coordinator.installStatusBarTint(above: webView)
+        controller.attachScrollObservation()
 
         return controller
     }
@@ -80,10 +92,9 @@ struct HardenedWebView: UIViewControllerRepresentable {
         context.coordinator.installStatusBarTint(above: webView)
         context.coordinator.updateTintColor(viewModel.themeColor)
 
-        if controller.additionalSafeAreaInsets.bottom != bottomInset {
-            UIView.animate(withDuration: 0.2) {
-                controller.additionalSafeAreaInsets.bottom = bottomInset
-            }
+        if webView.scrollView.contentInset.bottom != bottomInset {
+            webView.scrollView.contentInset.bottom = bottomInset
+            webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
 
             webView.evaluateJavaScript(
                 "window.__updateToolbarHeight && window.__updateToolbarHeight(\(Int(bottomInset)))"
@@ -101,14 +112,35 @@ struct HardenedWebView: UIViewControllerRepresentable {
 }
 
 final class WebViewHostController: UIViewController {
-    var webView: WKWebView?
+    var webView: WKWebView? {
+        didSet {
+            guard let webView = webView, isViewLoaded else { return }
+            setupWebView(webView)
+        }
+    }
+
+    private var contentOffsetObservation: NSKeyValueObservation?
+    private var lastBounceOffset: CGFloat = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .clear
 
-        guard let webView = webView else { return }
+        if let webView = webView {
+            setupWebView(webView)
+        }
+    }
+
+    private func setupWebView(_ webView: WKWebView) {
+        if webView.superview == view {
+            return
+        }
+
+        webView.removeFromSuperview()
 
         webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.backgroundColor = .clear
+        webView.isOpaque = false
         view.addSubview(webView)
 
         NSLayoutConstraint.activate([
@@ -117,6 +149,26 @@ final class WebViewHostController: UIViewController {
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+    }
+
+    func attachScrollObservation() {
+        guard let scrollView = webView?.scrollView else { return }
+        contentOffsetObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
+            guard let self, let offset = change.newValue else { return }
+            self.handleBounce(offset.y)
+        }
+    }
+
+    private func handleBounce(_ y: CGFloat) {
+        if y < 0 {
+            let bounce = -y
+            guard abs(bounce - lastBounceOffset) > 0.5 else { return }
+            lastBounceOffset = bounce
+            webView?.evaluateJavaScript("window.__nativeBounce && window.__nativeBounce(\(bounce))", completionHandler: nil)
+        } else if lastBounceOffset > 0 {
+            lastBounceOffset = 0
+            webView?.evaluateJavaScript("window.__nativeBounce && window.__nativeBounce(0)", completionHandler: nil)
+        }
     }
 }
 

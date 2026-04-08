@@ -3,53 +3,6 @@ import SwiftUI
 import UIKit
 import WebKit
 
-struct PrivacyPolicy {
-    var blocksThirdPartyCookies: Bool = true
-    var allowsJavaScript: Bool = true
-    var allowsInlineMediaPlayback: Bool = false
-    var allowsPictureInPictureMediaPlayback: Bool = false
-    var allowsAirPlayForMediaPlayback: Bool = false
-    var allowsMediaAutoPlay: Bool = false
-    var javaScriptCanOpenWindowsAutomatically: Bool = false
-    var suppressesIncrementalRendering: Bool = true
-    var limitsNavigationToHTTPS: Bool = true
-    var customUserAgent: String? = nil
-}
-
-enum HTTPSUpgradeLogic {
-    enum PolicyAction: Equatable {
-        case allow
-        case upgrade(URL)
-        case cancel
-    }
-
-    static func decidePolicy(for url: URL, httpsOnly: Bool) -> PolicyAction {
-        guard let scheme = url.scheme?.lowercased() else {
-            return .cancel
-        }
-
-        switch scheme {
-        case "https", "about", "file":
-            return .allow
-        case "http":
-            if httpsOnly {
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                components?.scheme = "https"
-
-                if let httpsURL = components?.url {
-                    return .upgrade(httpsURL)
-                }
-
-                return .cancel
-            }
-
-            return .allow
-        default:
-            return .cancel
-        }
-    }
-}
-
 enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
@@ -85,6 +38,7 @@ enum BrowserEngine {
                 (function() {
                     var toolbarHeight = 80;
                     var statusBarHeight = 0;
+                    var topStickyElements = [];
 
                     document.documentElement.style.setProperty(
                         '--toolbar-height', toolbarHeight + 'px');
@@ -94,7 +48,8 @@ enum BrowserEngine {
                     var style = document.createElement('style');
                     style.textContent =
                         '[data-kr-bumped-bottom] { transition: bottom 0.2s ease !important; }' +
-                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }';
+                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }' +
+                        '[data-kr-bounce-track] { will-change: transform; }';
                     document.head.appendChild(style);
 
                     var meta = document.querySelector('meta[name="viewport"]');
@@ -108,6 +63,22 @@ enum BrowserEngine {
                         meta.name = 'viewport';
                         meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
                         document.head.appendChild(meta);
+                    }
+
+                    function refreshTopStickyElements() {
+                        topStickyElements = [];
+                        var all = document.querySelectorAll('*');
+                        for (var i = 0; i < all.length; i++) {
+                            var el = all[i];
+                            var s = getComputedStyle(el);
+                            if (s.position !== 'fixed' && s.position !== 'sticky') continue;
+
+                            var rect = el.getBoundingClientRect();
+                            if (rect.top < window.innerHeight / 2) {
+                                el.setAttribute('data-kr-bounce-track', '1');
+                                topStickyElements.push(el);
+                            }
+                        }
                     }
 
                     function bumpElements() {
@@ -145,7 +116,25 @@ enum BrowserEngine {
                                 }
                             }
                         }
+                        requestAnimationFrame(refreshTopStickyElements);
                     }
+
+                    var lastBounceOffset = 0;
+
+                    window.__nativeBounce = function(offset) {
+                        if (offset > 0) {
+                            var transform = 'translateY(' + offset + 'px)';
+                            for (var i = 0; i < topStickyElements.length; i++) {
+                                topStickyElements[i].style.transform = transform;
+                            }
+                            lastBounceOffset = offset;
+                        } else if (lastBounceOffset > 0) {
+                            for (var i = 0; i < topStickyElements.length; i++) {
+                                topStickyElements[i].style.transform = '';
+                            }
+                            lastBounceOffset = 0;
+                        }
+                    };
 
                     window.__updateToolbarHeight = function(h) {
                         toolbarHeight = h;
@@ -260,6 +249,26 @@ enum BrowserEngine {
             config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        let readingSignalConfig = ReadingSignalConfig.default
+        let readingSignalScript = WKUserScript(
+            source: ReadingSignalScript.makeScript(config: readingSignalConfig),
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(readingSignalScript)
+
+        let readingSignalHandler = ReadingSignalHandler(config: readingSignalConfig)
+        readingSignalHandler.onReadingSignalTriggered = { payload, webView in
+            Task {
+                await KnowledgeCaptureService.shared.handleSignal(payload, webView: webView)
+            }
+        }
+        config.userContentController.add(readingSignalHandler, name: "readingSignal")
+
+        objc_setAssociatedObject(
+            config, &_WKWebViewAssociatedKeys.readingSignalHandlerKey, readingSignalHandler,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
         return config
     }
 
@@ -280,12 +289,20 @@ enum BrowserEngine {
         webView.scrollView.backgroundColor = .clear
 
         let detector = ThreatDetector()
-        detector.loadTrackerDatabase(TrackerDatabase.shared.allEntries())
-
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
+
+        Task.detached(priority: .utility) {
+            let entries = TrackerDatabase.shared.allEntries()
+            detector.loadTrackerDatabase(entries)
+
+            await MainActor.run {
+                webView.navigationDelegate = interceptor
+                webView.retainedDelegate = interceptor
+            }
+        }
 
         if let handler = objc_getAssociatedObject(
             config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler
@@ -309,6 +326,7 @@ enum BrowserEngine {
 private enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
     static var fingerprintHandlerKey: UInt8 = 1
+    static var readingSignalHandlerKey: UInt8 = 2
 }
 
 final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {

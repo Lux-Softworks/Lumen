@@ -1,10 +1,3 @@
-//
-//  LumenTests.swift
-//  LumenTests
-//
-//  Created by Daniel Kosukhin on 12/22/25.
-//
-
 import WebKit
 import XCTest
 
@@ -71,7 +64,6 @@ final class LumenTests: XCTestCase {
             return
         }
 
-        // direct url comparison
         self.measure {
             for _ in 0..<100_000 {
                 let _ = url1 != url2

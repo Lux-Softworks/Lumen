@@ -6,36 +6,46 @@ public enum AppTheme {
         public static let background = Color(
             UIColor { traitCollection in
                 return traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: 15 / 255, green: 15 / 255, blue: 15 / 255, alpha: 1)  // #0F0F0F
-                    : UIColor(red: 255 / 255, green: 255 / 255, blue: 255 / 255, alpha: 1)  // #FFFFFF
+                    ? UIColor(red: 26/255, green: 25/255, blue: 23/255, alpha: 1)  // #1A1917
+                    : UIColor(red: 244/255, green: 243/255, blue: 238/255, alpha: 1) // #F4F3EE
             })
 
         public static let uiElement = Color(
             UIColor { traitCollection in
                 return traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)  // #1C1C1E
-                    : UIColor(red: 242 / 255, green: 242 / 255, blue: 247 / 255, alpha: 1)  // #F2F2F7
+                    ? UIColor(red: 35/255, green: 34/255, blue: 32/255, alpha: 1)
+                    : UIColor(red: 255/255, green: 255/255, blue: 255/255, alpha: 1)
             })
 
         public static let accent = Color(
             UIColor { traitCollection in
                 return traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: 255 / 255, green: 107 / 255, blue: 53 / 255, alpha: 1)  // #FF6B35
-                    : UIColor(red: 211 / 255, green: 84 / 255, blue: 0 / 255, alpha: 1)  // #D35400
+                    ? UIColor(red: 217/255, green: 119/255, blue: 87/255, alpha: 1)  // #D97757
+                    : UIColor(red: 193/255, green: 95/255, blue: 60/255, alpha: 1)   // #C15F3C
             })
 
         public static let secondaryAccent = Color(
             UIColor { traitCollection in
                 return traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: 174 / 255, green: 182 / 255, blue: 191 / 255, alpha: 1)  // #AEB6BF
-                    : UIColor(red: 93 / 255, green: 109 / 255, blue: 126 / 255, alpha: 1)  // #5D6D7E
+                    ? UIColor(red: 140/255, green: 135/255, blue: 125/255, alpha: 1)
+                    : UIColor(red: 177/255, green: 173/255, blue: 161/255, alpha: 1)
             })
 
         public static let text = Color(
             UIColor { traitCollection in
                 return traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: 248 / 255, green: 249 / 255, blue: 250 / 255, alpha: 1)  // #F8F9FA
-                    : UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)  // #1C1C1E
+                    ? UIColor(red: 236/255, green: 235/255, blue: 230/255, alpha: 1)
+                    : UIColor(red: 30/255, green: 30/255, blue: 30/255, alpha: 1)
             })
+    }
+    
+    public enum Typography {
+        public static func serifDisplay(size: CGFloat, weight: Font.Weight = .bold) -> Font {
+            return .system(size: size, weight: weight, design: .default)
+        }
+        
+        public static func sansBody(size: CGFloat, weight: Font.Weight = .medium) -> Font {
+            return .system(size: size, weight: weight, design: .default)
+        }
     }
 }

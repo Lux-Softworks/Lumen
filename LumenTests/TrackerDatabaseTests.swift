@@ -2,9 +2,10 @@ import XCTest
 
 @testable import Lumen
 
+@MainActor
 final class TrackerDatabaseTests: XCTestCase {
 
-    func testParseDisconnectJSON_ValidData() {
+    func testParseDisconnectJSON_ValidData() async {
         let db = TrackerDatabase.shared
         let json = """
             {
@@ -27,9 +28,9 @@ final class TrackerDatabaseTests: XCTestCase {
             }
             """.data(using: .utf8)!
 
-        db.parseDisconnectJSON(json)
+        await db.parseDisconnectJSON(json)
 
-        let result = db.lookup(domain: "testtracker.com")
+        let result = await db.lookup(domain: "testtracker.com")
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.entityName, "TestTracker")
@@ -37,17 +38,17 @@ final class TrackerDatabaseTests: XCTestCase {
         XCTAssertTrue(result?.domains.contains("testtracker.net") ?? false)
     }
 
-    func testParseDisconnectJSON_AnalyticsCategory() {
+    func testParseDisconnectJSON_AnalyticsCategory() async {
         let db = TrackerDatabase.shared
 
-        let result = db.lookup(domain: "testanalytics.io")
+        let result = await db.lookup(domain: "testanalytics.io")
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.entityName, "TestAnalytics")
         XCTAssertEqual(result?.category, .analytics)
     }
 
-    func testLookupSubdomain() {
+    func testLookupSubdomain() async {
         let db = TrackerDatabase.shared
         let json = """
             {
@@ -63,26 +64,26 @@ final class TrackerDatabaseTests: XCTestCase {
             }
             """.data(using: .utf8)!
 
-        db.parseDisconnectJSON(json)
+        await db.parseDisconnectJSON(json)
 
-        let result = db.lookup(domain: "ad.subtest.com")
+        let result = await db.lookup(domain: "ad.subtest.com")
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.entityName, "SubTest")
     }
 
-    func testLookupUnknownDomain() {
+    func testLookupUnknownDomain() async {
         let db = TrackerDatabase.shared
-        let result = db.lookup(domain: "totally-unknown-domain-xyz123.com")
+        let result = await db.lookup(domain: "totally-unknown-domain-xyz123.com")
 
         XCTAssertNil(result)
     }
 
-    func testMergeAddsNewEntries() {
+    func testMergeAddsNewEntries() async {
         let db = TrackerDatabase.shared
-        let before = db.allEntries().count
+        let before = await db.allEntries().count
 
-        db.merge([
+        await db.merge([
             "custom-tracker-test.com": ThreatDetector.TrackerInfo(
                 entityName: "Custom Test",
                 category: .advertising,
@@ -90,11 +91,14 @@ final class TrackerDatabaseTests: XCTestCase {
             )
         ])
 
-        XCTAssertGreaterThan(db.allEntries().count, before)
-        XCTAssertNotNil(db.lookup(domain: "custom-tracker-test.com"))
+        let afterCount = await db.allEntries().count
+        XCTAssertGreaterThan(afterCount, before)
+        
+        let result = await db.lookup(domain: "custom-tracker-test.com")
+        XCTAssertNotNil(result)
     }
 
-    func testParseDisconnectJSON_CryptominingCategory() {
+    func testParseDisconnectJSON_CryptominingCategory() async {
         let db = TrackerDatabase.shared
         let json = """
             {
@@ -110,15 +114,15 @@ final class TrackerDatabaseTests: XCTestCase {
             }
             """.data(using: .utf8)!
 
-        db.parseDisconnectJSON(json)
+        await db.parseDisconnectJSON(json)
 
-        let result = db.lookup(domain: "testminer.com")
+        let result = await db.lookup(domain: "testminer.com")
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.category, .cryptomining)
     }
 
-    func testParseDisconnectJSON_SocialCategory() {
+    func testParseDisconnectJSON_SocialCategory() async {
         let db = TrackerDatabase.shared
         let json = """
             {
@@ -134,25 +138,26 @@ final class TrackerDatabaseTests: XCTestCase {
             }
             """.data(using: .utf8)!
 
-        db.parseDisconnectJSON(json)
+        await db.parseDisconnectJSON(json)
 
-        let result = db.lookup(domain: "testsocial.com")
+        let result = await db.lookup(domain: "testsocial.com")
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.category, .social)
     }
 
-    func testParseDisconnectJSON_InvalidData() {
+    func testParseDisconnectJSON_InvalidData() async {
         let db = TrackerDatabase.shared
-        let before = db.allEntries().count
+        let before = await db.allEntries().count
         let badData = "not json".data(using: .utf8)!
 
-        db.parseDisconnectJSON(badData)
+        await db.parseDisconnectJSON(badData)
 
-        XCTAssertEqual(db.allEntries().count, before)
+        let afterCount = await db.allEntries().count
+        XCTAssertEqual(afterCount, before)
     }
 
-    func testDomainCountUpdated() {
+    func testDomainCountUpdated() async {
         let db = TrackerDatabase.shared
         let json = """
             {
@@ -168,9 +173,11 @@ final class TrackerDatabaseTests: XCTestCase {
             }
             """.data(using: .utf8)!
 
-        db.parseDisconnectJSON(json)
+        await db.parseDisconnectJSON(json)
 
-        XCTAssertGreaterThan(db.domainCount, 0)
-        XCTAssertGreaterThan(db.entityCount, 0)
+        let domainCount = await db.domainCount
+        let entityCount = await db.entityCount
+        XCTAssertGreaterThan(domainCount, 0)
+        XCTAssertGreaterThan(entityCount, 0)
     }
 }
