@@ -29,6 +29,7 @@ struct TabOverlayView: View {
                                     config: config,
                                     tabManager: tabManager,
                                     hiddenTabId: hiddenTabId,
+                                    shrinkProgress: shrinkProgress,
                                     onSelectTab: onSelectTab,
                                     lastScrolledToId: $lastScrolledToId
                                 )
@@ -51,6 +52,11 @@ struct TabOverlayView: View {
                             }
                         }
                         lastScrolledToId = id
+                    }
+                    .onChange(of: tabManager.tabs.firstIndex(where: { $0.id == tabManager.activeTabId })) { _, _ in
+                        withAnimation(.smooth(duration: 0.2)) {
+                            proxy.scrollTo(tabManager.activeTabId, anchor: .center)
+                        }
                     }
                 }
 
@@ -101,6 +107,7 @@ private struct TabCardWrapper: View {
     let config: TabOverlayView.LayoutConfig
     @ObservedObject var tabManager: TabManager
     let hiddenTabId: UUID?
+    let shrinkProgress: CGFloat
     let onSelectTab: (UUID) -> Void
     @Binding var lastScrolledToId: UUID?
 
@@ -132,7 +139,20 @@ private struct TabCardWrapper: View {
                     return -maxLeftLimit * stackCurve
                 }
             }()
-            let xOffset = targetVisualDisplacement - displacement
+
+            let pushAmount: CGFloat = 20.0
+            let rawProgress = (1.0 - shrinkProgress)
+            let animationPush: CGFloat = {
+                if rawProgress <= 0 || hidden { return 0 }
+                if displacement < -10 {
+                    return -pushAmount * rawProgress
+                } else if displacement > 10 {
+                    return pushAmount * rawProgress
+                }
+                return 0
+            }()
+
+            let xOffset = targetVisualDisplacement - displacement + animationPush
 
             let cardOpacity: CGFloat = {
                 if hidden {

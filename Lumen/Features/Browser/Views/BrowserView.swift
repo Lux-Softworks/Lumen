@@ -485,6 +485,8 @@ struct BrowserView: View {
                 activeTab.snapshot = image
             }
 
+            tabManager.moveActiveTabToTop()
+
             activeTabViewState = .shrinking
             withAnimation(.smooth(duration: 0.2)) {
                 self.shrinkProgress = 1.0
