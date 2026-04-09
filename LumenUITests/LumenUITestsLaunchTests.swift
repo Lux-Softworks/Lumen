@@ -1,10 +1,3 @@
-//
-//  LumenUITestsLaunchTests.swift
-//  LumenUITests
-//
-//  Created by Daniel Kosukhin on 12/22/25.
-//
-
 import XCTest
 
 final class LumenUITestsLaunchTests: XCTestCase {
@@ -21,9 +14,6 @@ final class LumenUITestsLaunchTests: XCTestCase {
     func testLaunch() throws {
         let app = XCUIApplication()
         app.launch()
-
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"

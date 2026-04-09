@@ -2,12 +2,12 @@ import XCTest
 
 @testable import Lumen
 
-final class LocalBrainTests: XCTestCase {
+final class LocalKnowledgeProviderTests: XCTestCase {
 
-    var brain: LocalBrain!
+    var knowledgeProvider: LocalKnowledgeProvider!
 
     override func setUp() async throws {
-        brain = LocalBrain()
+        knowledgeProvider = LocalKnowledgeProvider()
     }
 
     func testHeuristicRoutingAction() async {
@@ -15,7 +15,7 @@ final class LocalBrainTests: XCTestCase {
         let input = "Click the login button"
 
         Task {
-            let intent = await brain.route(input)
+            let intent = await knowledgeProvider.route(input)
             XCTAssertEqual(intent, .action, "Should detect 'click' as an action intent")
             expectation.fulfill()
         }
@@ -28,7 +28,7 @@ final class LocalBrainTests: XCTestCase {
         let input = "Summarize this page"
 
         Task {
-            let intent = await brain.route(input)
+            let intent = await knowledgeProvider.route(input)
             XCTAssertEqual(intent, .context, "Should detect 'summarize' as a context intent")
             expectation.fulfill()
         }
@@ -41,7 +41,7 @@ final class LocalBrainTests: XCTestCase {
         let input = "What is the capital of France?"
 
         Task {
-            let intent = await brain.route(input)
+            let intent = await knowledgeProvider.route(input)
             XCTAssertEqual(
                 intent, .knowledge, "Should default to knowledge intent for unknown patterns")
             expectation.fulfill()

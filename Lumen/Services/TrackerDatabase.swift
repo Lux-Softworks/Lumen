@@ -1,36 +1,20 @@
 import Foundation
 
-final class TrackerDatabase {
+actor TrackerDatabase {
 
     static let shared = TrackerDatabase()
 
     private var trackers: [String: ThreatDetector.TrackerInfo] = [:]
-    private var _entityCount: Int = 0
-    private var _domainCount: Int = 0
-    private let lock = NSRecursiveLock()
-
-    var entityCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return _entityCount
-    }
-
-    var domainCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return _domainCount
-    }
+    private(set) var entityCount: Int = 0
+    private(set) var domainCount: Int = 0
 
     private init() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.loadBundledDatabase()
+        Task {
+            await loadBundledDatabase()
         }
     }
 
     func lookup(domain: String) -> ThreatDetector.TrackerInfo? {
-        lock.lock()
-        defer { lock.unlock() }
-
         if let direct = trackers[domain] {
             return direct
         }
@@ -46,30 +30,23 @@ final class TrackerDatabase {
     }
 
     func allEntries() -> [String: ThreatDetector.TrackerInfo] {
-        lock.lock()
-        defer { lock.unlock() }
         return trackers
     }
 
     func merge(_ additional: [String: ThreatDetector.TrackerInfo]) {
-        lock.lock()
-        defer { lock.unlock() }
-
         for (key, value) in additional {
             trackers[key] = value
         }
-        _domainCount = trackers.count
+        domainCount = trackers.count
     }
 
     func reload() {
-        lock.lock()
         trackers.removeAll()
-        _entityCount = 0
-        _domainCount = 0
-        lock.unlock()
+        entityCount = 0
+        domainCount = 0
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.loadBundledDatabase()
+        Task {
+            await loadBundledDatabase()
         }
     }
 
@@ -152,14 +129,11 @@ final class TrackerDatabase {
             }
         }
 
-        lock.lock()
-        defer { lock.unlock() }
-
         for (key, value) in newTrackers {
             trackers[key] = value
         }
 
-        _entityCount = seenEntities.count
-        _domainCount = trackers.count
+        entityCount = seenEntities.count
+        domainCount = trackers.count
     }
 }

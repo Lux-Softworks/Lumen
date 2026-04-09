@@ -6,7 +6,7 @@ enum Intent: String, Sendable {
     case context
 }
 
-enum AgentState: String, Sendable {
+enum LocalKnowledgeState: String, Sendable {
     case idle
     case thinking
     case executing

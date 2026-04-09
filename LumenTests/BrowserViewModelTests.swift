@@ -3,18 +3,19 @@ import XCTest
 
 @testable import Lumen
 
+@MainActor
 final class BrowserViewModelTests: XCTestCase {
 
     var viewModel: BrowserViewModel!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         viewModel = BrowserViewModel()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         viewModel = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testInitialState() {

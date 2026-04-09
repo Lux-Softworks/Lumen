@@ -3,15 +3,17 @@ import XCTest
 
 @testable import Lumen
 
+@MainActor
 final class NetworkInterceptorTests: XCTestCase {
 
     var detector: ThreatDetector!
     var interceptor: NetworkInterceptor!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         detector = ThreatDetector()
-        detector.loadTrackerDatabase(TrackerDatabase.shared.allEntries())
+        let entries = await TrackerDatabase.shared.allEntries()
+        detector.loadTrackerDatabase(entries)
         interceptor = NetworkInterceptor(detector: detector, httpsOnly: true)
     }
 

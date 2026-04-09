@@ -84,7 +84,6 @@ final class BrowserEngineTests: XCTestCase {
         let policy = PrivacyPolicy()
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        // Using KVC to check the value as it's not a direct property in some versions
         let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
         let universalAccess =
             config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
@@ -121,8 +120,11 @@ final class BrowserEngineTests: XCTestCase {
         let policy = PrivacyPolicy()
         let config = BrowserEngine.makeConfiguration(policy: policy)
 
-        XCTAssertFalse(config.preferences.allowFileAccessFromFileURLs)
-        XCTAssertFalse(config.preferences.allowUniversalAccessFromFileURLs)
+        let fileAccess = config.preferences.value(forKey: "allowFileAccessFromFileURLs") as? Bool
+        let universalAccess = config.preferences.value(forKey: "allowUniversalAccessFromFileURLs") as? Bool
+
+        XCTAssertEqual(fileAccess, false)
+        XCTAssertEqual(universalAccess, false)
     }
 
     func testMakeConfiguration_JavaScriptCanOpenWindowsAutomatically_Disabled() {
@@ -177,5 +179,20 @@ final class BrowserEngineTests: XCTestCase {
         XCTAssertTrue(policy.suppressesIncrementalRendering)
         XCTAssertTrue(policy.limitsNavigationToHTTPS)
         XCTAssertNil(policy.customUserAgent)
+    }
+
+    func testMakeConfiguration_RegistersReadingSignalScript() {
+        let policy = PrivacyPolicy()
+        let config = BrowserEngine.makeConfiguration(policy: policy)
+
+        let script = config.userContentController.userScripts.first {
+            $0.source.contains("lumenReadingSignalInstalled")
+        }
+        XCTAssertNotNil(script)
+
+        let defaultConfig = ReadingSignalConfig.default
+        XCTAssertTrue(script!.source.contains("DWELL_THRESHOLD = \(defaultConfig.dwellThresholdSeconds)"))
+        XCTAssertTrue(script!.source.contains("SCROLL_THRESHOLD = \(defaultConfig.scrollDepthThreshold)"))
+        XCTAssertTrue(script!.source.contains("POLL_INTERVAL_MS = \(defaultConfig.pollIntervalMs)"))
     }
 }
