@@ -72,9 +72,10 @@ struct ResizableSheetContainer<Content: View>: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16)
                     .frame(
-                        height: currentHeight(screenHeight: outerGeometry.size.height),
+                        height: currentHeight(screenHeight: UIScreen.main.bounds.height),
                         alignment: .top
                     )
+                    .animation(.smooth(duration: 0.3), value: isExpanded)
                     .opacity(isCollapsed ? 0 : 1)
                     .background(
                         ZStack(alignment: .top) {
@@ -91,13 +92,13 @@ struct ResizableSheetContainer<Content: View>: View {
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 )
                                 .cornerRadius(
-                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
+                                    animatedCornerRadius(screenHeight: UIScreen.main.bounds.height),
                                     corners: [.topLeft, .topRight]
                                 )
                                 .overlay(
                                     RoundedCorner(
                                         radius: animatedCornerRadius(
-                                            screenHeight: outerGeometry.size.height),
+                                            screenHeight: UIScreen.main.bounds.height),
                                         corners: [.topLeft, .topRight]
                                     )
                                     .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
@@ -109,12 +110,12 @@ struct ResizableSheetContainer<Content: View>: View {
                                 isLoading: isLoading,
                                 width: outerGeometry.size.width,
                                 cornerRadius: animatedCornerRadius(
-                                    screenHeight: outerGeometry.size.height),
+                                    screenHeight: UIScreen.main.bounds.height),
                             )
                         }
                     )
                     .gesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                        DragGesture(minimumDistance: 10, coordinateSpace: .global)
                             .updating($activeDragTranslation) { value, state, _ in
                                 let translation = value.translation.height
                                 let rubberBanded: CGFloat
@@ -134,7 +135,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                                 state = rubberBanded
 
-                                let screenHeight = outerGeometry.size.height
+                                let screenHeight = UIScreen.main.bounds.height
                                 let currentHeight =
                                     isExpanded
                                     ? screenHeight * expandedHeightRatio : collapsedHeight

@@ -94,6 +94,7 @@ struct BrowserView: View {
                 bottomBarState: $bottomBarState
             )
             .applyBottomBarFocusHandlers(
+                tabManager: tabManager,
                 bottomBarState: $bottomBarState,
                 isAddressBarFocused: $isAddressBarFocused
             )
@@ -259,6 +260,7 @@ struct BrowserView: View {
             .frame(maxHeight: .infinity, alignment: .bottom)
             .blur(radius: isReady ? 0 : 20)
             .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
+            .animation(.smooth(duration: 0.3), value: bottomBarState)
     }
 
     @ViewBuilder
@@ -575,9 +577,7 @@ struct BrowserView: View {
 
             await tabToLoad?.viewModel.processUserInput(query)
 
-            withAnimation(.smooth(duration: 0.3)) {
-                self.bottomBarState = .collapsed
-            }
+            self.bottomBarState = .collapsed
 
             if tabsEmpty {
                 coverFinished = true
@@ -640,9 +640,7 @@ struct BrowserView: View {
             wasScrollingDown = false
 
             if bottomBarState == .hidden {
-                withAnimation(.smooth(duration: 0.3)) {
-                    bottomBarState = .collapsed
-                }
+                bottomBarState = .collapsed
             }
 
             return
@@ -663,9 +661,7 @@ struct BrowserView: View {
             scrollAnchor = offset
 
             if bottomBarState == .hidden {
-                withAnimation(.smooth(duration: 0.3)) {
-                    bottomBarState = .collapsed
-                }
+                bottomBarState = .collapsed
             }
         }
     }
@@ -761,15 +757,13 @@ private struct TabManagerHandlers: ViewModifier {
                     activeTabViewState = .fullScreen
                     shrinkProgress = 0
                     webViewReady = true
-                    withAnimation(.smooth(duration: 0.3)) {
-                        bottomBarState = .search
-                    }
                 }
             }
     }
 }
 
 private struct BottomBarFocusHandlers: ViewModifier {
+    let tabManager: TabManager
     @Binding var bottomBarState: BottomBarState
     var isAddressBarFocused: FocusState<Bool>.Binding
 
@@ -806,7 +800,9 @@ private struct ActiveTabChangedHandlers: ViewModifier {
                 }
 
                 guard let newTab = tabManager.tabs.first(where: { $0.id == newId }) else {
-                    withAnimation(.smooth(duration: 0.3)) { bottomBarState = .search }
+                    if !tabManager.tabs.isEmpty {
+                        withAnimation(.smooth(duration: 0.3)) { bottomBarState = .search }
+                    }
                     return
                 }
 
@@ -818,9 +814,7 @@ private struct ActiveTabChangedHandlers: ViewModifier {
                     webViewReady = true
                     bottomBarState = .collapsed
                 } else {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        bottomBarState = .search
-                    }
+                    bottomBarState = .search
                 }
             }
     }
@@ -891,11 +885,13 @@ extension View {
     }
 
     fileprivate func applyBottomBarFocusHandlers(
+        tabManager: TabManager,
         bottomBarState: Binding<BottomBarState>,
         isAddressBarFocused: FocusState<Bool>.Binding
     ) -> some View {
         modifier(
             BottomBarFocusHandlers(
+                tabManager: tabManager,
                 bottomBarState: bottomBarState,
                 isAddressBarFocused: isAddressBarFocused
             ))

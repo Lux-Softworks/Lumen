@@ -118,7 +118,7 @@ struct BottomBarView: View {
                         .transition(
                             .asymmetric(
                                 insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
-                                removal: .opacity.animation(.smooth(duration: 0.15))
+                                removal: .opacity.animation(.easeIn(duration: 0.05))
                             )
                         )
                 } else if state == .browserSettings || state == .siteSettings {
@@ -132,7 +132,7 @@ struct BottomBarView: View {
                     .transition(
                         .asymmetric(
                             insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
-                            removal: .opacity.animation(.smooth(duration: 0.15))
+                            removal: .opacity.animation(.easeIn(duration: 0.05))
                         )
                     )
                 } else {
@@ -152,7 +152,14 @@ struct BottomBarView: View {
                 }
             }
         }
+        .animation(.smooth(duration: 0.3), value: state)
         .ignoresSafeArea(.keyboard)
+        .onChange(of: tabCount) { oldCount, newCount in
+            guard newCount == 0, oldCount > 0 else { return }
+            withAnimation(.smooth(duration: 0.3)) {
+                state = .search
+            }
+        }
         .onChange(of: state) { _, newState in
             let wasDragging = toolbarDragFraction > 0
 
@@ -496,9 +503,7 @@ struct BottomBarView: View {
                     handler()
                 } else {
                     text = ""
-                    withAnimation(.smooth(duration: 0.3)) {
-                        state = .search
-                    }
+                    state = .search
                 }
             }) {
                 ZStack {
@@ -560,9 +565,7 @@ struct BottomBarView: View {
         .frame(height: 80)
         .overlay(alignment: .topTrailing) {
             KnowledgeButton {
-                withAnimation(.smooth(duration: 0.25)) {
-                    state = .knowledge
-                }
+                state = .knowledge
             }
             .padding(.trailing, 16)
             .alignmentGuide(.top) { d in d[.bottom] }
