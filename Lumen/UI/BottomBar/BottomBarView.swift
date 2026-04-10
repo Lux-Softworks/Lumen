@@ -147,7 +147,7 @@ struct BottomBarView: View {
                     dragRevealedHistory
                 }
 
-                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings || state == .knowledge {
+                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings {
                     Spacer(minLength: 0)
                 }
             }
@@ -575,7 +575,7 @@ struct BottomBarView: View {
     }
 
     private var knowledgeContent: some View {
-        Spacer()
+        KnowledgePanelView()
     }
 
     private var displayBinding: Binding<String> {

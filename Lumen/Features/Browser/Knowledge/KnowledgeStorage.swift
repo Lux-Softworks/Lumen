@@ -2,7 +2,7 @@ import SQLite3
 import Foundation
 import Accelerate
 
-struct Website: Identifiable, Codable {
+struct Website: Identifiable, Codable, Equatable, Hashable {
     let id: String
     let domain: String
     var displayName: String
@@ -40,7 +40,7 @@ struct Website: Identifiable, Codable {
     }
 }
 
-struct Topic: Identifiable, Codable {
+struct Topic: Identifiable, Codable, Equatable, Hashable {
     let id: String
     let name: String
     let color: String?
@@ -62,7 +62,7 @@ struct Topic: Identifiable, Codable {
     }
 }
 
-struct PageContent: Identifiable, Codable {
+struct PageContent: Identifiable, Codable, Equatable, Hashable {
     let id: String
     let websiteID: String
     let url: String
@@ -191,6 +191,8 @@ actor KnowledgeStorage {
         try createTables()
     }
 
+
+
     private func createTables() throws {
         let createTopicsTable = """
         CREATE TABLE IF NOT EXISTS topics (
@@ -302,17 +304,17 @@ actor KnowledgeStorage {
     ) async throws -> String {
         try initialize()
 
-        let domain = await PageContent.extractDomain(from: url)
+        let domain = PageContent.extractDomain(from: url)
         let websiteID: String
         if let existingWebsite = try fetchWebsite(domain: domain) {
             websiteID = existingWebsite.id
         } else {
-            let newWebsite = await Website(domain: domain, displayName: domain)
+            let newWebsite = Website(domain: domain, displayName: domain)
             try createWebsite(website: newWebsite)
             websiteID = newWebsite.id
         }
 
-        let page = await PageContent(
+        let page = PageContent(
             websiteID: websiteID,
             url: url,
             title: title,
@@ -695,6 +697,13 @@ actor KnowledgeStorage {
         try execute(sql, bindValues: { statement in
             sqlite3_bind_text(statement, 1, topicID, -1, nil)
         })
+    }
+
+    func deleteAllTopics() throws {
+        try initialize()
+        try execute("DELETE FROM topics")
+        try execute("DELETE FROM websites")
+        try execute("DELETE FROM pages")
     }
 
     func getStats() throws -> StorageStats {
