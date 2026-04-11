@@ -38,7 +38,8 @@ enum BrowserEngine {
                 (function() {
                     var toolbarHeight = 80;
                     var statusBarHeight = 0;
-                    var topStickyElements = [];
+
+                    try { window.webkit.messageHandlers.insetProvider.postMessage({}); } catch(e) {}
 
                     document.documentElement.style.setProperty(
                         '--toolbar-height', toolbarHeight + 'px');
@@ -48,8 +49,7 @@ enum BrowserEngine {
                     var style = document.createElement('style');
                     style.textContent =
                         '[data-kr-bumped-bottom] { transition: bottom 0.2s ease !important; }' +
-                        '[data-kr-bumped-top] { transition: top 0.2s ease !important; }' +
-                        '[data-kr-bounce-track] { will-change: transform; }';
+                        '[data-kr-bumped-top] { transition: top 0.2s ease; }';
                     document.head.appendChild(style);
 
                     var meta = document.querySelector('meta[name="viewport"]');
@@ -63,22 +63,6 @@ enum BrowserEngine {
                         meta.name = 'viewport';
                         meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
                         document.head.appendChild(meta);
-                    }
-
-                    function refreshTopStickyElements() {
-                        topStickyElements = [];
-                        var all = document.querySelectorAll('*');
-                        for (var i = 0; i < all.length; i++) {
-                            var el = all[i];
-                            var s = getComputedStyle(el);
-                            if (s.position !== 'fixed' && s.position !== 'sticky') continue;
-
-                            var rect = el.getBoundingClientRect();
-                            if (rect.top < window.innerHeight / 2) {
-                                el.setAttribute('data-kr-bounce-track', '1');
-                                topStickyElements.push(el);
-                            }
-                        }
                     }
 
                     function bumpElements() {
@@ -104,37 +88,17 @@ enum BrowserEngine {
 
                             if (!el.hasAttribute('data-kr-bumped-top') &&
                                 statusBarHeight > 0 &&
-                                rect.top < window.innerHeight / 3) {
+                                rect.top < window.innerHeight / 2) {
                                 var topVal = parseFloat(s.top);
-
                                 if (s.top !== 'auto' && s.top !== '' &&
-                                    !isNaN(topVal) && topVal < 60) {
+                                    !isNaN(topVal) && topVal < statusBarHeight + 20) {
                                     el.setAttribute('data-kr-orig-top', String(topVal));
-                                    el.style.setProperty('top',
-                                        (topVal + statusBarHeight) + 'px', 'important');
+                                    el.style.top = (topVal + statusBarHeight) + 'px';
                                     el.setAttribute('data-kr-bumped-top', '1');
                                 }
                             }
                         }
-                        requestAnimationFrame(refreshTopStickyElements);
                     }
-
-                    var lastBounceOffset = 0;
-
-                    window.__nativeBounce = function(offset) {
-                        if (offset > 0) {
-                            var transform = 'translateY(' + offset + 'px)';
-                            for (var i = 0; i < topStickyElements.length; i++) {
-                                topStickyElements[i].style.transform = transform;
-                            }
-                            lastBounceOffset = offset;
-                        } else if (lastBounceOffset > 0) {
-                            for (var i = 0; i < topStickyElements.length; i++) {
-                                topStickyElements[i].style.transform = '';
-                            }
-                            lastBounceOffset = 0;
-                        }
-                    };
 
                     window.__updateToolbarHeight = function(h) {
                         toolbarHeight = h;
@@ -157,8 +121,7 @@ enum BrowserEngine {
                         for (var i = 0; i < bumped.length; i++) {
                             var orig = parseFloat(
                                 bumped[i].getAttribute('data-kr-orig-top')) || 0;
-                            bumped[i].style.setProperty('top',
-                                (orig + h) + 'px', 'important');
+                            bumped[i].style.top = (orig + h) + 'px';
                         }
                         requestAnimationFrame(bumpElements);
                     };
@@ -174,8 +137,22 @@ enum BrowserEngine {
                     setTimeout(bumpElements, 3000);
 
                     var debounceTimer;
-                    var observer = new MutationObserver(function() {
+                    var observer = new MutationObserver(function(mutations) {
                         clearTimeout(debounceTimer);
+                        if (statusBarHeight > 0) {
+                            for (var i = 0; i < mutations.length; i++) {
+                                var el = mutations[i].target;
+                                if (mutations[i].attributeName === 'style' &&
+                                    el.hasAttribute && el.hasAttribute('data-kr-bumped-top')) {
+                                    var orig = parseFloat(
+                                        el.getAttribute('data-kr-orig-top')) || 0;
+                                    var expected = (orig + statusBarHeight) + 'px';
+                                    if (el.style.top !== expected) {
+                                        el.style.top = expected;
+                                    }
+                                }
+                            }
+                        }
                         debounceTimer = setTimeout(function() {
                             requestAnimationFrame(bumpElements);
                         }, 100);

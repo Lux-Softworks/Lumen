@@ -8,8 +8,8 @@ struct BrowserView: View {
     @State private var isReady = false
     @State private var activeTabViewState: TabViewState = .fullScreen
     @State private var shrinkProgress: CGFloat = 0
-    @State private var scrollAnchor: CGFloat = 0
-    @State private var wasScrollingDown: Bool = false
+    @State private var scrollDownAccumulator: CGFloat = 0
+    @State private var topBarOffset: CGFloat = 47
     @State private var urlText: String = ""
 
     @State private var bottomBarOpacity: CGFloat = 1
@@ -286,7 +286,9 @@ struct BrowserView: View {
             viewModel: tab.viewModel,
             bottomInset: (bottomBarState == .search || bottomBarState == .browserSettings
                 || bottomBarState == .siteSettings || bottomBarState == .knowledge)
-                ? 0 : (bottomBarState == .hidden ? 20 : 80)
+                ? 0 : (bottomBarState == .hidden ? 20 : 80),
+            topBarOffset: topBarOffset,
+            statusBarInset: topBarOffset == 0 ? getStatusBarHeight(geometry) : 0
         )
         .id(tab.id)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -294,8 +296,19 @@ struct BrowserView: View {
         .blur(radius: isReady ? 0 : 20)
         .allowsHitTesting(activeTabViewState == .fullScreen && webViewReady)
         .disabled(activeTabViewState != .fullScreen || !webViewReady)
-        .onChange(of: tab.viewModel.scrollDelta) { _, delta in
-            updateScrollState(delta: delta)
+        .onAppear {
+            topBarOffset = getStatusBarHeight(geometry)
+            tab.viewModel.onScrollUpdate = nil
+            scrollDownAccumulator = 0
+            tab.viewModel.onScrollUpdate = { offset, delta in
+                updateScrollState(offset: offset, delta: delta, statusBarHeight: getStatusBarHeight(geometry))
+            }
+        }
+        .onDisappear {
+            tab.viewModel.onScrollUpdate = nil
+        }
+        .onChange(of: tab.viewModel.pageReadyToken) { _, _ in
+            scrollDownAccumulator = 0
         }
     }
 
@@ -337,7 +350,9 @@ struct BrowserView: View {
             if let tab = activeTab {
                 tabCardHeader(tab: tab)
                     .padding(.top, lerp(0, 6, progress))
-                    .frame(width: currentCardWidth, height: 36 + lerp(0, 6, progress), alignment: .top)
+                    .frame(
+                        width: currentCardWidth, height: 36 + lerp(0, 6, progress), alignment: .top
+                    )
                     .frame(height: max(0, visualGapHeight), alignment: .top)
                     .clipped()
                     .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
@@ -631,37 +646,35 @@ struct BrowserView: View {
         }
     }
 
-    private func updateScrollState(delta: CGFloat) {
-        guard let viewModel = activeTab?.viewModel else { return }
-        let offset = viewModel.scrollOffset
+    private func updateScrollState(offset: CGFloat, delta: CGFloat, statusBarHeight: CGFloat) {
+        guard bottomBarState == .collapsed || bottomBarState == .hidden else { return }
 
         if offset < 80 {
-            scrollAnchor = offset
-            wasScrollingDown = false
-
+            scrollDownAccumulator = 0
             if bottomBarState == .hidden {
-                bottomBarState = .collapsed
+                withAnimation(.smooth(duration: 0.2)) {
+                    bottomBarState = .collapsed
+                    topBarOffset = statusBarHeight
+                }
             }
-
             return
         }
 
-        if delta > 0 {
-            if !wasScrollingDown {
-                scrollAnchor = offset
-                wasScrollingDown = true
-            }
-            if offset - scrollAnchor >= 80 && bottomBarState == .collapsed {
-                withAnimation(.smooth(duration: 0.3)) {
+        if delta > 1 {
+            scrollDownAccumulator = min(scrollDownAccumulator + delta, 200)
+            if scrollDownAccumulator > 50 && bottomBarState == .collapsed {
+                withAnimation(.smooth(duration: 0.2)) {
                     bottomBarState = .hidden
+                    topBarOffset = 0
                 }
             }
-        } else if delta < -1 {
-            wasScrollingDown = false
-            scrollAnchor = offset
-
+        } else if delta < -2 {
+            scrollDownAccumulator = 0
             if bottomBarState == .hidden {
-                bottomBarState = .collapsed
+                withAnimation(.smooth(duration: 0.2)) {
+                    bottomBarState = .collapsed
+                    topBarOffset = statusBarHeight
+                }
             }
         }
     }
@@ -713,6 +726,11 @@ private struct PageLoadHandlers: ViewModifier {
         content
             .onChange(of: pageReadyToken) { _, _ in
                 pageCommitted = true
+                if bottomBarState == .hidden {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        bottomBarState = .collapsed
+                    }
+                }
                 if !webViewReady {
                     onFadeIn()
                 }

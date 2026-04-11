@@ -6,19 +6,29 @@ struct HardenedWebView: UIViewControllerRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
     @StateObject private var settings = BrowserSettings.shared
     var bottomInset: CGFloat = 0
+    var topBarOffset: CGFloat = 0
+    var statusBarInset: CGFloat = 0
 
     var policy: PrivacyPolicy {
         settings.policy(for: viewModel.currentURL)
     }
 
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, WKScriptMessageHandler {
         var parent: HardenedWebView
         var hasAttached = false
         var statusBarTintView: UIView?
-        var lastStatusBarHeight: Int = 0
+        var lastToolbarHeight: Int = 0
+        var lastPageReadyToken: Int = -1
 
         init(_ parent: HardenedWebView) {
             self.parent = parent
+        }
+
+        func userContentController(
+            _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "insetProvider", let webView = message.webView else { return }
+            parent.pushCurrentInsets(webView: webView, context: nil)
         }
 
         func installStatusBarTint(above webView: WKWebView) {
@@ -76,7 +86,10 @@ struct HardenedWebView: UIViewControllerRepresentable {
         controller.webView = webView
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         context.coordinator.installStatusBarTint(above: webView)
-        controller.attachScrollObservation()
+
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: "insetProvider")
+        webView.configuration.userContentController.add(context.coordinator, name: "insetProvider")
 
         return controller
     }
@@ -84,30 +97,45 @@ struct HardenedWebView: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: WebViewHostController, context: Context) {
         guard let webView = controller.webView else { return }
 
+        context.coordinator.parent = self
+
         if !context.coordinator.hasAttached {
             viewModel.attachWebView(webView)
             context.coordinator.hasAttached = true
+            context.coordinator.lastToolbarHeight = -1
         }
 
         context.coordinator.installStatusBarTint(above: webView)
         context.coordinator.updateTintColor(viewModel.themeColor)
 
-        if webView.scrollView.contentInset.bottom != bottomInset {
-            webView.scrollView.contentInset.bottom = bottomInset
-            webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
+        controller.updateTopOffset(topBarOffset)
 
-            webView.evaluateJavaScript(
-                "window.__updateToolbarHeight && window.__updateToolbarHeight(\(Int(bottomInset)))"
-            )
+        if context.coordinator.lastPageReadyToken != viewModel.pageReadyToken {
+            context.coordinator.lastToolbarHeight = -1
+            context.coordinator.lastPageReadyToken = viewModel.pageReadyToken
         }
 
-        let safeTop = Int(webView.safeAreaInsets.top)
-        if safeTop > 0 && context.coordinator.lastStatusBarHeight != safeTop {
-            context.coordinator.lastStatusBarHeight = safeTop
-            webView.evaluateJavaScript(
-                "window.__updateStatusBarHeight && window.__updateStatusBarHeight(\(safeTop))"
-            )
+        pushCurrentInsets(webView: webView, controller: controller, context: context)
+    }
+
+    private func pushCurrentInsets(
+        webView: WKWebView, controller: UIViewController? = nil, context: Context? = nil
+    ) {
+        let targetToolbarHeight = Int(bottomInset)
+        let effectiveSafeTop = Int(statusBarInset)
+
+        let toolbarNeedsUpdate =
+            context == nil || targetToolbarHeight != context?.coordinator.lastToolbarHeight
+        guard toolbarNeedsUpdate else { return }
+
+        if let coordinator = context?.coordinator {
+            coordinator.lastToolbarHeight = targetToolbarHeight
         }
+        webView.scrollView.contentInset.bottom = bottomInset
+        webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
+        webView.evaluateJavaScript(
+            "(function(){ if(window.__updateStatusBarHeight) window.__updateStatusBarHeight(\(effectiveSafeTop)); if(window.__updateToolbarHeight) window.__updateToolbarHeight(\(targetToolbarHeight)); })();"
+        )
     }
 }
 
@@ -119,8 +147,14 @@ final class WebViewHostController: UIViewController {
         }
     }
 
-    private var contentOffsetObservation: NSKeyValueObservation?
-    private var lastBounceOffset: CGFloat = 0
+    private var topConstraint: NSLayoutConstraint?
+
+    func updateTopOffset(_ offset: CGFloat) {
+        if topConstraint?.constant != offset {
+            topConstraint?.constant = offset
+            view.layoutIfNeeded()
+        }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -143,33 +177,17 @@ final class WebViewHostController: UIViewController {
         webView.isOpaque = false
         view.addSubview(webView)
 
+        let top = webView.topAnchor.constraint(equalTo: view.topAnchor, constant: 0)
+        self.topConstraint = top
+
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            top,
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }
 
-    func attachScrollObservation() {
-        guard let scrollView = webView?.scrollView else { return }
-        contentOffsetObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
-            guard let self, let offset = change.newValue else { return }
-            self.handleBounce(offset.y)
-        }
-    }
-
-    private func handleBounce(_ y: CGFloat) {
-        if y < 0 {
-            let bounce = -y
-            guard abs(bounce - lastBounceOffset) > 0.5 else { return }
-            lastBounceOffset = bounce
-            webView?.evaluateJavaScript("window.__nativeBounce && window.__nativeBounce(\(bounce))", completionHandler: nil)
-        } else if lastBounceOffset > 0 {
-            lastBounceOffset = 0
-            webView?.evaluateJavaScript("window.__nativeBounce && window.__nativeBounce(0)", completionHandler: nil)
-        }
-    }
 }
 
 #Preview {

@@ -352,22 +352,25 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     private var lastContentOffset: CGFloat = 0
-    @Published var scrollDelta: CGFloat = 0
-    @Published var scrollOffset: CGFloat = 0
+    var onScrollUpdate: ((CGFloat, CGFloat) -> Void)?
     @Published var themeColor: UIColor? = nil
 
     private func startScrollObservation(_ webView: WKWebView) {
         observations.append(
-            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] scrollView, change in
-                guard let self = self, let newOffset = change.newValue?.y, let oldOffset = change.oldValue?.y else { return }
-
+            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] _, change in
+                guard let self = self,
+                      let newY = change.newValue?.y,
+                      let oldY = change.oldValue?.y else { return }
+                let delta = newY - oldY
+                
                 Task { @MainActor in
-                    self.scrollOffset = newOffset
-                    let delta = newOffset - oldOffset
-                    if abs(delta) > 0.5 {
-                        self.scrollDelta = delta
+                    self.lastContentOffset = newY
+                }
+                
+                if abs(delta) > 0.5 {
+                    MainActor.assumeIsolated {
+                        self.onScrollUpdate?(newY, delta)
                     }
-                    self.lastContentOffset = newOffset
                 }
             }
         )

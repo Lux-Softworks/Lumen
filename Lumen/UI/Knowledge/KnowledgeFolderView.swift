@@ -78,11 +78,11 @@ struct FolderItemButton: View {
     var topic: Topic
     @Environment(\.colorScheme) var colorScheme
 
-    let cornerRadius: CGFloat = 10
-    let filletRadius: CGFloat = 12
+    let cornerRadius: CGFloat = 13
+    let filletRadius: CGFloat = 18
     let frontTabWidth: CGFloat = 55
     let backTabWidth: CGFloat = 75
-    let tabHeight: CGFloat = 9
+    let tabHeight: CGFloat = 13
 
     private var topicColor: Color {
         if let colorStr = topic.color, let uiColor = UIColor.fromAnyString(colorStr) {
@@ -92,7 +92,15 @@ struct FolderItemButton: View {
     }
 
     private var rearFlapColor: Color {
-        Color((colorScheme == .dark ?UIColor.fromAnyString("#252525") : UIColor.fromAnyString("#f5f5f5"))!)
+        colorScheme == .dark
+            ? Color(.sRGB, red: 1.0, green: 0.96, blue: 0.88, opacity: 1.0)   // cream
+            : Color(.sRGB, red: 0.11, green: 0.11, blue: 0.13, opacity: 1.0)  // carbon fiber
+    }
+
+    private var rearFlapStrokeColor: Color {
+        colorScheme == .dark
+            ? Color.black.opacity(0.12)
+            : Color.white.opacity(0.07)
     }
 
     var body: some View {
@@ -109,26 +117,29 @@ struct FolderItemButton: View {
                     tabWidth: backTabWidth, tabHeight: tabHeight, cornerRadius: cornerRadius,
                     filletRadius: filletRadius
                 )
-                .stroke(Color.black.opacity(0.6), lineWidth: 0.5)
+                .stroke(rearFlapStrokeColor, lineWidth: 0.5)
             }
             .frame(height: 65)
 
             ZStack {
+                // Soft color glow behind the blur
                 FrontFolderShape(
                     tabWidth: frontTabWidth, tabHeight: tabHeight, cornerRadius: cornerRadius,
                     filletRadius: filletRadius
                 )
                 .fill(topicColor)
-                .blur(radius: 12)
-                .opacity(0.15)
+                .blur(radius: 18)
+                .opacity(0.28)
                 .blendMode(colorScheme == .dark ? .plusLighter : .normal)
 
-                BlurView(style: .systemThinMaterial)
+                // Frosted glass base — lets background show through
+                BlurView(style: .systemUltraThinMaterial)
                     .clipShape(
                         FrontFolderShape(
                             tabWidth: frontTabWidth, tabHeight: tabHeight,
                             cornerRadius: cornerRadius, filletRadius: filletRadius))
 
+                // Translucent color tint — colored but see-through
                 FrontFolderShape(
                     tabWidth: frontTabWidth, tabHeight: tabHeight, cornerRadius: cornerRadius,
                     filletRadius: filletRadius
@@ -136,8 +147,8 @@ struct FolderItemButton: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            AppTheme.Colors.secondaryAccent.opacity(0.95),
-                            AppTheme.Colors.accent.opacity(0.85)
+                            topicColor.opacity(0.38),
+                            topicColor.opacity(0.22)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -151,9 +162,9 @@ struct FolderItemButton: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.6),
-                            AppTheme.Colors.accent.opacity(0.4),
-                            Color.white.opacity(0.15)
+                            Color.white.opacity(0.55),
+                            topicColor.opacity(0.3),
+                            Color.white.opacity(0.1)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
