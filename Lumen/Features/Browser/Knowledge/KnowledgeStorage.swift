@@ -171,6 +171,7 @@ actor KnowledgeStorage {
 
     private var db: OpaquePointer?
     private let dbPath: String
+    private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private init() {
         let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -188,10 +189,18 @@ actor KnowledgeStorage {
             throw StorageError.failedToOpenDatabase
         }
 
-        try createTables()
+        try execute("PRAGMA journal_mode=WAL")
+        try execute("PRAGMA synchronous=NORMAL")
+
+        try execute("BEGIN TRANSACTION")
+        do {
+            try createTables()
+            try execute("COMMIT")
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
     }
-
-
 
     private func createTables() throws {
         let createTopicsTable = """
@@ -260,26 +269,24 @@ actor KnowledgeStorage {
         let createFTS = """
         CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
             title,
-            content,
-            content='pages',
-            content_rowid=rowid
+            body
         );
         """
 
         let createFTSTriggers = """
         CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-            INSERT INTO pages_fts(rowid, title, content)
-            VALUES (new.rowid, new.title, new.content);
+            INSERT INTO pages_fts(title, body)
+            VALUES (new.title, new.content);
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-            DELETE FROM pages_fts WHERE rowid = old.rowid;
+            DELETE FROM pages_fts WHERE title = old.title AND body = old.content;
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-            DELETE FROM pages_fts WHERE rowid = old.rowid;
-            INSERT INTO pages_fts(rowid, title, content)
-            VALUES (new.rowid, new.title, new.content);
+            DELETE FROM pages_fts WHERE title = old.title AND body = old.content;
+            INSERT INTO pages_fts(title, body)
+            VALUES (new.title, new.content);
         END;
         """
 
@@ -347,17 +354,17 @@ actor KnowledgeStorage {
             throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
         }
 
-        sqlite3_bind_text(statement, 1, page.id, -1, nil)
-        sqlite3_bind_text(statement, 2, page.websiteID, -1, nil)
-        sqlite3_bind_text(statement, 3, page.url, -1, nil)
-        sqlite3_bind_text(statement, 4, page.normalizedURL, -1, nil)
-        sqlite3_bind_text(statement, 5, page.domain, -1, nil)
-        sqlite3_bind_text(statement, 6, page.title, -1, nil)
-        sqlite3_bind_text(statement, 7, page.content, -1, nil)
-        sqlite3_bind_text(statement, 8, page.summary, -1, nil)
+        sqlite3_bind_text(statement, 1, page.id, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, page.websiteID, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, page.url, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, page.normalizedURL, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 5, page.domain, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 6, page.title, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 7, page.content, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 8, page.summary, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int64(statement, 9, Int64(page.timestamp.timeIntervalSince1970))
-        sqlite3_bind_text(statement, 10, page.author, -1, nil)
-        sqlite3_bind_text(statement, 11, page.description, -1, nil)
+        sqlite3_bind_text(statement, 10, page.author, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 11, page.description, -1, SQLITE_TRANSIENT)
 
         if let readingTime = page.readingTime {
             sqlite3_bind_int(statement, 12, Int32(readingTime))
@@ -381,19 +388,19 @@ actor KnowledgeStorage {
 
     func createWebsite(website: Website) throws {
         let sql = """
-        INSERT INTO websites (
+        INSERT OR REPLACE INTO websites (
             id, domain, display_name, summary, topic_id, page_count, total_words,
             first_visit, last_visit, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, website.id, -1, nil)
-            sqlite3_bind_text(statement, 2, website.domain, -1, nil)
-            sqlite3_bind_text(statement, 3, website.displayName, -1, nil)
-            sqlite3_bind_text(statement, 4, website.summary, -1, nil)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, website.id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, website.domain, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, website.displayName, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, website.summary, -1, SQLITE_TRANSIENT)
             if let topicID = website.topicID {
-                sqlite3_bind_text(statement, 5, topicID, -1, nil)
+                sqlite3_bind_text(statement, 5, topicID, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(statement, 5)
             }
@@ -418,19 +425,19 @@ actor KnowledgeStorage {
         WHERE id = ?
         """
 
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, website.domain, -1, nil)
-            sqlite3_bind_text(statement, 2, website.displayName, -1, nil)
-            sqlite3_bind_text(statement, 3, website.summary, -1, nil)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, website.domain, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, website.displayName, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, website.summary, -1, SQLITE_TRANSIENT)
             if let topicID = website.topicID {
-                sqlite3_bind_text(statement, 4, topicID, -1, nil)
+                sqlite3_bind_text(statement, 4, topicID, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(statement, 4)
             }
             sqlite3_bind_int(statement, 5, Int32(website.pageCount))
             sqlite3_bind_int(statement, 6, Int32(website.totalWords))
             sqlite3_bind_int64(statement, 7, Int64(website.lastVisit.timeIntervalSince1970))
-            sqlite3_bind_text(statement, 8, website.id, -1, nil)
+            sqlite3_bind_text(statement, 8, website.id, -1, SQLITE_TRANSIENT)
         })
     }
 
@@ -445,7 +452,7 @@ actor KnowledgeStorage {
             throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
         }
 
-        sqlite3_bind_text(statement, 1, name, -1, nil)
+        sqlite3_bind_text(statement, 1, name, -1, SQLITE_TRANSIENT)
 
         guard sqlite3_step(statement) == SQLITE_ROW else {
             return nil
@@ -465,7 +472,7 @@ actor KnowledgeStorage {
             throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
         }
 
-        sqlite3_bind_text(statement, 1, domain, -1, nil)
+        sqlite3_bind_text(statement, 1, domain, -1, SQLITE_TRANSIENT)
 
         guard sqlite3_step(statement) == SQLITE_ROW else {
             return nil
@@ -479,9 +486,9 @@ actor KnowledgeStorage {
         let sql = "INSERT OR REPLACE INTO page_embeddings (page_id, vector) VALUES (?, ?)"
         let data = vector.withUnsafeBytes { Data($0) }
 
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, pageID, -1, nil)
-            sqlite3_bind_blob(statement, 2, (data as NSData).bytes, Int32(data.count), nil)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, pageID, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_blob(statement, 2, (data as NSData).bytes, Int32(data.count), SQLITE_TRANSIENT)
         })
     }
 
@@ -542,13 +549,18 @@ actor KnowledgeStorage {
         return try queryWebsites(sql: sql)
     }
 
-    func fetchWebsites(topicID: String) throws -> [Website] {
+    func fetchAllTopics() throws -> [Topic] {
         try initialize()
+        let sql = "SELECT * FROM topics ORDER BY name ASC"
+        return try queryTopics(sql: sql)
+    }
 
+    func fetchWebsites(for topicID: String) throws -> [Website] {
+        try initialize()
         let sql = "SELECT * FROM websites WHERE topic_id = ? ORDER BY last_visit DESC"
-        return try queryWebsites(sql: sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, topicID, -1, nil)
-        })
+        return try queryWebsites(sql: sql) { [self] statement in
+            sqlite3_bind_text(statement, 1, (topicID as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
+        }
     }
 
     private func updateWebsiteStats(websiteID: String) throws {
@@ -560,11 +572,11 @@ actor KnowledgeStorage {
         WHERE id = ?
         """
 
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, websiteID, -1, nil)
-            sqlite3_bind_text(statement, 2, websiteID, -1, nil)
-            sqlite3_bind_text(statement, 3, websiteID, -1, nil)
-            sqlite3_bind_text(statement, 4, websiteID, -1, nil)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, websiteID, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, websiteID, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, websiteID, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, websiteID, -1, SQLITE_TRANSIENT)
         })
     }
 
@@ -573,7 +585,7 @@ actor KnowledgeStorage {
 
         let sql = "DELETE FROM websites WHERE id = ?"
         try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, websiteID, -1, nil)
+            sqlite3_bind_text(statement, 1, websiteID, -1, self.SQLITE_TRANSIENT)
         })
 
     }
@@ -583,7 +595,7 @@ actor KnowledgeStorage {
 
         let sql = "SELECT * FROM pages WHERE website_id = ? ORDER BY timestamp DESC"
         return try queryPages(sql: sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, websiteID, -1, nil)
+            sqlite3_bind_text(statement, 1, websiteID, -1, self.SQLITE_TRANSIENT)
         })
     }
 
@@ -598,7 +610,7 @@ actor KnowledgeStorage {
             throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
         }
 
-        sqlite3_bind_text(statement, 1, pageID, -1, nil)
+        sqlite3_bind_text(statement, 1, pageID, -1, SQLITE_TRANSIENT)
 
         guard sqlite3_step(statement) == SQLITE_ROW else {
             return nil
@@ -619,7 +631,7 @@ actor KnowledgeStorage {
         """
 
         return try queryPages(sql: sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, query, -1, nil)
+            sqlite3_bind_text(statement, 1, query, -1, self.SQLITE_TRANSIENT)
             sqlite3_bind_int(statement, 2, Int32(limit))
         })
     }
@@ -631,7 +643,7 @@ actor KnowledgeStorage {
 
         let sql = "DELETE FROM pages WHERE id = ?"
         try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, pageID, -1, nil)
+            sqlite3_bind_text(statement, 1, pageID, -1, self.SQLITE_TRANSIENT)
         })
 
         try updateWebsiteStats(websiteID: page.websiteID)
@@ -647,10 +659,10 @@ actor KnowledgeStorage {
         VALUES (?, ?, ?, ?, ?)
         """
 
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, topic.id, -1, nil)
-            sqlite3_bind_text(statement, 2, topic.name, -1, nil)
-            sqlite3_bind_text(statement, 3, topic.color, -1, nil)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, topic.id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, topic.name, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, topic.color, -1, SQLITE_TRANSIENT)
             sqlite3_bind_int(statement, 4, Int32(topic.websiteCount))
             sqlite3_bind_int64(statement, 5, Int64(topic.createdAt.timeIntervalSince1970))
         })
@@ -658,24 +670,17 @@ actor KnowledgeStorage {
         return topic.id
     }
 
-    func fetchAllTopics() throws -> [Topic] {
-        try initialize()
-
-        let sql = "SELECT * FROM topics ORDER BY name"
-        return try queryTopics(sql: sql)
-    }
-
     func assignWebsiteToTopic(websiteID: String, topicID: String?) throws {
         try initialize()
 
         let sql = "UPDATE websites SET topic_id = ? WHERE id = ?"
-        try execute(sql, bindValues: { statement in
+        try execute(sql, bindValues: { [self] statement in
             if let topicID = topicID {
-                sqlite3_bind_text(statement, 1, topicID, -1, nil)
+                sqlite3_bind_text(statement, 1, topicID, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(statement, 1)
             }
-            sqlite3_bind_text(statement, 2, websiteID, -1, nil)
+            sqlite3_bind_text(statement, 2, websiteID, -1, SQLITE_TRANSIENT)
         })
 
         try updateTopicCounts()
@@ -695,24 +700,95 @@ actor KnowledgeStorage {
 
         let sql = "DELETE FROM topics WHERE id = ?"
         try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, topicID, -1, nil)
+            sqlite3_bind_text(statement, 1, topicID, -1, self.SQLITE_TRANSIENT)
         })
     }
 
     func deleteAllTopics() throws {
         try initialize()
-        try execute("DELETE FROM topics")
-        try execute("DELETE FROM websites")
         try execute("DELETE FROM pages")
+        try execute("DELETE FROM websites")
+        try execute("DELETE FROM topics")
+    }
+
+    func seedTestData() throws {
+        try initialize()
+        
+        try execute("BEGIN TRANSACTION")
+        do {
+            try deleteAllTopics()
+            
+            let topicID = try createTopic(name: "Technology", color: "#4A90E2")
+            
+            let apple = Website(
+                domain: "apple.com",
+                displayName: "Apple",
+                summary: "Official Apple website",
+                topicID: topicID
+            )
+            try createWebsite(website: apple)
+
+            let github = Website(
+                domain: "github.com",
+                displayName: "GitHub",
+                summary: "Where the world builds software",
+                topicID: topicID
+            )
+            try createWebsite(website: github)
+
+            let theverge = Website(
+                domain: "theverge.com",
+                displayName: "The Verge",
+                summary: "Tech news and reviews",
+                topicID: topicID
+            )
+            try createWebsite(website: theverge)
+
+            for w in [apple, github, theverge] {
+                let page = PageContent(
+                    websiteID: w.id,
+                    url: "https://\(w.domain)",
+                    title: w.displayName,
+                    content: "This is sample content for \(w.displayName). Generated for UI testing purposes.",
+                    summary: "Sample summary for \(w.displayName)."
+                )
+                try savePage(page)
+                try updateWebsiteStats(websiteID: w.id)
+            }
+            
+            try updateTopicCounts()
+            try execute("COMMIT")
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
+    func nukeDatabase() throws {
+        if let db = db {
+            let result = sqlite3_close_v2(db)
+            self.db = nil
+        }
+
+        let fileManager = FileManager.default
+        let appSupportDirectory = URL(fileURLWithPath: dbPath).deletingLastPathComponent()
+
+        if fileManager.fileExists(atPath: appSupportDirectory.path) {
+            let files = try fileManager.contentsOfDirectory(at: appSupportDirectory, includingPropertiesForKeys: nil)
+            for file in files {
+                try fileManager.removeItem(at: file)
+            }
+        }
+
+        try initialize()
     }
 
     func getStats() throws -> StorageStats {
         try initialize()
-
-        var totalWebsites = 0
         var totalPages = 0
         var totalWords = 0
         var totalTopics = 0
+        var totalWebsites = 0
         var oldestTimestamp: Int64?
         var newestTimestamp: Int64?
 
@@ -818,17 +894,34 @@ actor KnowledgeStorage {
     }
 
     private func execute(_ sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) throws {
-        var statement: OpaquePointer?
-        defer { sqlite3_finalize(statement) }
+        var currentSql = sql
 
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
-        }
+        while !currentSql.isEmpty {
+            var statement: OpaquePointer?
+            var tail: UnsafePointer<Int8>?
 
-        bindValues?(statement)
+            let result = sqlite3_prepare_v2(db, currentSql, -1, &statement, &tail)
+            guard result == SQLITE_OK else {
+                throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+            }
 
-        guard sqlite3_step(statement) == SQLITE_DONE else {
-            throw StorageError.failedToExecute(String(cString: sqlite3_errmsg(db)))
+            if let statement = statement {
+                defer { sqlite3_finalize(statement) }
+
+                bindValues?(statement)
+
+                let stepResult = sqlite3_step(statement)
+                guard stepResult == SQLITE_DONE || stepResult == SQLITE_ROW else {
+                    throw StorageError.failedToExecute(String(cString: sqlite3_errmsg(db)))
+                }
+            }
+
+            if let tail = tail {
+                let tailStr = String(cString: tail).trimmingCharacters(in: .whitespacesAndNewlines)
+                currentSql = tailStr
+            } else {
+                currentSql = ""
+            }
         }
     }
 

@@ -112,13 +112,6 @@ struct KnowledgePanelView: View {
     @Previewable @State var vm = KnowledgePanelViewModel()
     KnowledgePanelView(viewModel: vm)
         .task {
-            vm.menuViewModel.topics = [
-                Topic(name: "Technology", color: "#4A90E2", websiteCount: 12),
-                Topic(name: "Science", color: "#50E3C2", websiteCount: 5),
-                Topic(name: "Finance", color: "#F5A623", websiteCount: 8),
-                Topic(name: "Health", color: "#D0021B", websiteCount: 3),
-                Topic(name: "Art", color: "#9B59B6", websiteCount: 7),
-                Topic(name: "Nature", color: "#2ECC71", websiteCount: 4),
-            ]
+            vm.menuViewModel.topics = []
         }
 }

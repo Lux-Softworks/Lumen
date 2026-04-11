@@ -47,7 +47,7 @@ final class KnowledgeMenuViewModel {
         defer { isLoading = false }
         do {
             if let topic = topic {
-                websites = try await KnowledgeStorage.shared.fetchWebsites(topicID: topic.id)
+                websites = try await KnowledgeStorage.shared.fetchWebsites(for: topic.id)
             } else {
                 websites = try await KnowledgeStorage.shared.fetchAllWebsites()
             }
@@ -62,6 +62,7 @@ final class KnowledgeMenuViewModel {
         selectedPage = nil
         isLoading = true
         defer { isLoading = false }
+
         do {
             pages = try await KnowledgeStorage.shared.fetchPages(websiteID: website.id)
             navigationPath.append(.pages(website: website))
@@ -113,6 +114,22 @@ final class KnowledgeMenuViewModel {
             websites = []
             pages = []
             navigationPath = []
+        } catch {
+            self.error = error
+        }
+    }
+
+    func seedData() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await KnowledgeStorage.shared.nukeDatabase()
+
+            self.topics = []
+            self.websites = []
+
+            try await KnowledgeStorage.shared.seedTestData()
+            topics = try await KnowledgeStorage.shared.fetchAllTopics()
         } catch {
             self.error = error
         }

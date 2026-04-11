@@ -13,7 +13,6 @@ enum KnowledgeIntent {
 actor LocalKnowledgeProvider {
     static let shared = LocalKnowledgeProvider()
 
-    let predefinedTopics = ["Technology", "Science", "Politics", "Health", "Finance", "Business", "Sports", "Entertainment", "Education", "Environment", "Travel", "Food & Cooking", "Art & Design", "History", "Philosophy", "Psychology", "Engineering", "Space", "Medicine", "Other"]
 
     private var modelContainer: ModelContainer?
     private var loadingTask: Task<ModelContainer, Error>?
@@ -47,25 +46,6 @@ actor LocalKnowledgeProvider {
         loadingTask = nil
     }
 
-    /*
-    func route(_ input: String) async -> KnowledgeIntent {
-        let lower = input.lowercased()
-
-        if lower.starts(with: "click") || lower.starts(with: "tap") || lower.starts(with: "fill")
-            || lower.starts(with: "type")
-        {
-            return .action
-        }
-
-        if lower.contains("summarize") || lower.contains("read this")
-            || lower.contains("what is on this page")
-        {
-            return .context
-        }
-
-        return .knowledge
-    }
-    */
 
     func summarizeWithLLM(content: String, title: String?) async throws -> String {
         if modelContainer == nil {
@@ -150,15 +130,13 @@ actor LocalKnowledgeProvider {
         }
 
         let prompt = """
-        You are a topic classifier. Choose ONE topic from this list:
-        \(predefinedTopics.joined(separator: ", "))
-
-        If the article doesn't clearly fit any category, respond with "Other".
+        You are a topic classifier. Categorize the following article into a single, concise topic name (e.g., 'Finance', 'Technology', 'Sports', 'AI').
+        If the article doesn't clearly fit a common category, provide a custom one that is 1-2 words max.
 
         Title: \(title ?? "N/A")
         Content: \(content.prefix(2000))
 
-        Respond with ONLY the topic name from the list above.
+        Respond with ONLY the topic name.
         """
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
@@ -177,13 +155,7 @@ actor LocalKnowledgeProvider {
             return result.output
         }
 
-        let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if predefinedTopics.contains(cleanedOutput) {
-            return cleanedOutput
-        } else {
-            return "Other"
-        }
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func refineQueryAndFindKeywordWithLLM(query: String) async throws -> String {

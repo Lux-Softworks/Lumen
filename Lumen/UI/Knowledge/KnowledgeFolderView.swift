@@ -1,7 +1,5 @@
 import SwiftUI
 
-import SwiftUI
-
 struct FrontFolderShape: Shape {
     var tabWidth: CGFloat
     var tabHeight: CGFloat
@@ -75,8 +73,6 @@ struct BackFolderShape: Shape {
         return path
     }
 }
-
-import SwiftUI
 
 struct FolderItemButton: View {
     var topic: Topic
@@ -172,9 +168,35 @@ struct FolderItemButton: View {
     }
 }
 
+struct WebsitePageButton: View {
+    var website: Website
+    @Environment(\.colorScheme) var colorScheme
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+
+                // Subtle inner border
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+            }
+            .aspectRatio(3/4, contentMode: .fit)
+
+            Text(website.displayName)
+                .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
+                .foregroundColor(AppTheme.Colors.text)
+                .lineLimit(1)
+        }
+    }
+}
+
 @MainActor
 struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
+    @State private var animateItems = false
 
     var body: some View {
         ZStack {
@@ -182,7 +204,7 @@ struct KnowledgeFolderView: View {
                 .opacity(viewModel.currentLevel == .topics ? 1 : 0)
                 .animation(.easeInOut(duration: 0.25), value: viewModel.currentLevel == .topics)
 
-            detailViewPlaceholder
+            topicKnowledgeView
                 .opacity(viewModel.currentLevel == .topics ? 0 : 1)
                 .animation(.easeInOut(duration: 0.25), value: viewModel.currentLevel == .topics)
         }
@@ -196,32 +218,29 @@ struct KnowledgeFolderView: View {
                     Text("No Topics Found")
                         .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
                         .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+
+                    if seedKnowledge {
+                        Button {
+                            Task { await viewModel.seedData() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.square.fill.on.square.fill")
+                                Text("Seed Test Data")
+                            }
+                            .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.accent)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(AppTheme.Colors.accent.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 180)
             } else {
                 VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            Task { await viewModel.clearAllTopics() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "trash")
-                                Text("Clear All")
-                            }
-                            .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.4))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(AppTheme.Colors.uiElement.opacity(0.3))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 16)
-                    }
-
                     LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 24),
@@ -253,8 +272,68 @@ struct KnowledgeFolderView: View {
         }
     }
 
-    private var detailViewPlaceholder: some View {
-        EmptyView()
+    private var topicKnowledgeView: some View {
+        VStack(spacing: 0) {
+            // Header: Centered Title with Left Back Button (matches SettingsPage)
+            ZStack {
+                HStack {
+                    Button {
+                        viewModel.navigateBack()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.accent)
+                            .frame(width: 40, height: 40)
+                            .background(AppTheme.Colors.accent.opacity(0.1))
+                            .cornerRadius(20)
+                    }
+                    Spacer()
+                }
+
+                Text(viewModel.selectedTopic?.name ?? "")
+                    .font(AppTheme.Typography.serifDisplay(size: 20, weight: .bold))
+                    .foregroundColor(AppTheme.Colors.text)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+            .padding(.top, 16)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 20),
+                    GridItem(.flexible(), spacing: 20),
+                    GridItem(.flexible(), spacing: 20),
+                ], spacing: 24) {
+                    ForEach(Array(viewModel.websites.enumerated()), id: \.element.id) { index, website in
+                        Button {
+                            Task { await viewModel.selectWebsite(website) }
+                        } label: {
+                            WebsitePageButton(website: website)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(animateItems ? 1 : 0)
+                        .offset(y: animateItems ? 0 : 8)
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.05),
+                            value: animateItems
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+        }
+        .onChange(of: viewModel.currentLevel) { _, newValue in
+            if case .websites = newValue {
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    animateItems = true
+                }
+            } else {
+                animateItems = false
+            }
+        }
     }
 }
 
