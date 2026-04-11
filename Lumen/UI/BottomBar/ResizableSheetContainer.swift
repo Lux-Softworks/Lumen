@@ -72,7 +72,7 @@ struct ResizableSheetContainer<Content: View>: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16)
                     .frame(
-                        height: currentHeight(screenHeight: UIScreen.main.bounds.height),
+                        height: currentHeight(screenHeight: outerGeometry.size.height),
                         alignment: .top
                     )
                     .animation(.smooth(duration: 0.3), value: isExpanded)
@@ -86,15 +86,6 @@ struct ResizableSheetContainer<Content: View>: View {
                                         if colorScheme == .dark {
                                             ZStack {
                                                 Color.black.opacity(0.4)
-                                                LinearGradient(
-                                                    colors: [
-                                                        AppTheme.Colors.accent.opacity(0.06),
-                                                        Color.clear,
-                                                        AppTheme.Colors.secondaryAccent.opacity(0.03)
-                                                    ],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                )
                                             }
                                         } else {
                                             Color.gray.opacity(0.1)
@@ -103,13 +94,13 @@ struct ResizableSheetContainer<Content: View>: View {
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 )
                                 .cornerRadius(
-                                    animatedCornerRadius(screenHeight: UIScreen.main.bounds.height),
+                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
                                     corners: [.topLeft, .topRight]
                                 )
                                 .overlay(
                                     RoundedCorner(
                                         radius: animatedCornerRadius(
-                                            screenHeight: UIScreen.main.bounds.height),
+                                            screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
                                     .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
@@ -121,7 +112,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                 isLoading: isLoading,
                                 width: outerGeometry.size.width,
                                 cornerRadius: animatedCornerRadius(
-                                    screenHeight: UIScreen.main.bounds.height),
+                                    screenHeight: outerGeometry.size.height),
                             )
                         }
                     )
@@ -146,7 +137,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                                 state = rubberBanded
 
-                                let screenHeight = UIScreen.main.bounds.height
+                                let screenHeight = outerGeometry.size.height
                                 let currentHeight =
                                     isExpanded
                                     ? screenHeight * expandedHeightRatio : collapsedHeight

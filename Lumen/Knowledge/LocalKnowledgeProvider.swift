@@ -64,22 +64,17 @@ actor LocalKnowledgeProvider {
         """
 
         let parameters = GenerateParameters(maxTokens: 150, temperature: 0.1)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
 
-        let output = try await container.perform { context in
-            let promptTokens = context.tokenizer.encode(text: prompt)
+        let stream = try await container.generate(input: input, parameters: parameters)
 
-            let result = try await MLXLMCommon.generate(
-                promptTokens: promptTokens,
-                parameters: parameters,
-                model: context.model,
-                tokenizer: context.tokenizer,
-                didGenerate: { _ in .more }
-            )
-
-            await unloadModel()
-            return result.output
+        var output = ""
+        for await event in stream {
+            if case let .chunk(text) = event { output += text }
         }
 
+        unloadModel()
         return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
@@ -101,22 +96,17 @@ actor LocalKnowledgeProvider {
         """
 
         let parameters = GenerateParameters(maxTokens: 40, temperature: 0.1)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
 
-        let output = try await container.perform { context in
-            let promptTokens = context.tokenizer.encode(text: prompt)
+        let stream = try await container.generate(input: input, parameters: parameters)
 
-            let result = try await MLXLMCommon.generate(
-                promptTokens: promptTokens,
-                parameters: parameters,
-                model: context.model,
-                tokenizer: context.tokenizer,
-                didGenerate: { _ in .more }
-            )
-
-            await unloadModel()
-            return result.output
+        var output = ""
+        for await event in stream {
+            if case let .chunk(text) = event { output += text }
         }
 
+        unloadModel()
         return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
@@ -140,21 +130,17 @@ actor LocalKnowledgeProvider {
         """
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
 
-        let output = try await container.perform { context in
-            let promptTokens = context.tokenizer.encode(text: prompt)
-            let result = try await MLXLMCommon.generate(
-                promptTokens: promptTokens,
-                parameters: parameters,
-                model: context.model,
-                tokenizer: context.tokenizer,
-                didGenerate: { _ in .more }
-            )
+        let stream = try await container.generate(input: input, parameters: parameters)
 
-            await unloadModel()
-            return result.output
+        var output = ""
+        for await event in stream {
+            if case let .chunk(text) = event { output += text }
         }
 
+        unloadModel()
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -176,23 +162,17 @@ actor LocalKnowledgeProvider {
         """
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
 
-        let output = try await container.perform { context in
-            let promptTokens = context.tokenizer.encode(text: prompt)
-            let result = try await MLXLMCommon.generate(
-                promptTokens: promptTokens,
-                parameters: parameters,
-                model: context.model,
-                tokenizer: context.tokenizer,
-                didGenerate: { _ in .more }
-            )
+        let stream = try await container.generate(input: input, parameters: parameters)
 
-            await unloadModel()
-            return result.output
+        var output = ""
+        for await event in stream {
+            if case let .chunk(text) = event { output += text }
         }
 
-        let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return cleanedOutput
+        unloadModel()
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -92,7 +92,7 @@ struct FolderItemButton: View {
     }
 
     private var rearFlapColor: Color {
-        Color(UIColor.fromAnyString("#252525") ?? .gray)
+        Color((colorScheme == .dark ?UIColor.fromAnyString("#252525") : UIColor.fromAnyString("#f5f5f5"))!)
     }
 
     var body: some View {
@@ -119,8 +119,8 @@ struct FolderItemButton: View {
                     filletRadius: filletRadius
                 )
                 .fill(topicColor)
-                .blur(radius: 18)
-                .opacity(0.25)
+                .blur(radius: 12)
+                .opacity(0.15)
                 .blendMode(colorScheme == .dark ? .plusLighter : .normal)
 
                 BlurView(style: .systemThinMaterial)

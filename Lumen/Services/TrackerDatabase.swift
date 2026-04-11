@@ -10,7 +10,7 @@ actor TrackerDatabase {
 
     private init() {
         Task {
-            await loadBundledDatabase()
+            await self.loadBundledDatabase()
         }
     }
 
@@ -46,7 +46,7 @@ actor TrackerDatabase {
         domainCount = 0
 
         Task {
-            await loadBundledDatabase()
+            self.loadBundledDatabase()
         }
     }
 

@@ -295,10 +295,9 @@ enum BrowserEngine {
         webView.retainedDelegate = interceptor
 
         Task.detached(priority: .utility) {
-            let entries = TrackerDatabase.shared.allEntries()
-            detector.loadTrackerDatabase(entries)
-
+            let entries = await TrackerDatabase.shared.allEntries()
             await MainActor.run {
+                detector.loadTrackerDatabase(entries)
                 webView.navigationDelegate = interceptor
                 webView.retainedDelegate = interceptor
             }

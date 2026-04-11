@@ -2,7 +2,7 @@ import SQLite3
 import Foundation
 import Accelerate
 
-struct Website: Identifiable, Codable, Equatable, Hashable {
+struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let domain: String
     var displayName: String
@@ -40,7 +40,7 @@ struct Website: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
-struct Topic: Identifiable, Codable, Equatable, Hashable {
+struct Topic: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let name: String
     let color: String?
@@ -62,7 +62,7 @@ struct Topic: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
-struct PageContent: Identifiable, Codable, Equatable, Hashable {
+struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let websiteID: String
     let url: String
@@ -110,7 +110,7 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable {
         self.createdAt = createdAt
     }
 
-    static func normalizeURL(_ url: String) -> String {
+    nonisolated static func normalizeURL(_ url: String) -> String {
         var normalized = url.lowercased()
         normalized = normalized.replacingOccurrences(of: "https://", with: "")
         normalized = normalized.replacingOccurrences(of: "http://", with: "")
@@ -119,18 +119,18 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable {
         return normalized
     }
 
-    static func extractDomain(from url: String) -> String {
+    nonisolated static func extractDomain(from url: String) -> String {
         guard let host = URL(string: url)?.host else { return "" }
         return host.replacingOccurrences(of: "www.", with: "")
     }
 
-    static func countWords(in text: String) -> Int {
+    nonisolated static func countWords(in text: String) -> Int {
         return text.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }.count
     }
 }
 
-struct StorageStats {
+struct StorageStats: Sendable {
     let totalWebsites: Int
     let totalPages: Int
     let totalWords: Int
@@ -147,8 +147,8 @@ extension String {
     static func pageID() -> String { return "page_\(UUID().uuidString)" }
 }
 
-enum VectorMath {
-    static func cosineSimilarity(_ a: [Double], _ b: [Double]) -> Double {
+enum VectorMath: Sendable {
+    nonisolated static func cosineSimilarity(_ a: [Double], _ b: [Double]) -> Double {
         guard a.count == b.count, !a.isEmpty else { return 0 }
         var dotProduct: Double = 0
         vDSP_dotprD(a, 1, b, 1, &dotProduct, vDSP_Length(a.count))
@@ -313,15 +313,15 @@ actor KnowledgeStorage {
 
         let domain = PageContent.extractDomain(from: url)
         let websiteID: String
-        if let existingWebsite = try fetchWebsite(domain: domain) {
+        if let existingWebsite = try await fetchWebsite(domain: domain) {
             websiteID = existingWebsite.id
         } else {
-            let newWebsite = Website(domain: domain, displayName: domain)
+            let newWebsite = await Website(domain: domain, displayName: domain)
             try createWebsite(website: newWebsite)
             websiteID = newWebsite.id
         }
 
-        let page = PageContent(
+        let page = await PageContent(
             websiteID: websiteID,
             url: url,
             title: title,
@@ -441,7 +441,7 @@ actor KnowledgeStorage {
         })
     }
 
-    func fetchTopic(name: String) throws -> Topic? {
+    func fetchTopic(name: String) async throws -> Topic? {
         try initialize()
 
         let sql = "SELECT * FROM topics WHERE name = ?"
@@ -458,10 +458,10 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try parseTopic(from: statement)
+        return try await parseTopic(from: statement)
     }
 
-    func fetchWebsite(domain: String) throws -> Website? {
+    func fetchWebsite(domain: String) async throws -> Website? {
         try initialize()
 
         let sql = "SELECT * FROM websites WHERE domain = ?"
@@ -478,7 +478,7 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try parseWebsite(from: statement)
+        return try await parseWebsite(from: statement)
     }
 
     func saveEmbedding(pageID: String, vector: [Double]) throws {
@@ -534,7 +534,7 @@ actor KnowledgeStorage {
 
         var pages: [PageContent] = []
         for result in topResults {
-            if let page = try fetchPage(pageID: result.pageID) {
+            if let page = try await fetchPage(pageID: result.pageID) {
                 pages.append(page)
             }
         }
@@ -542,23 +542,23 @@ actor KnowledgeStorage {
         return pages
     }
 
-    func fetchAllWebsites() throws -> [Website] {
+    func fetchAllWebsites() async throws -> [Website] {
         try initialize()
 
         let sql = "SELECT * FROM websites ORDER BY last_visit DESC"
-        return try queryWebsites(sql: sql)
+        return try await queryWebsites(sql: sql)
     }
 
-    func fetchAllTopics() throws -> [Topic] {
+    func fetchAllTopics() async throws -> [Topic] {
         try initialize()
         let sql = "SELECT * FROM topics ORDER BY name ASC"
-        return try queryTopics(sql: sql)
+        return try await queryTopics(sql: sql)
     }
 
-    func fetchWebsites(for topicID: String) throws -> [Website] {
+    func fetchWebsites(for topicID: String) async throws -> [Website] {
         try initialize()
         let sql = "SELECT * FROM websites WHERE topic_id = ? ORDER BY last_visit DESC"
-        return try queryWebsites(sql: sql) { [self] statement in
+        return try await queryWebsites(sql: sql) { [self] statement in
             sqlite3_bind_text(statement, 1, (topicID as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
         }
     }
@@ -590,16 +590,16 @@ actor KnowledgeStorage {
 
     }
 
-    func fetchPages(websiteID: String) throws -> [PageContent] {
+    func fetchPages(websiteID: String) async throws -> [PageContent] {
         try initialize()
 
         let sql = "SELECT * FROM pages WHERE website_id = ? ORDER BY timestamp DESC"
-        return try queryPages(sql: sql, bindValues: { statement in
+        return try await queryPages(sql: sql, bindValues: { statement in
             sqlite3_bind_text(statement, 1, websiteID, -1, self.SQLITE_TRANSIENT)
         })
     }
 
-    func fetchPage(pageID: String) throws -> PageContent? {
+    func fetchPage(pageID: String) async throws -> PageContent? {
         try initialize()
 
         let sql = "SELECT * FROM pages WHERE id = ?"
@@ -616,10 +616,10 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try parsePage(from: statement)
+        return try await parsePage(from: statement)
     }
 
-    func searchPages(query: String, limit: Int = 50) throws -> [PageContent] {
+    func searchPages(query: String, limit: Int = 50) async throws -> [PageContent] {
         try initialize()
 
         let sql = """
@@ -630,16 +630,16 @@ actor KnowledgeStorage {
         LIMIT ?
         """
 
-        return try queryPages(sql: sql, bindValues: { statement in
+        return try await queryPages(sql: sql, bindValues: { statement in
             sqlite3_bind_text(statement, 1, query, -1, self.SQLITE_TRANSIENT)
             sqlite3_bind_int(statement, 2, Int32(limit))
         })
     }
 
-    func deletePage(pageID: String) throws {
+    func deletePage(pageID: String) async throws {
         try initialize()
 
-        guard let page = try fetchPage(pageID: pageID) else { return }
+        guard let page = try await fetchPage(pageID: pageID) else { return }
 
         let sql = "DELETE FROM pages WHERE id = ?"
         try execute(sql, bindValues: { statement in
@@ -649,10 +649,10 @@ actor KnowledgeStorage {
         try updateWebsiteStats(websiteID: page.websiteID)
     }
 
-    func createTopic(name: String, color: String? = nil) throws -> String {
+    func createTopic(name: String, color: String? = nil) async throws -> String {
         try initialize()
 
-        let topic = Topic(name: name, color: color)
+        let topic = await Topic(name: name, color: color)
 
         let sql = """
         INSERT INTO topics (id, name, color, website_count, created_at)
@@ -711,16 +711,16 @@ actor KnowledgeStorage {
         try execute("DELETE FROM topics")
     }
 
-    func seedTestData() throws {
+    func seedTestData() async throws {
         try initialize()
         
         try execute("BEGIN TRANSACTION")
         do {
             try deleteAllTopics()
             
-            let topicID = try createTopic(name: "Technology", color: "#4A90E2")
+            let topicID = try await createTopic(name: "Technology", color: "#4A90E2")
             
-            let apple = Website(
+            let apple = await Website(
                 domain: "apple.com",
                 displayName: "Apple",
                 summary: "Official Apple website",
@@ -728,7 +728,7 @@ actor KnowledgeStorage {
             )
             try createWebsite(website: apple)
 
-            let github = Website(
+            let github = await Website(
                 domain: "github.com",
                 displayName: "GitHub",
                 summary: "Where the world builds software",
@@ -736,7 +736,7 @@ actor KnowledgeStorage {
             )
             try createWebsite(website: github)
 
-            let theverge = Website(
+            let theverge = await Website(
                 domain: "theverge.com",
                 displayName: "The Verge",
                 summary: "Tech news and reviews",
@@ -745,7 +745,7 @@ actor KnowledgeStorage {
             try createWebsite(website: theverge)
 
             for w in [apple, github, theverge] {
-                let page = PageContent(
+                let page = await PageContent(
                     websiteID: w.id,
                     url: "https://\(w.domain)",
                     title: w.displayName,
@@ -766,7 +766,7 @@ actor KnowledgeStorage {
 
     func nukeDatabase() throws {
         if let db = db {
-            let result = sqlite3_close_v2(db)
+            let _ = sqlite3_close_v2(db)
             self.db = nil
         }
 
@@ -783,7 +783,7 @@ actor KnowledgeStorage {
         try initialize()
     }
 
-    func getStats() throws -> StorageStats {
+    func getStats() async throws -> StorageStats {
         try initialize()
         var totalPages = 0
         var totalWords = 0
@@ -823,7 +823,7 @@ actor KnowledgeStorage {
             }
         }
 
-        let topWebsites = try fetchAllWebsites().prefix(10).map { ($0.domain, $0.pageCount) }
+        let topWebsites = try await fetchAllWebsites().prefix(10).map { ($0.domain, $0.pageCount) }
 
         let fileSize = try? FileManager.default.attributesOfItem(atPath: dbPath)[.size] as? Int ?? 0
 
@@ -839,7 +839,7 @@ actor KnowledgeStorage {
         )
     }
 
-    private func queryPages(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) throws -> [PageContent] {
+    private func queryPages(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) async throws -> [PageContent] {
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
@@ -851,13 +851,13 @@ actor KnowledgeStorage {
 
         var results: [PageContent] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            results.append(try parsePage(from: statement))
+            await results.append(try parsePage(from: statement))
         }
 
         return results
     }
 
-    private func queryWebsites(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) throws -> [Website] {
+    private func queryWebsites(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) async throws -> [Website] {
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
@@ -869,13 +869,13 @@ actor KnowledgeStorage {
 
         var results: [Website] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            results.append(try parseWebsite(from: statement))
+            await results.append(try parseWebsite(from: statement))
         }
 
         return results
     }
 
-    private func queryTopics(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) throws -> [Topic] {
+    private func queryTopics(sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) async throws -> [Topic] {
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
@@ -887,7 +887,7 @@ actor KnowledgeStorage {
 
         var results: [Topic] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            results.append(try parseTopic(from: statement))
+            await results.append(try parseTopic(from: statement))
         }
 
         return results
@@ -925,7 +925,7 @@ actor KnowledgeStorage {
         }
     }
 
-    private func parsePage(from statement: OpaquePointer?) throws -> PageContent {
+    private func parsePage(from statement: OpaquePointer?) async throws -> PageContent {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let websiteID = String(cString: sqlite3_column_text(statement, 1))
         let url = String(cString: sqlite3_column_text(statement, 2))
@@ -952,10 +952,10 @@ actor KnowledgeStorage {
         let scrollDepth = sqlite3_column_type(statement, 12) != SQLITE_NULL
             ? sqlite3_column_double(statement, 12) : nil
 
-        let wordCount = Int(sqlite3_column_int(statement, 13))
+        let _ = Int(sqlite3_column_int(statement, 13))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 14)))
 
-        return PageContent(
+        return await PageContent(
             id: id,
             websiteID: websiteID,
             url: url,
@@ -971,7 +971,7 @@ actor KnowledgeStorage {
         )
     }
 
-    private func parseWebsite(from statement: OpaquePointer?) throws -> Website {
+    private func parseWebsite(from statement: OpaquePointer?) async throws -> Website {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let domain = String(cString: sqlite3_column_text(statement, 1))
         let displayName = String(cString: sqlite3_column_text(statement, 2))
@@ -991,7 +991,7 @@ actor KnowledgeStorage {
         let lastVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 9)))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 10)))
 
-        return Website(
+        return await Website(
             id: id,
             domain: domain,
             displayName: displayName,
@@ -1006,7 +1006,7 @@ actor KnowledgeStorage {
         )
     }
 
-    private func parseTopic(from statement: OpaquePointer?) throws -> Topic {
+    private func parseTopic(from statement: OpaquePointer?) async throws -> Topic {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let name = String(cString: sqlite3_column_text(statement, 1))
 
@@ -1016,7 +1016,7 @@ actor KnowledgeStorage {
         let websiteCount = Int(sqlite3_column_int(statement, 3))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 4)))
 
-        return Topic(
+        return await Topic(
             id: id,
             name: name,
             color: color,
@@ -1051,3 +1051,4 @@ enum StorageError: Error, LocalizedError {
         }
     }
 }
+

@@ -244,13 +244,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
                         
-                        webView.evaluateJavaScript("""
+                        _ = try? await webView.evaluateJavaScript("""
                             requestAnimationFrame(() => {
                                 requestAnimationFrame(() => {
                                     window.webkit.messageHandlers.firstPaint.postMessage({});
                                 });
                             });
-                        """, completionHandler: nil)
+                        """)
 
                         if let url = webView.url?.absoluteString,
                             let title = webView.title, !title.isEmpty
