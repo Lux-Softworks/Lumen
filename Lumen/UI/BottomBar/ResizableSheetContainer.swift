@@ -84,7 +84,18 @@ struct ResizableSheetContainer<Content: View>: View {
                                 .overlay(
                                     Group {
                                         if colorScheme == .dark {
-                                            Color.black.opacity(0.35)
+                                            ZStack {
+                                                Color.black.opacity(0.4)
+                                                LinearGradient(
+                                                    colors: [
+                                                        AppTheme.Colors.accent.opacity(0.06),
+                                                        Color.clear,
+                                                        AppTheme.Colors.secondaryAccent.opacity(0.03)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            }
                                         } else {
                                             Color.gray.opacity(0.1)
                                         }

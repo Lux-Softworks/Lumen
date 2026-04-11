@@ -50,6 +50,14 @@ struct KnowledgePanelView: View {
             GeometryReader { geo in
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(AppTheme.Colors.uiElement)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(AppTheme.Colors.accent.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppTheme.Colors.accent.opacity(0.1), lineWidth: 0.5)
+                    )
                     .frame(width: geo.size.width / 2, height: geo.size.height)
                     .offset(x: viewModel.activeTab == .ai ? 0 : geo.size.width / 2)
                     .animation(.smooth(duration: 0.3), value: viewModel.activeTab)

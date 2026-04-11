@@ -88,11 +88,11 @@ struct FolderItemButton: View {
         if let colorStr = topic.color, let uiColor = UIColor.fromAnyString(colorStr) {
             return Color(uiColor)
         }
-        return .gray
+        return AppTheme.Colors.accent
     }
 
     private var rearFlapColor: Color {
-        Color(UIColor.fromAnyString("#2C2D30") ?? .gray)
+        Color(UIColor.fromAnyString("#252525") ?? .gray)
     }
 
     var body: some View {
@@ -136,8 +136,8 @@ struct FolderItemButton: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            topicColor.opacity(0.95),
-                            topicColor.opacity(0.4)
+                            AppTheme.Colors.secondaryAccent.opacity(0.95),
+                            AppTheme.Colors.accent.opacity(0.85)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -151,9 +151,9 @@ struct FolderItemButton: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.95),
-                            topicColor.opacity(0.5),
-                            Color.white.opacity(0.2)
+                            Color.white.opacity(0.6),
+                            AppTheme.Colors.accent.opacity(0.4),
+                            Color.white.opacity(0.15)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -179,7 +179,6 @@ struct WebsitePageButton: View {
                     .fill(Color.white)
                     .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
 
-                // Subtle inner border
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
             }
@@ -212,61 +211,63 @@ struct KnowledgeFolderView: View {
     }
 
     private var topicSelectionGrid: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            if viewModel.topics.isEmpty {
-                VStack(spacing: 16) {
-                    Text("No Topics Found")
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+        ZStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                if viewModel.topics.isEmpty {
+                    VStack(spacing: 16) {
+                        Text("No Topics Found")
+                            .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.35))
 
-                    if seedKnowledge {
-                        Button {
-                            Task { await viewModel.seedData() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus.square.fill.on.square.fill")
-                                Text("Seed Test Data")
+                        if seedKnowledge {
+                            Button {
+                                Task { await viewModel.seedData() }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "plus.square.fill.on.square.fill")
+                                    Text("Seed Test Data")
+                                }
+                                .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.accent)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(AppTheme.Colors.accent.opacity(0.1))
+                                .clipShape(Capsule())
                             }
-                            .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.accent)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(AppTheme.Colors.accent.opacity(0.1))
-                            .clipShape(Capsule())
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 180)
-            } else {
-                VStack(spacing: 0) {
-                    LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 24),
-                        GridItem(.flexible(), spacing: 24),
-                        GridItem(.flexible(), spacing: 24),
-                    ],
-                    spacing: 32
-                ) {
-                    ForEach(viewModel.topics) { topic in
-                        Button {
-                            Task { await viewModel.selectTopic(topic) }
-                        } label: {
-                            VStack(alignment: .center) {
-                                FolderItemButton(topic: topic)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 180)
+                } else {
+                    VStack(spacing: 0) {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 24),
+                                GridItem(.flexible(), spacing: 24),
+                                GridItem(.flexible(), spacing: 24),
+                            ],
+                            spacing: 32
+                        ) {
+                            ForEach(viewModel.topics) { topic in
+                                Button {
+                                    Task { await viewModel.selectTopic(topic) }
+                                } label: {
+                                    VStack(alignment: .center) {
+                                        FolderItemButton(topic: topic)
 
-                                Text(topic.name)
-                                    .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
-                                    .foregroundColor(AppTheme.Colors.text)
-                                    .lineLimit(1)
+                                        Text(topic.name)
+                                            .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
+                                            .foregroundColor(AppTheme.Colors.text)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 32)
                     }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 32)
                 }
             }
         }
@@ -274,7 +275,6 @@ struct KnowledgeFolderView: View {
 
     private var topicKnowledgeView: some View {
         VStack(spacing: 0) {
-            // Header: Centered Title with Left Back Button (matches SettingsPage)
             ZStack {
                 HStack {
                     Button {

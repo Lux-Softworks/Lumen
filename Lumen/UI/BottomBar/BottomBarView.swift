@@ -459,6 +459,7 @@ struct BottomBarView: View {
         ZStack {
             AppTheme.Colors.uiElement
             AppTheme.Colors.background.opacity(0.1)
+            AppTheme.Colors.accent.opacity(0.04)
         }
     }
 
