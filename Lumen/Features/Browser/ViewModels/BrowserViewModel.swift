@@ -243,7 +243,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
                     if !webView.isLoading {
                         self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
-                        
+
                         _ = try? await webView.evaluateJavaScript("""
                             requestAnimationFrame(() => {
                                 requestAnimationFrame(() => {
@@ -351,26 +351,21 @@ final class BrowserViewModel: NSObject, ObservableObject {
         }
     }
 
-    private var lastContentOffset: CGFloat = 0
-    var onScrollUpdate: ((CGFloat, CGFloat) -> Void)?
     @Published var themeColor: UIColor? = nil
+
+    private var isBouncing: Bool = false
+    var onScrollUpdate: ((CGFloat, CGFloat, CGFloat, CGFloat) -> Void)?
 
     private func startScrollObservation(_ webView: WKWebView) {
         observations.append(
-            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self] _, change in
+            webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self, weak webView] _, change in
                 guard let self = self,
                       let newY = change.newValue?.y,
                       let oldY = change.oldValue?.y else { return }
-                let delta = newY - oldY
-                
-                Task { @MainActor in
-                    self.lastContentOffset = newY
-                }
-                
-                if abs(delta) > 0.5 {
-                    MainActor.assumeIsolated {
-                        self.onScrollUpdate?(newY, delta)
-                    }
+
+                MainActor.assumeIsolated {
+                    let delta = newY - oldY
+                    self.onScrollUpdate?(newY, delta, webView?.scrollView.contentSize.height ?? 0, webView?.scrollView.bounds.height ?? 0)
                 }
             }
         )

@@ -2,7 +2,7 @@ import Foundation
 import WebKit
 
 struct BrowserInsetScript {
-    static func atDocumentStart(safeTop: Int, safeBottom: Int) -> String {
+    static func atDocumentStart(safeTop: Int = 0, safeBottom: Int) -> String {
         return """
             (function() {
                 var style = document.getElementById('lumen-safe-area-bridge');
@@ -12,34 +12,40 @@ struct BrowserInsetScript {
                     document.documentElement.appendChild(style);
                 }
 
-                var css = `
+                style.textContent = `
                     :root {
-                        --lumen-safe-top: \(safeTop)px;
                         --lumen-safe-bottom: \(safeBottom)px;
-                    }
-
-                    [data-lumen-sticky-top] {
-                        transform: translateY(var(--lumen-safe-top)) !important;
+                        --lumen-top-bounce: 0px;
                     }
 
                     [data-lumen-sticky-bottom] {
-                        transform: translateY(calc(-1 * var(--lumen-safe-bottom))) !important;
+                        bottom: var(--lumen-safe-bottom) !important;
+                    }
+
+                    [data-lumen-fixed] {
+                        translate: 0 var(--lumen-top-bounce) !important;
                     }
                 `;
-                style.textContent = css;
 
-                var meta = document.querySelector('meta[name="viewport"]');
-                if (meta) {
-                    var content = meta.getAttribute('content');
-                    if (!content.includes('viewport-fit=cover')) {
-                        meta.setAttribute('content', content + ', viewport-fit=cover');
+                var _lumenScheduled = false;
+                var _lumenLastBounce = 0;
+                function _lumenFlushBounce() {
+                    _lumenScheduled = false;
+                    var y = window.scrollY;
+                    var bounce = y < 0 ? -y : 0;
+                    if (bounce !== _lumenLastBounce) {
+                        _lumenLastBounce = bounce;
+                        document.documentElement.style.setProperty(
+                            '--lumen-top-bounce', bounce === 0 ? '0px' : bounce + 'px'
+                        );
                     }
-                } else {
-                    meta = document.createElement('meta');
-                    meta.name = 'viewport';
-                    meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
-                    document.head.appendChild(meta);
                 }
+                window.addEventListener('scroll', function() {
+                    if (!_lumenScheduled) {
+                        _lumenScheduled = true;
+                        requestAnimationFrame(_lumenFlushBounce);
+                    }
+                }, { passive: true });
             })();
             """
     }
@@ -51,32 +57,23 @@ struct BrowserInsetScript {
                     var all = document.querySelectorAll('*');
                     for (var i = 0; i < all.length; i++) {
                         var el = all[i];
+                        var pos = window.getComputedStyle(el).position;
+                        if (pos !== 'fixed' && pos !== 'sticky') continue;
 
-                        var s = window.getComputedStyle(el);
-                        var pos = s.position;
+                        var rect = el.getBoundingClientRect();
 
-                        if (pos === 'fixed' || pos === 'sticky') {
-                            var rect = el.getBoundingClientRect();
+                        el.setAttribute('data-lumen-fixed', 'true');
 
-                            if (rect.top < window.innerHeight / 3) {
-                                if (!el.hasAttribute('data-lumen-sticky-top')) {
-                                    el.setAttribute('data-lumen-sticky-top', 'true');
-                                }
-                            } else if (rect.bottom > (window.innerHeight * 2/3)) {
-                                if (!el.hasAttribute('data-lumen-sticky-bottom')) {
-                                    el.setAttribute('data-lumen-sticky-bottom', 'true');
-                                }
-                            }
+                        if (!el.hasAttribute('data-lumen-sticky-bottom') &&
+                            rect.bottom > window.innerHeight * 2 / 3) {
+                            el.setAttribute('data-lumen-sticky-bottom', 'true');
                         }
                     }
                 }
 
                 tagElements();
 
-                var observer = new MutationObserver(function(mutations) {
-                    tagElements();
-                });
-
+                var observer = new MutationObserver(function() { tagElements(); });
                 observer.observe(document.documentElement, {
                     childList: true,
                     subtree: true,
@@ -84,27 +81,16 @@ struct BrowserInsetScript {
                     attributeFilter: ['style', 'class']
                 });
 
-                // Backup intervals for very dynamic sites
                 setTimeout(tagElements, 500);
                 setTimeout(tagElements, 1500);
             })();
             """
     }
 
-    static func update(safeTop: Int, safeBottom: Int) -> String {
+    static func update(safeTop: Int = 0, safeBottom: Int) -> String {
         return """
             (function() {
-                var root = document.documentElement;
-                root.style.setProperty('--lumen-safe-top', '\(safeTop)px');
-                root.style.setProperty('--lumen-safe-bottom', '\(safeBottom)px');
-
-                var bridge = document.getElementById('lumen-safe-area-bridge');
-                if (bridge) {
-                    var css = bridge.textContent;
-                    css = css.replace(/--lumen-safe-top: [^;]+;/, '--lumen-safe-top: \(safeTop)px;');
-                    css = css.replace(/--lumen-safe-bottom: [^;]+;/, '--lumen-safe-bottom: \(safeBottom)px;');
-                    bridge.textContent = css;
-                }
+                document.documentElement.style.setProperty('--lumen-safe-bottom', '\(safeBottom)px');
             })();
             """
     }

@@ -287,8 +287,7 @@ struct BrowserView: View {
             bottomInset: (bottomBarState == .search || bottomBarState == .browserSettings
                 || bottomBarState == .siteSettings || bottomBarState == .knowledge)
                 ? 0 : (bottomBarState == .hidden ? 20 : 80),
-            topBarOffset: topBarOffset,
-            statusBarInset: topBarOffset == 0 ? getStatusBarHeight(geometry) : 0
+            safeAreaTop: getStatusBarHeight(geometry)
         )
         .id(tab.id)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -297,11 +296,56 @@ struct BrowserView: View {
         .allowsHitTesting(activeTabViewState == .fullScreen && webViewReady)
         .disabled(activeTabViewState != .fullScreen || !webViewReady)
         .onAppear {
-            topBarOffset = getStatusBarHeight(geometry)
-            tab.viewModel.onScrollUpdate = nil
+            let statusBarHeight = getStatusBarHeight(geometry)
+            topBarOffset = statusBarHeight
             scrollDownAccumulator = 0
-            tab.viewModel.onScrollUpdate = { offset, delta in
-                updateScrollState(offset: offset, delta: delta, statusBarHeight: getStatusBarHeight(geometry))
+            tab.viewModel.onScrollUpdate = { offset, delta, contentHeight, frameHeight in
+                guard bottomBarState == .collapsed || bottomBarState == .hidden else { return }
+
+                let maxScroll = contentHeight - frameHeight
+                let statusBarHeight = getStatusBarHeight(geometry)
+
+                if offset < 100 {
+                    scrollDownAccumulator = 0
+                    if topBarOffset != statusBarHeight || bottomBarState == .hidden {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            topBarOffset = statusBarHeight
+                            bottomBarState = .collapsed
+                        }
+                    }
+                    if offset <= 0 { return }
+                }
+
+                if contentHeight > 0 && offset >= maxScroll - 5 {
+                    scrollDownAccumulator = 0
+                    return
+                }
+
+                if delta > 3 && offset > 30 && topBarOffset != 0 {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        topBarOffset = 0
+                    }
+                } else if delta < -5 && topBarOffset == 0 {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        topBarOffset = statusBarHeight
+                    }
+                }
+
+                if delta > 3 {
+                    scrollDownAccumulator = min(scrollDownAccumulator + delta, 300)
+                    if scrollDownAccumulator > 120 && bottomBarState == .collapsed {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            bottomBarState = .hidden
+                        }
+                    }
+                } else if delta < -10 {
+                    scrollDownAccumulator = 0
+                    if bottomBarState == .hidden {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            bottomBarState = .collapsed
+                        }
+                    }
+                }
             }
         }
         .onDisappear {
@@ -309,6 +353,10 @@ struct BrowserView: View {
         }
         .onChange(of: tab.viewModel.pageReadyToken) { _, _ in
             scrollDownAccumulator = 0
+            withAnimation(.easeOut(duration: 0.15)) {
+                topBarOffset = getStatusBarHeight(geometry)
+                bottomBarState = .collapsed
+            }
         }
     }
 
@@ -646,38 +694,6 @@ struct BrowserView: View {
         }
     }
 
-    private func updateScrollState(offset: CGFloat, delta: CGFloat, statusBarHeight: CGFloat) {
-        guard bottomBarState == .collapsed || bottomBarState == .hidden else { return }
-
-        if offset < 80 {
-            scrollDownAccumulator = 0
-            if bottomBarState == .hidden {
-                withAnimation(.smooth(duration: 0.2)) {
-                    bottomBarState = .collapsed
-                    topBarOffset = statusBarHeight
-                }
-            }
-            return
-        }
-
-        if delta > 1 {
-            scrollDownAccumulator = min(scrollDownAccumulator + delta, 200)
-            if scrollDownAccumulator > 50 && bottomBarState == .collapsed {
-                withAnimation(.smooth(duration: 0.2)) {
-                    bottomBarState = .hidden
-                    topBarOffset = 0
-                }
-            }
-        } else if delta < -2 {
-            scrollDownAccumulator = 0
-            if bottomBarState == .hidden {
-                withAnimation(.smooth(duration: 0.2)) {
-                    bottomBarState = .collapsed
-                    topBarOffset = statusBarHeight
-                }
-            }
-        }
-    }
 }
 
 private struct NavigationCoverChangeHandlers: ViewModifier {
