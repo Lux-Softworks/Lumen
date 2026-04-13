@@ -15,37 +15,17 @@ struct BrowserInsetScript {
                 style.textContent = `
                     :root {
                         --lumen-safe-bottom: \(safeBottom)px;
-                        --lumen-top-bounce: 0px;
                     }
 
                     [data-lumen-sticky-bottom] {
                         bottom: var(--lumen-safe-bottom) !important;
                     }
 
-                    [data-lumen-fixed] {
-                        translate: 0 var(--lumen-top-bounce) !important;
+                    [data-lumen-fixed]:not([data-lumen-sticky-bottom]) {
+                        position: sticky !important;
+                        top: 0px !important;
                     }
                 `;
-
-                var _lumenScheduled = false;
-                var _lumenLastBounce = 0;
-                function _lumenFlushBounce() {
-                    _lumenScheduled = false;
-                    var y = window.scrollY;
-                    var bounce = y < 0 ? -y : 0;
-                    if (bounce !== _lumenLastBounce) {
-                        _lumenLastBounce = bounce;
-                        document.documentElement.style.setProperty(
-                            '--lumen-top-bounce', bounce === 0 ? '0px' : bounce + 'px'
-                        );
-                    }
-                }
-                window.addEventListener('scroll', function() {
-                    if (!_lumenScheduled) {
-                        _lumenScheduled = true;
-                        requestAnimationFrame(_lumenFlushBounce);
-                    }
-                }, { passive: true });
             })();
             """
     }

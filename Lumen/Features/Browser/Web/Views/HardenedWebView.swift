@@ -96,7 +96,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: WebViewHostController, context: Context) {
         if let wv = controller.webView {
-            let screenFrame = wv.convert(wv.bounds, to: nil)
+            let _ = wv.convert(wv.bounds, to: nil)
         }
         guard let webView = controller.webView else { return }
 
@@ -158,7 +158,7 @@ final class WebViewHostController: UIViewController {
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         let windowTop = view.window?.safeAreaInsets.top
-        let viewTop = view.safeAreaInsets.top
+        let _ = view.safeAreaInsets.top
         let top = windowTop ?? 44
         guard topConstraint?.constant != top else {
             return

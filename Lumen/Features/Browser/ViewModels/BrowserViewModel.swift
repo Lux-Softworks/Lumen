@@ -353,7 +353,6 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     @Published var themeColor: UIColor? = nil
 
-    private var isBouncing: Bool = false
     var onScrollUpdate: ((CGFloat, CGFloat, CGFloat, CGFloat) -> Void)?
 
     private func startScrollObservation(_ webView: WKWebView) {
