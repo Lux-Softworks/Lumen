@@ -24,6 +24,7 @@ final class KnowledgeMenuViewModel {
     var selectedTopic: Topic? = nil
     var selectedWebsite: Website? = nil
     var selectedPage: PageContent? = nil
+    var websiteViewModel: KnowledgeWebsiteViewModel? = nil
 
     var isLoading = false
     var error: Error? = nil
@@ -65,6 +66,7 @@ final class KnowledgeMenuViewModel {
 
         do {
             pages = try await KnowledgeStorage.shared.fetchPages(websiteID: website.id)
+            websiteViewModel = KnowledgeWebsiteViewModel(website: website, pages: pages)
             navigationPath.append(.pages(website: website))
         } catch {
             self.error = error
@@ -79,23 +81,6 @@ final class KnowledgeMenuViewModel {
     func navigateBack() {
         guard !navigationPath.isEmpty else { return }
         navigationPath.removeLast()
-
-        switch currentLevel {
-        case .topics:
-            selectedTopic = nil
-            selectedWebsite = nil
-            selectedPage = nil
-            websites = []
-            pages = []
-        case .websites:
-            selectedWebsite = nil
-            selectedPage = nil
-            pages = []
-        case .pages:
-            selectedPage = nil
-        case .detail:
-            break
-        }
     }
 
     func navigateToRoot() {
@@ -105,6 +90,7 @@ final class KnowledgeMenuViewModel {
         selectedPage = nil
         websites = []
         pages = []
+        websiteViewModel = nil
     }
 
     func clearAllTopics() async {

@@ -25,4 +25,12 @@ actor KnowledgeClassifier {
             return ""
         }
     }
+
+    static func synthesizeWebsiteReading(summaries: [String]) async -> String {
+        do {
+            return try await LocalKnowledgeProvider.shared.synthesizeWebsiteReadingWithLLM(summaries: summaries)
+        } catch {
+            return ""
+        }
+    }
 }

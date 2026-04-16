@@ -48,14 +48,14 @@ struct KnowledgePanelView: View {
     private var tabToggle: some View {
         ZStack(alignment: .leading) {
             GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .fill(AppTheme.Colors.uiElement)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        Capsule()
                             .fill(AppTheme.Colors.accent.opacity(0.06))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        Capsule()
                             .stroke(AppTheme.Colors.accent.opacity(0.1), lineWidth: 0.5)
                     )
                     .frame(width: geo.size.width / 2, height: geo.size.height)
@@ -70,7 +70,7 @@ struct KnowledgePanelView: View {
                     Text("AI")
                         .font(AppTheme.Typography.sansBody(
                             size: 15,
-                            weight: viewModel.activeTab == .ai ? .semibold : .regular
+                            weight: viewModel.activeTab == .ai ? .bold : .medium
                         ))
                         .foregroundColor(
                             viewModel.activeTab == .ai
@@ -89,7 +89,7 @@ struct KnowledgePanelView: View {
                     Text("Folders")
                         .font(AppTheme.Typography.sansBody(
                             size: 15,
-                            weight: viewModel.activeTab == .folder ? .semibold : .regular
+                            weight: viewModel.activeTab == .folder ? .bold : .medium
                         ))
                         .foregroundColor(
                             viewModel.activeTab == .folder
@@ -105,9 +105,9 @@ struct KnowledgePanelView: View {
         }
         .frame(height: 38)
         .background(AppTheme.Colors.background.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(Capsule())
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            Capsule()
                 .stroke(AppTheme.Colors.text.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 16)

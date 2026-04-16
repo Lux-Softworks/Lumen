@@ -63,6 +63,12 @@ struct BrowserView: View {
         return top > 0 ? top : 44
     }
 
+    private func updateState(_ changes: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            changes()
+        }
+    }
+
     var body: some View {
         content
             .ignoresSafeArea()
@@ -299,6 +305,7 @@ struct BrowserView: View {
             let statusBarHeight = getStatusBarHeight(geometry)
             topBarOffset = statusBarHeight
             scrollDownAccumulator = 0
+
             tab.viewModel.onScrollUpdate = { offset, delta, contentHeight, frameHeight in
                 guard bottomBarState == .collapsed || bottomBarState == .hidden else { return }
 
@@ -306,43 +313,53 @@ struct BrowserView: View {
                 let statusBarHeight = getStatusBarHeight(geometry)
 
                 if offset < 100 {
-                    scrollDownAccumulator = 0
+                    updateState { scrollDownAccumulator = 0 }
                     if topBarOffset != statusBarHeight || bottomBarState == .hidden {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            topBarOffset = statusBarHeight
-                            bottomBarState = .collapsed
+                        updateState {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                topBarOffset = statusBarHeight
+                                bottomBarState = .collapsed
+                            }
                         }
                     }
                     if offset <= 0 { return }
                 }
 
                 if contentHeight > 0 && offset >= maxScroll - 5 {
-                    scrollDownAccumulator = 0
+                    updateState { scrollDownAccumulator = 0 }
                     return
                 }
 
                 if delta > 3 && offset > 30 && topBarOffset != 0 {
-                    withAnimation(.snappy(duration: 0.2)) {
-                        topBarOffset = 0
+                    updateState {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            topBarOffset = 0
+                        }
                     }
                 } else if delta < -5 && topBarOffset == 0 {
-                    withAnimation(.snappy(duration: 0.2)) {
-                        topBarOffset = statusBarHeight
+                    updateState {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            topBarOffset = statusBarHeight
+                        }
                     }
                 }
 
                 if delta > 3 {
-                    scrollDownAccumulator = min(scrollDownAccumulator + delta, 300)
+                    updateState { scrollDownAccumulator = min(scrollDownAccumulator + delta, 300) }
                     if scrollDownAccumulator > 120 && bottomBarState == .collapsed {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            bottomBarState = .hidden
+                        updateState {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                bottomBarState = .hidden
+                            }
                         }
                     }
                 } else if delta < -10 {
-                    scrollDownAccumulator = 0
+                    updateState { scrollDownAccumulator = 0 }
                     if bottomBarState == .hidden {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            bottomBarState = .collapsed
+                        updateState {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                bottomBarState = .collapsed
+                            }
                         }
                     }
                 }
@@ -352,10 +369,12 @@ struct BrowserView: View {
             tab.viewModel.onScrollUpdate = nil
         }
         .onChange(of: tab.viewModel.pageReadyToken) { _, _ in
-            scrollDownAccumulator = 0
-            withAnimation(.easeOut(duration: 0.15)) {
-                topBarOffset = getStatusBarHeight(geometry)
-                bottomBarState = .collapsed
+            updateState { scrollDownAccumulator = 0 }
+            updateState {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    topBarOffset = getStatusBarHeight(geometry)
+                    bottomBarState = .collapsed
+                }
             }
         }
     }
@@ -380,7 +399,7 @@ struct BrowserView: View {
         let currentCardHeight = geometry.size.height * currentScale
         let cardTopEdgeY = currentY - (currentCardHeight / 2)
 
-        let currentHeaderTranslate = lerp(0, (headerHeight + 18) / targetScale, progress)
+        let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
         let visualGapHeight = currentHeaderTranslate * currentScale
 
         let titleOpacity: CGFloat = {
@@ -397,11 +416,7 @@ struct BrowserView: View {
         ZStack(alignment: .top) {
             if let tab = activeTab {
                 tabCardHeader(tab: tab)
-                    .padding(.top, lerp(0, 6, progress))
-                    .frame(
-                        width: currentCardWidth, height: 36 + lerp(0, 6, progress), alignment: .top
-                    )
-                    .frame(height: max(0, visualGapHeight), alignment: .top)
+                    .frame(width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top)
                     .clipped()
                     .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
                     .zIndex(1)
@@ -411,7 +426,7 @@ struct BrowserView: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
                     Color.clear
-                        .frame(height: headerHeight)
+                        .frame(height: headerHeight / targetScale)
                         .frame(maxWidth: .infinity)
 
                     Group {
@@ -507,7 +522,7 @@ struct BrowserView: View {
 
     private func tabCardHeader(tab: Tab) -> some View {
         tabHeaderContent(tab: tab)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 10)
             .frame(height: 36)
     }
 
@@ -526,15 +541,19 @@ struct BrowserView: View {
             currentURL: vm?.currentURL,
             tabCount: tabManager.tabs.count,
             isTabOverlayVisible: isOverlayVisible,
-            onTabsPressed: { Task { @MainActor in handleTabsPressed() } },
-            onSettingsPressed: { Task { @MainActor in handleSettingsPressed() } },
-            onSubmit: { Task { @MainActor in handleSubmit() } },
-            onHistoryTap: { url in Task { @MainActor in handleHistoryTap(url: url) } },
-            onSearchPressedInTabOverlay: { Task { @MainActor in handleSearchFromCarousel() } },
-            onCopyUrl: { Task { @MainActor in handleCopyUrl() } },
-            onReload: { Task { @MainActor in vm?.reload() } },
+            onTabsPressed: handleTabsPressed,
+            onSettingsPressed: handleSettingsPressed,
+            onSubmit: { handleSubmit() },
+            onHistoryTap: { url in handleHistoryTap(url: url) },
+            onSearchPressedInTabOverlay: handleSearchFromCarousel,
+            onCopyUrl: handleCopyUrl,
+            onReload: { vm?.reload() },
+            onBack: { vm?.goBack() },
+            onForward: { vm?.goForward() },
+            canGoBack: vm?.canGoBack ?? false,
+            canGoForward: vm?.canGoForward ?? false,
             onSuggestionTap: { suggestion in
-                Task { @MainActor in handleSubmit(queryOverride: suggestion) }
+                handleSubmit(queryOverride: suggestion)
             }
         )
     }
@@ -552,11 +571,13 @@ struct BrowserView: View {
 
             tabManager.moveActiveTabToTop()
 
-            activeTabViewState = .shrinking
-            withAnimation(.smooth(duration: 0.2)) {
-                self.shrinkProgress = 1.0
-            } completion: {
-                self.activeTabViewState = .shrunk
+            updateState { activeTabViewState = .shrinking }
+            updateState {
+                withAnimation(.smooth(duration: 0.2)) {
+                    self.shrinkProgress = 1.0
+                } completion: {
+                    self.activeTabViewState = .shrunk
+                }
             }
         }
     }
@@ -567,13 +588,15 @@ struct BrowserView: View {
         guard tabManager.tabs.contains(where: { $0.id == id }) else { return }
 
         tabManager.switchTab(id: id)
-        activeTabViewState = .expanding
+        updateState { activeTabViewState = .expanding }
 
-        withAnimation(.smooth(duration: 0.2)) {
-            self.shrinkProgress = 0.0
-        } completion: {
-            self.activeTabViewState = .fullScreen
-            self.webViewReady = true
+        updateState {
+            withAnimation(.smooth(duration: 0.2)) {
+                self.shrinkProgress = 0.0
+            } completion: {
+                self.activeTabViewState = .fullScreen
+                self.webViewReady = true
+            }
         }
     }
 
@@ -592,9 +615,8 @@ struct BrowserView: View {
                 if activeTabViewState != .fullScreen {
                     bottomBarState = .browserSettings
                 } else if let url = activeTab?.viewModel.currentURL,
-                    !url.absoluteString.isEmpty,
-                    url.absoluteString != "about:blank"
-                {
+                          !url.absoluteString.isEmpty,
+                          url.absoluteString != "about:blank" {
                     bottomBarState = .siteSettings
                 } else {
                     bottomBarState = .browserSettings
@@ -613,10 +635,12 @@ struct BrowserView: View {
         isAddressBarFocused = false
         urlText = query
 
-        withAnimation(.smooth(duration: 0.3)) {
-            self.bottomBarState = .submittingSearch
-            self.bottomBarOpacity = 0
-            self.webViewReady = false
+        updateState {
+            withAnimation(.smooth(duration: 0.3)) {
+                self.bottomBarState = .submittingSearch
+                self.bottomBarOpacity = 0
+                self.webViewReady = false
+            }
         }
 
         beginNavigation()
@@ -647,8 +671,10 @@ struct BrowserView: View {
             }
 
             try? await Task.sleep(for: .seconds(0.25))
-            withAnimation(.linear(duration: 0.15)) {
-                self.bottomBarOpacity = 1
+            updateState {
+                withAnimation(.linear(duration: 0.15)) {
+                    self.bottomBarOpacity = 1
+                }
             }
         }
     }
@@ -671,26 +697,34 @@ struct BrowserView: View {
     }
 
     private func beginNavigation() {
-        coverFinished = false
-        pageCommitted = false
-        webViewReady = false
+        updateState {
+            coverFinished = false
+            pageCommitted = false
+            webViewReady = false
+        }
 
         triggerNavigationCover()
     }
 
     private func triggerNavigationCover() {
-        showNavigationCover = true
-        navigationCoverProgress = 0
-        navigationCoverOpacity = 1
+        updateState {
+            showNavigationCover = true
+            navigationCoverProgress = 0
+            navigationCoverOpacity = 1
+        }
 
-        withAnimation(.smooth(duration: 0.45)) {
-            self.navigationCoverProgress = 1.0
+        updateState {
+            withAnimation(.smooth(duration: 0.45)) {
+                self.navigationCoverProgress = 1.0
+            }
         }
     }
 
     private func fadeInWebView() {
-        withAnimation(.smooth(duration: 0.3)) {
-            webViewReady = true
+        updateState {
+            withAnimation(.smooth(duration: 0.3)) {
+                webViewReady = true
+            }
         }
     }
 
@@ -788,9 +822,11 @@ private struct TabManagerHandlers: ViewModifier {
         content
             .onChange(of: tabManager.tabs.isEmpty) { _, isEmpty in
                 if isEmpty {
-                    activeTabViewState = .fullScreen
-                    shrinkProgress = 0
-                    webViewReady = true
+                    DispatchQueue.main.async {
+                        activeTabViewState = .fullScreen
+                        shrinkProgress = 0
+                        webViewReady = true
+                    }
                 }
             }
     }
@@ -806,7 +842,9 @@ private struct BottomBarFocusHandlers: ViewModifier {
             .onChange(of: bottomBarState) { oldState, newState in
                 if oldState != .search && newState == .search {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isAddressBarFocused.wrappedValue = true
+                        DispatchQueue.main.async {
+                            isAddressBarFocused.wrappedValue = true
+                        }
                     }
                 }
             }
@@ -824,7 +862,9 @@ private struct ActiveTabChangedHandlers: ViewModifier {
         content
             .onChange(of: tabManager.activeTabId) { _, newId in
                 if !tabManager.tabs.isEmpty {
-                    isAddressBarFocused.wrappedValue = false
+                    DispatchQueue.main.async {
+                        isAddressBarFocused.wrappedValue = false
+                    }
                 }
 
                 if bottomBarState == .submittingSearch { return }
@@ -835,7 +875,9 @@ private struct ActiveTabChangedHandlers: ViewModifier {
 
                 guard let newTab = tabManager.tabs.first(where: { $0.id == newId }) else {
                     if !tabManager.tabs.isEmpty {
-                        withAnimation(.smooth(duration: 0.3)) { bottomBarState = .search }
+                        DispatchQueue.main.async {
+                            withAnimation(.smooth(duration: 0.3)) { bottomBarState = .search }
+                        }
                     }
                     return
                 }
@@ -845,8 +887,10 @@ private struct ActiveTabChangedHandlers: ViewModifier {
                 let hasPendingURL = !newTab.viewModel.urlString.isEmpty
 
                 if hasValidURL || isActivelyLoading || hasPendingURL {
-                    webViewReady = true
-                    bottomBarState = .collapsed
+                    DispatchQueue.main.async {
+                        webViewReady = true
+                        bottomBarState = .collapsed
+                    }
                 } else {
                     bottomBarState = .search
                 }

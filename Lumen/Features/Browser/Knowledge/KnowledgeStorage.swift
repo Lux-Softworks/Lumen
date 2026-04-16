@@ -13,6 +13,8 @@ struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
     let firstVisit: Date
     var lastVisit: Date
     let createdAt: Date
+    var synthesisUpdatedAt: Date?
+    var pageCountAtSynthesis: Int
 
     init(
         id: String = .websiteID(),
@@ -25,7 +27,9 @@ struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
         totalWords: Int = 0,
         firstVisit: Date = Date(),
         lastVisit: Date = Date(),
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        synthesisUpdatedAt: Date? = nil,
+        pageCountAtSynthesis: Int = 0
     ) {
         self.id = id
         self.domain = domain
@@ -37,6 +41,8 @@ struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.firstVisit = firstVisit
         self.lastVisit = lastVisit
         self.createdAt = createdAt
+        self.synthesisUpdatedAt = synthesisUpdatedAt
+        self.pageCountAtSynthesis = pageCountAtSynthesis
     }
 }
 
@@ -200,6 +206,8 @@ actor KnowledgeStorage {
             try? execute("ROLLBACK")
             throw error
         }
+
+        try runMigrations()
     }
 
     private func createTables() throws {
@@ -226,6 +234,8 @@ actor KnowledgeStorage {
             first_visit INTEGER NOT NULL,
             last_visit INTEGER NOT NULL,
             created_at INTEGER NOT NULL,
+            synthesis_updated_at INTEGER,
+            page_count_at_synthesis INTEGER DEFAULT 0,
             FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
         );
         """
@@ -297,6 +307,11 @@ actor KnowledgeStorage {
         try execute(createIndexes)
         try execute(createFTS)
         try execute(createFTSTriggers)
+    }
+
+    private func runMigrations() throws {
+        try? execute("ALTER TABLE websites ADD COLUMN synthesis_updated_at INTEGER")
+        try? execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
     }
 
     func save(
@@ -390,8 +405,8 @@ actor KnowledgeStorage {
         let sql = """
         INSERT OR REPLACE INTO websites (
             id, domain, display_name, summary, topic_id, page_count, total_words,
-            first_visit, last_visit, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            first_visit, last_visit, created_at, synthesis_updated_at, page_count_at_synthesis
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         try execute(sql, bindValues: { [self] statement in
@@ -409,6 +424,12 @@ actor KnowledgeStorage {
             sqlite3_bind_int64(statement, 8, Int64(website.firstVisit.timeIntervalSince1970))
             sqlite3_bind_int64(statement, 9, Int64(website.lastVisit.timeIntervalSince1970))
             sqlite3_bind_int64(statement, 10, Int64(website.createdAt.timeIntervalSince1970))
+            if let synthesisDate = website.synthesisUpdatedAt {
+                sqlite3_bind_int64(statement, 11, Int64(synthesisDate.timeIntervalSince1970))
+            } else {
+                sqlite3_bind_null(statement, 11)
+            }
+            sqlite3_bind_int(statement, 12, Int32(website.pageCountAtSynthesis))
         })
     }
 
@@ -421,7 +442,9 @@ actor KnowledgeStorage {
             topic_id = ?,
             page_count = ?,
             total_words = ?,
-            last_visit = ?
+            last_visit = ?,
+            synthesis_updated_at = ?,
+            page_count_at_synthesis = ?
         WHERE id = ?
         """
 
@@ -437,7 +460,48 @@ actor KnowledgeStorage {
             sqlite3_bind_int(statement, 5, Int32(website.pageCount))
             sqlite3_bind_int(statement, 6, Int32(website.totalWords))
             sqlite3_bind_int64(statement, 7, Int64(website.lastVisit.timeIntervalSince1970))
-            sqlite3_bind_text(statement, 8, website.id, -1, SQLITE_TRANSIENT)
+            if let synthesisDate = website.synthesisUpdatedAt {
+                sqlite3_bind_int64(statement, 8, Int64(synthesisDate.timeIntervalSince1970))
+            } else {
+                sqlite3_bind_null(statement, 8)
+            }
+            sqlite3_bind_int(statement, 9, Int32(website.pageCountAtSynthesis))
+            sqlite3_bind_text(statement, 10, website.id, -1, SQLITE_TRANSIENT)
+        })
+    }
+
+    func updateWebsiteSynthesis(websiteID: String, summary: String, pageCount: Int) throws {
+        try initialize()
+        let sql = """
+        UPDATE websites SET
+            summary = ?,
+            synthesis_updated_at = ?,
+            page_count_at_synthesis = ?
+        WHERE id = ?
+        """
+        let now = Int64(Date().timeIntervalSince1970)
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, summary, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int64(statement, 2, now)
+            sqlite3_bind_int(statement, 3, Int32(pageCount))
+            sqlite3_bind_text(statement, 4, websiteID, -1, SQLITE_TRANSIENT)
+        })
+    }
+
+    func updatePageEngagement(url: String, scrollDepth: Double, readingTime: Int) throws {
+        try initialize()
+        let normalizedURL = PageContent.normalizeURL(url)
+        let sql = """
+        UPDATE pages SET
+            scroll_depth = ?,
+            reading_time = ?
+        WHERE normalized_url = ?
+        """
+
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_double(statement, 1, scrollDepth)
+            sqlite3_bind_int(statement, 2, Int32(readingTime))
+            sqlite3_bind_text(statement, 3, normalizedURL, -1, SQLITE_TRANSIENT)
         })
     }
 
@@ -713,13 +777,13 @@ actor KnowledgeStorage {
 
     func seedTestData() async throws {
         try initialize()
-        
+
         try execute("BEGIN TRANSACTION")
         do {
             try deleteAllTopics()
-            
+
             let topicID = try await createTopic(name: "Technology", color: "#4A90E2")
-            
+
             let apple = await Website(
                 domain: "apple.com",
                 displayName: "Apple",
@@ -744,18 +808,36 @@ actor KnowledgeStorage {
             )
             try createWebsite(website: theverge)
 
-            for w in [apple, github, theverge] {
+            let seedPages: [(website: Website, title: String, summary: String)] = [
+                (apple, "Apple Intelligence Overview",
+                 "Covers Apple's on-device AI features in iOS 18, including Writing Tools, Image Playground, and Siri upgrades."),
+                (apple, "WWDC 2025 Highlights",
+                 "Swift 6 language changes, visionOS 3 updates, and new SwiftUI APIs for spatial computing."),
+                (github, "GitHub Copilot Workspace",
+                 "AI-assisted code planning tool that turns issues into pull requests with multi-file context."),
+                (github, "GitHub Actions improvements",
+                 "New arm64 runners, faster caching, and improved secrets management in Actions 2025."),
+                (theverge, "The state of AI browsers",
+                 "Survey of browsers integrating LLMs: Arc, Opera, Brave, and new challengers."),
+            ]
+
+            var offset: TimeInterval = 0
+            for item in seedPages {
                 let page = await PageContent(
-                    websiteID: w.id,
-                    url: "https://\(w.domain)",
-                    title: w.displayName,
-                    content: "This is sample content for \(w.displayName). Generated for UI testing purposes.",
-                    summary: "Sample summary for \(w.displayName)."
+                    websiteID: item.website.id,
+                    url: "https://\(item.website.domain)/\(item.title.lowercased().replacingOccurrences(of: " ", with: "-"))",
+                    title: item.title,
+                    content: item.summary,
+                    summary: item.summary,
+                    timestamp: Date().addingTimeInterval(-offset),
+                    readingTime: Int.random(in: 4...15),
+                    scrollDepth: Double.random(in: 0.5...1.0)
                 )
+                offset += 3600
                 try savePage(page)
-                try updateWebsiteStats(websiteID: w.id)
+                try updateWebsiteStats(websiteID: item.website.id)
             }
-            
+
             try updateTopicCounts()
             try execute("COMMIT")
         } catch {
@@ -991,6 +1073,10 @@ actor KnowledgeStorage {
         let lastVisit = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 9)))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 10)))
 
+        let synthesisUpdatedAt: Date? = sqlite3_column_type(statement, 11) != SQLITE_NULL
+            ? Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 11))) : nil
+        let pageCountAtSynthesis = Int(sqlite3_column_int(statement, 12))
+
         return await Website(
             id: id,
             domain: domain,
@@ -1002,7 +1088,9 @@ actor KnowledgeStorage {
             totalWords: totalWords,
             firstVisit: firstVisit,
             lastVisit: lastVisit,
-            createdAt: createdAt
+            createdAt: createdAt,
+            synthesisUpdatedAt: synthesisUpdatedAt,
+            pageCountAtSynthesis: pageCountAtSynthesis
         )
     }
 
@@ -1051,4 +1139,3 @@ enum StorageError: Error, LocalizedError {
         }
     }
 }
-

@@ -112,6 +112,47 @@ actor LocalKnowledgeProvider {
         return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
+    func synthesizeWebsiteReadingWithLLM(summaries: [String]) async throws -> String {
+        guard !summaries.isEmpty else { return "" }
+
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(
+                domain: "LocalKnowledgeProvider", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        let joined = summaries.prefix(10).enumerated()
+            .map { i, s in "[\(i + 1)] \(s)" }
+            .joined(separator: "\n")
+
+        let prompt = """
+            You are summarizing what a person has learned from reading multiple pages on a website.
+            Write 2-3 sentences synthesizing the key themes and takeaways across all the reads below.
+            Be specific. Do not mention the website name or URLs.
+
+            Reads:
+            \(joined)
+            """
+
+        let parameters = GenerateParameters(maxTokens: 120, temperature: 0.2)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
+
+        let stream = try await container.generate(input: input, parameters: parameters)
+
+        var output = ""
+        for await event in stream {
+            if case .chunk(let text) = event { output += text }
+        }
+
+        unloadModel()
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func classifyTopicWithLLM(content: String, title: String?) async throws -> String {
         if modelContainer == nil {
             try await loadModel()

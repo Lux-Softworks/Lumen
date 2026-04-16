@@ -203,19 +203,60 @@ struct WebsitePageButton: View {
 @MainActor
 struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
-    @State private var animateItems = false
 
     var body: some View {
-        ZStack {
-            topicSelectionGrid
-                .opacity(viewModel.currentLevel == .topics ? 1 : 0)
-                .animation(.easeInOut(duration: 0.25), value: viewModel.currentLevel == .topics)
+        GeometryReader { geo in
+            let width = geo.size.width
+            ZStack {
+                topicSelectionGrid
+                    .frame(width: width)
+                    .offset(x: offsetFor(index: 0, width: width))
+                    .opacity(opacityFor(index: 0))
 
-            topicKnowledgeView
-                .opacity(viewModel.currentLevel == .topics ? 0 : 1)
-                .animation(.easeInOut(duration: 0.25), value: viewModel.currentLevel == .topics)
+                topicKnowledgeView
+                    .frame(width: width)
+                    .offset(x: offsetFor(index: 1, width: width))
+                    .opacity(opacityFor(index: 1))
+
+                pagesView
+                    .frame(width: width)
+                    .offset(x: offsetFor(index: 2, width: width))
+                    .opacity(opacityFor(index: 2))
+
+                detailView
+                    .frame(width: width)
+                    .offset(x: offsetFor(index: 3, width: width))
+                    .opacity(opacityFor(index: 3))
+            }
+            .animation(.smooth(duration: 0.3), value: viewModel.navigationPath)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func offsetFor(index: Int, width: CGFloat) -> CGFloat {
+        if index == levelIndex { return 0 }
+        if index < levelIndex { return -width * 0.25 }
+        return width
+    }
+
+    private func opacityFor(index: Int) -> Double {
+        if index == levelIndex { return 1.0 }
+        if abs(index - levelIndex) == 1 { return 0.0 }
+        return 0.0
+    }
+
+    private var levelIndex: Int {
+        switch viewModel.currentLevel {
+        case .topics: return 0
+        case .websites: return 1
+        case .pages: return 2
+        case .detail: return 3
+        }
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        EmptyView()
     }
 
     private var topicSelectionGrid: some View {
@@ -319,28 +360,20 @@ struct KnowledgeFolderView: View {
                             WebsitePageButton(website: website)
                         }
                         .buttonStyle(.plain)
-                        .opacity(animateItems ? 1 : 0)
-                        .offset(y: animateItems ? 0 : 8)
-                        .animation(
-                            .spring(response: 0.4, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.05),
-                            value: animateItems
-                        )
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
         }
-        .onChange(of: viewModel.currentLevel) { _, newValue in
-            if case .websites = newValue {
-                Task {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    animateItems = true
-                }
-            } else {
-                animateItems = false
-            }
+    }
+
+    @ViewBuilder
+    private var pagesView: some View {
+        if let websiteVM = viewModel.websiteViewModel {
+            KnowledgeWebsiteView(viewModel: websiteVM, onBack: {
+                viewModel.navigateBack()
+            })
         }
     }
 }

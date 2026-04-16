@@ -6,6 +6,7 @@ final class ReadingSignalHandler: NSObject, WKScriptMessageHandler {
     private let config: ReadingSignalConfig
 
     var onReadingSignalTriggered: ((ReadingSignalPayload, WKWebView?) -> Void)?
+    var onReadingSignalUpdated: ((ReadingSignalPayload, WKWebView?) -> Void)?
 
     init(config: ReadingSignalConfig = .default) {
         self.config = config
@@ -29,7 +30,11 @@ final class ReadingSignalHandler: NSObject, WKScriptMessageHandler {
         guard payload.triggered else { return }
         guard !isExcluded(urlString: payload.url) else { return }
 
-        onReadingSignalTriggered?(payload, webView)
+        if payload.isUpdate {
+            onReadingSignalUpdated?(payload, webView)
+        } else {
+            onReadingSignalTriggered?(payload, webView)
+        }
     }
 
     func isExcluded(urlString: String) -> Bool {

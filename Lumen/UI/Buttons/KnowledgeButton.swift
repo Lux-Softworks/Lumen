@@ -15,9 +15,6 @@ struct KnowledgeButton: View {
                             : Color.gray.opacity(0.1)
                     )
                     .clipShape(FolderTabShape(isFill: true))
-
-                FolderTabShape(isFill: false)
-                    .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
             }
             .frame(width: 85, height: 18)
         }

@@ -11,9 +11,9 @@ enum NativeAppsPolicy: String, CaseIterable, Identifiable {
 
 class BrowserSettings: ObservableObject {
     static let shared = BrowserSettings()
-    
+
     private let defaults = UserDefaults.standard
-    
+
     @Published var enableJavaScript: Bool {
         didSet { defaults.set(enableJavaScript, forKey: "enableJavaScript") }
     }
@@ -32,12 +32,15 @@ class BrowserSettings: ObservableObject {
     @Published var nativeAppsPolicy: NativeAppsPolicy {
         didSet { defaults.set(nativeAppsPolicy.rawValue, forKey: "nativeAppsPolicy") }
     }
-    
+    @Published var collectKnowledge: Bool {
+        didSet { defaults.set(collectKnowledge, forKey: "collectKnowledge") }
+    }
+
     var searchEngine: SearchEngine {
         get { SearchEngine(rawValue: defaultSearchEngine) ?? .google }
         set { defaultSearchEngine = newValue.rawValue }
     }
-    
+
     private init() {
         self.enableJavaScript = defaults.object(forKey: "enableJavaScript") as? Bool ?? true
         self.blockPopups = defaults.object(forKey: "blockPopups") as? Bool ?? true
@@ -46,15 +49,16 @@ class BrowserSettings: ObservableObject {
         self.clearHistoryOnClose = defaults.object(forKey: "clearHistoryOnClose") as? Bool ?? false
         let savedPolicy = defaults.string(forKey: "nativeAppsPolicy") ?? ""
         self.nativeAppsPolicy = NativeAppsPolicy(rawValue: savedPolicy) ?? .ask
+        self.collectKnowledge = defaults.object(forKey: "collectKnowledge") as? Bool ?? true
     }
-    
+
     func policy(for url: URL?) -> PrivacyPolicy {
         if let sitePolicy = SiteSettingsStore.shared.policy(for: url) {
             return sitePolicy
         }
         return globalPrivacyPolicy
     }
-    
+
     var globalPrivacyPolicy: PrivacyPolicy {
         PrivacyPolicy(
             blocksThirdPartyCookies: blockTrackers,

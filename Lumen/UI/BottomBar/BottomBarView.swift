@@ -22,21 +22,24 @@ struct BottomBarView: View {
 
     var onCopyUrl: () -> Void
     var onReload: () -> Void
+    var onBack: () -> Void = {}
+    var onForward: () -> Void = {}
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
     var onSuggestionTap: (String) -> Void
 
     @ObservedObject private var historyStore = HistoryStore.shared
 
     @Namespace private var animation
-    @State private var showHistory = false
+    @State private var isSpinning = false
     @State private var reloadRotation: Double = 0
-    @State private var isSpinning: Bool = false
     @State private var toolbarDragFraction: CGFloat = 0
-    @State private var suggestionsExpanded = false
-    @State private var suggestionsOpacity: Double = 0
 
     var isExpanded: Bool {
-        state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge || state == .submittingSearch
+        state == .search || state == .browserSettings || state == .siteSettings
+            || state == .knowledge || state == .submittingSearch
     }
+
     var expandedHeightRatio: CGFloat {
         if state == .submittingSearch { return 1.0 }
         return state == .knowledge ? 0.9 : 0.67
@@ -45,7 +48,10 @@ struct BottomBarView: View {
     var body: some View {
         ResizableSheetContainer(
             isExpanded: Binding(
-                get: { state == .search || state == .browserSettings || state == .siteSettings || state == .knowledge || state == .submittingSearch },
+                get: {
+                    state == .search || state == .browserSettings || state == .siteSettings
+                        || state == .knowledge || state == .submittingSearch
+                },
                 set: { expanded in
                     if expanded {
                         if state == .collapsed || state == .hidden {
@@ -80,14 +86,21 @@ struct BottomBarView: View {
                     state = .search
                 }
 
+                withAnimation(.smooth(duration: 0.3)) {
+                    toolbarDragFraction = 1.0
+                }
+
                 if state == .search {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isFocused = true
-                }
+                        isFocused = true
+                    }
                 }
             },
             onCollapse: {
                 isFocused = false
+                withAnimation(.smooth(duration: 0.3)) {
+                    toolbarDragFraction = 0
+                }
             },
             onDismissFocused: {
                 isFocused = false
@@ -115,10 +128,11 @@ struct BottomBarView: View {
 
                 if state == .knowledge {
                     knowledgeContent
+                        .id(state)
                         .transition(
                             .asymmetric(
-                                insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
-                                removal: .opacity.animation(.easeIn(duration: 0.05))
+                                insertion: .opacity.animation(.smooth(duration: 0.25).delay(0.15)),
+                                removal: .opacity.animation(.smooth(duration: 0.05))
                             )
                         )
                 } else if state == .browserSettings || state == .siteSettings {
@@ -129,25 +143,24 @@ struct BottomBarView: View {
                             state = .collapsed
                         }
                     )
+                    .id(state)
                     .transition(
                         .asymmetric(
-                            insertion: .opacity.animation(.smooth(duration: 0.2).delay(0.3)),
-                            removal: .opacity.animation(.easeIn(duration: 0.05))
+                            insertion: .opacity.animation(.smooth(duration: 0.25).delay(0.15)),
+                            removal: .opacity.animation(.smooth(duration: 0.05))
                         )
                     )
                 } else {
                     searchSuggestionsArea
-                        .opacity(suggestionsOpacity)
                         .allowsHitTesting(state == .search)
-                        .frame(maxHeight: suggestionsExpanded ? .infinity : 0, alignment: .top)
+                        .opacity(isExpanded ? 1 : min(1, toolbarDragFraction * 2.0))
+                        .frame(maxHeight: .infinity, alignment: .top)
                         .clipped()
                 }
 
-                if state != .search && state != .browserSettings && state != .siteSettings && state != .knowledge {
-                    dragRevealedHistory
-                }
-
-                if state == .search || state == .collapsed || state == .hidden || state == .browserSettings || state == .siteSettings {
+                if state == .search || state == .collapsed || state == .hidden
+                    || state == .browserSettings || state == .siteSettings
+                {
                     Spacer(minLength: 0)
                 }
             }
@@ -161,86 +174,84 @@ struct BottomBarView: View {
             }
         }
         .onChange(of: state) { _, newState in
-            let wasDragging = toolbarDragFraction > 0
-
-            if newState == .search {
-                suggestionsExpanded = true
-
-                if wasDragging {
-                    toolbarDragFraction = 0
-                    var t = Transaction(animation: .none)
-                    t.disablesAnimations = true
-                    withTransaction(t) {
-                        showHistory = true
-                        suggestionsOpacity = 1
-                    }
-                } else {
-                toolbarDragFraction = 0
-                    withAnimation(.smooth(duration: 0.15)) {
-                    suggestionsOpacity = 1
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        withAnimation(.smooth(duration: 0.2)) {
-                    showHistory = true
-                        }
-                }
-                }
-            } else {
+            if newState != .search {
                 isFocused = false
                 toolbarDragFraction = 0
-
-                withAnimation(.smooth(duration: 0.15)) {
-                    showHistory = false
-                    suggestionsOpacity = 0
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    if state != .search {
-                        withAnimation(.smooth(duration: 0.2)) {
-                            suggestionsExpanded = false
-                        }
-                    }
-                }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-            if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+        ) { notification in
+            if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey]
+                as? CGRect
+            {
                 keyboardHeight = frame.height
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+        ) { _ in
             keyboardHeight = 0
         }
     }
 
     var searchBarRow: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                    .opacity(state == .search ? 1 : 0)
 
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                    .opacity(state == .browserSettings ? 1 : 0)
+            ZStack(alignment: .leading) {
+                HStack(spacing: 6) {
+                    Button(action: onCopyUrl) {
+                        Image(systemName: "link")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                    }
 
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                    .opacity(state == .knowledge ? 1 : 0)
+                    HStack(spacing: 2) {
+                        Button(action: onBack) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(canGoBack ? AppTheme.Colors.text : AppTheme.Colors.text.opacity(0.2))
+                                .frame(width: 28, height: 28)
+                        }
+                        .disabled(!canGoBack)
 
-                Button(action: onCopyUrl) {
-                    Image(systemName: "link")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                        Button(action: onForward) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(canGoForward ? AppTheme.Colors.text : AppTheme.Colors.text.opacity(0.2))
+                                .frame(width: 28, height: 28)
+                        }
+                        .disabled(!canGoForward)
+                    }
+                    .padding(.horizontal, 2)
+                    .clipShape(Capsule())
                 }
+                .frame(width: 96, alignment: .leading)
                 .opacity(state == .siteSettings ? 1 : 0)
                 .allowsHitTesting(state == .siteSettings)
+
+                Button(action: onSettingsPressed) {
+                    ZStack {
+                        Image(systemName: "magnifyingglass")
+                            .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: isExpanded)
+                            .opacity((state == .search || state == .collapsed || state == .hidden) ? 1 : 0)
+                        Image(systemName: "gearshape.fill")
+                            .opacity(state == .browserSettings ? 1 : 0)
+                        Image(systemName: "folder.fill")
+                            .opacity(state == .knowledge ? 1 : 0)
+                    }
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .opacity(state == .siteSettings ? 0 : 1)
+                .allowsHitTesting(state != .siteSettings)
             }
-            .frame(width: 44, height: 44)
-            .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: isExpanded)
+            .frame(width: state == .siteSettings ? 96 : 44, height: 44, alignment: .leading)
+            .clipped()
 
             TextField(
                 state == .browserSettings ? "Browser Settings" : "Search...",
@@ -258,15 +269,36 @@ struct BottomBarView: View {
             .frame(height: 44)
             .disabled(state == .siteSettings || state == .browserSettings || state == .knowledge)
             .truncationMode(
-                (state == .siteSettings || state == .browserSettings || state == .knowledge) ? .tail : .head
+                (state == .siteSettings || state == .browserSettings || state == .knowledge)
+                    ? .tail : .head
             )
 
-            Button(action: { text = "" }) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+            ZStack {
+                Button(action: onReload) {
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .antialiased(true)
+                        .scaledToFit()
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                        .frame(width: 18, height: 18)
+                        .rotationEffect(.degrees(reloadRotation), anchor: .center)
+                        .drawingGroup()
+                        .frame(width: 44, height: 44)
+                }
+                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
+                .opacity(state == .siteSettings ? 1 : 0)
+                .allowsHitTesting(state == .siteSettings)
+
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                        .frame(width: 44, height: 44)
+                }
+                .opacity(state == .search && !text.isEmpty ? 1 : 0)
+                .allowsHitTesting(state == .search && !text.isEmpty)
             }
-            .opacity(state == .search && !text.isEmpty ? 1 : 0)
-            .allowsHitTesting(state == .search && !text.isEmpty)
+            .frame(width: 44, height: 44)
         }
         .padding(.horizontal, 16)
         .frame(height: 44)
@@ -277,36 +309,20 @@ struct BottomBarView: View {
                     Capsule()
                         .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                 )
-                .matchedGeometryEffect(id: "searchBackground_fill", in: animation, isSource: isExpanded)
+                .matchedGeometryEffect(
+                    id: "searchBackground_fill", in: animation, isSource: isExpanded)
         )
-        .overlay(alignment: .trailing) {
-            Button(action: onReload) {
-                Image(systemName: "arrow.clockwise")
-                    .resizable()
-                    .antialiased(true)
-                    .scaledToFit()
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                    .frame(width: 18, height: 18)
-                    .rotationEffect(.degrees(reloadRotation), anchor: .center)
-                    .drawingGroup()
-                    .frame(width: 44, height: 44)
-            }
-            .opacity(state == .siteSettings ? 1 : 0)
-            .allowsHitTesting(state == .siteSettings)
-            .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
-            .onChange(of: isLoading) { _, loading in
-                if loading {
-                    if !isSpinning {
-                        isSpinning = true
-                        triggerSpin()
-                    }
-                } else {
-                    isSpinning = false
+        .padding(.top, 16)
+        .onChange(of: isLoading) { _, loading in
+            if loading {
+                if !isSpinning {
+                    isSpinning = true
+                    triggerSpin()
                 }
+            } else {
+                isSpinning = false
             }
         }
-        .padding(.top, 16)
     }
 
     var searchSuggestionsArea: some View {
@@ -398,15 +414,6 @@ struct BottomBarView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .opacity(showHistory ? 1 : 0)
-                        .blur(radius: showHistory ? 0 : 4)
-                        .offset(y: showHistory ? 0 : 5)
-                        .animation(
-                            showHistory
-                                ? .smooth(duration: 0.32).delay(Double(index) * 0.035)
-                                : .smooth(duration: 0.07),
-                            value: showHistory
-                        )
                     }
                 }
                 .frame(minHeight: 10)
@@ -414,46 +421,11 @@ struct BottomBarView: View {
         }
         .padding(.top, state == .search ? 0 : 12)
         .scrollContentBackground(.hidden)
-        .contentMargins(.bottom, (state == .search && isFocused) ? keyboardHeight : 0, for: .scrollContent)
+        .contentMargins(
+            .bottom, (state == .search && isFocused) ? keyboardHeight : 0, for: .scrollContent)
     }
 
     @State private var keyboardHeight: CGFloat = 0
-
-    private var dragRevealedHistory: some View {
-        let historyOpacity = min(1.0, toolbarDragFraction * 3.0)
-
-        return VStack(spacing: 0) {
-            ForEach(
-                Array(historyStore.recentEntries.enumerated()), id: \.element.id
-            ) { _, entry in
-                Button {
-                    onHistoryTap(entry.url)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                            .frame(width: 24)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.title)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(AppTheme.Colors.text)
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.top, 12)
-        .opacity(historyOpacity)
-    }
 
     private var frostedBackground: some View {
         ZStack {
@@ -472,9 +444,7 @@ struct BottomBarView: View {
     }
 
     var collapsedContent: some View {
-        let dragFade = max(0, 1 - toolbarDragFraction * 3.0)
-        let sideOpacity = isTabOverlayVisible ? 0.0 : dragFade
-        let sideSlide: CGFloat = toolbarDragFraction * 14
+        let sideOpacity = isTabOverlayVisible ? 0.0 : 1.0
 
         return HStack(spacing: 0) {
             Button(action: onTabsPressed) {
@@ -486,7 +456,7 @@ struct BottomBarView: View {
                         .background(frostedBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                         )
                 }
@@ -494,7 +464,6 @@ struct BottomBarView: View {
             .disabled(tabCount == 0)
             .padding(.leading, 8)
             .opacity(sideOpacity)
-            .offset(x: -sideSlide)
             .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
 
             Spacer()
@@ -514,33 +483,31 @@ struct BottomBarView: View {
                             Capsule()
                                 .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
                         )
-                        .matchedGeometryEffect(id: "searchBackground_fill", in: animation, isSource: !isExpanded)
+                        .matchedGeometryEffect(
+                            id: "searchBackground_fill", in: animation, isSource: !isExpanded
+                        )
                         .frame(width: 80, height: 44)
 
-                    HStack(spacing: 0) {
-                        ZStack {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.Colors.text)
-                                .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded)
+                    ZStack {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.text)
+                            .matchedGeometryEffect(
+                                id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded
+                            )
 
-                            Image(systemName: "arrow.clockwise")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.Colors.text)
-                                .frame(width: 18, height: 18)
-                                .rotationEffect(.degrees(0))
-                                .opacity(0)
-                                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: !isExpanded)
-                        }
-                        .frame(width: 80, height: 44)
-
-                        TextField("", text: .constant(""))
-                            .labelsHidden()
-                            .frame(width: 0, height: 0)
+                        Image(systemName: "arrow.clockwise")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.Colors.text)
+                            .frame(width: 18, height: 18)
+                            .rotationEffect(.degrees(0))
                             .opacity(0)
+                            .matchedGeometryEffect(
+                                id: "reloadButton", in: animation, isSource: !isExpanded)
                     }
+                    .frame(width: 80, height: 44)
                 }
             }
 
@@ -560,7 +527,6 @@ struct BottomBarView: View {
             }
             .padding(.trailing, 8)
             .opacity(sideOpacity)
-            .offset(x: sideSlide)
             .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
         }
         .frame(height: 80)
@@ -603,7 +569,8 @@ struct BottomBarView: View {
 
     private func neaten(url: String) -> String {
         guard let urlComponents = URLComponents(string: url),
-              let host = urlComponents.host else {
+            let host = urlComponents.host
+        else {
             return url.isEmpty ? "Search..." : url
         }
 

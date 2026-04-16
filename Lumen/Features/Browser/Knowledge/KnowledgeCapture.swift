@@ -81,4 +81,16 @@ class KnowledgeCaptureService {
             print("Knowledge capture failed: \(error)")
         }
     }
+
+    func handleUpdateSignal(_ payload: ReadingSignalPayload) async {
+        do {
+            try await KnowledgeStorage.shared.updatePageEngagement(
+                url: payload.url,
+                scrollDepth: payload.scrollDepth,
+                readingTime: payload.readingTime
+            )
+        } catch {
+            print("Knowledge engagement update failed: \(error)")
+        }
+    }
 }

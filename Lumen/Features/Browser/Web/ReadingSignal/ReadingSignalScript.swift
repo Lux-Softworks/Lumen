@@ -11,6 +11,8 @@ enum ReadingSignalScript {
             var dwellSeconds = 0;
             var maxScrollDepth = 0;
             var hasTextSelection = false;
+            var scrollDepthAtFire = 0;
+            var readingTimeAtFire = 0;
 
             var DWELL_THRESHOLD = \(config.dwellThresholdSeconds);
             var SCROLL_THRESHOLD = \(config.scrollDepthThreshold);
@@ -56,6 +58,8 @@ enum ReadingSignalScript {
 
                 if (dwellMet || hasTextSelection) {
                     hasFired = true;
+                    scrollDepthAtFire = maxScrollDepth;
+                    readingTimeAtFire = dwellSeconds;
                     clearInterval(interval);
 
                     try {
@@ -64,11 +68,35 @@ enum ReadingSignalScript {
                             title: document.title || '',
                             readingTime: dwellSeconds,
                             scrollDepth: maxScrollDepth,
-                            triggered: true
+                            triggered: true,
+                            isUpdate: false
                         });
                     } catch (e) {}
                 }
             }, POLL_INTERVAL_MS);
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState !== 'hidden') { return; }
+                if (!hasFired) { return; }
+
+                updateScrollDepth();
+
+                var depthGrew = maxScrollDepth - scrollDepthAtFire > 0.10;
+                var timeGrew = dwellSeconds - readingTimeAtFire > 30;
+
+                if (depthGrew || timeGrew) {
+                    try {
+                        window.webkit.messageHandlers.readingSignal.postMessage({
+                            url: window.location.href,
+                            title: document.title || '',
+                            readingTime: dwellSeconds,
+                            scrollDepth: maxScrollDepth,
+                            triggered: true,
+                            isUpdate: true
+                        });
+                    } catch (e) {}
+                }
+            });
         })();
         """
     }

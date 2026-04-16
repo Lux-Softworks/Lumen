@@ -120,6 +120,11 @@ enum BrowserEngine {
                 await KnowledgeCaptureService.shared.handleSignal(payload, webView: webView)
             }
         }
+        readingSignalHandler.onReadingSignalUpdated = { payload, _ in
+            Task { @MainActor in
+                await KnowledgeCaptureService.shared.handleUpdateSignal(payload)
+            }
+        }
         config.userContentController.add(readingSignalHandler, name: "readingSignal")
 
         objc_setAssociatedObject(
