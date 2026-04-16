@@ -74,7 +74,6 @@ actor LocalKnowledgeProvider {
             if case .chunk(let text) = event { output += text }
         }
 
-        unloadModel()
         return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
@@ -108,7 +107,6 @@ actor LocalKnowledgeProvider {
             if case .chunk(let text) = event { output += text }
         }
 
-        unloadModel()
         return output.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
@@ -149,7 +147,6 @@ actor LocalKnowledgeProvider {
             if case .chunk(let text) = event { output += text }
         }
 
-        unloadModel()
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -185,7 +182,6 @@ actor LocalKnowledgeProvider {
             if case .chunk(let text) = event { output += text }
         }
 
-        unloadModel()
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -219,7 +215,6 @@ actor LocalKnowledgeProvider {
             if case .chunk(let text) = event { output += text }
         }
 
-        unloadModel()
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

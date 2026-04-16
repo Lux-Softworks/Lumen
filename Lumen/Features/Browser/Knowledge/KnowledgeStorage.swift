@@ -310,8 +310,31 @@ actor KnowledgeStorage {
     }
 
     private func runMigrations() throws {
-        try? execute("ALTER TABLE websites ADD COLUMN synthesis_updated_at INTEGER")
-        try? execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
+        if try !columnExists(table: "websites", column: "synthesis_updated_at") {
+            try execute("ALTER TABLE websites ADD COLUMN synthesis_updated_at INTEGER")
+        }
+        if try !columnExists(table: "websites", column: "page_count_at_synthesis") {
+            try execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
+        }
+    }
+
+    private func columnExists(table: String, column: String) throws -> Bool {
+        let sql = "PRAGMA table_info(\(table))"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let columnName = String(cString: sqlite3_column_text(statement, 1))
+            if columnName == column {
+                return true
+            }
+            
+        }
+        return false
     }
 
     func save(

@@ -554,6 +554,29 @@ struct BrowserView: View {
             canGoForward: vm?.canGoForward ?? false,
             onSuggestionTap: { suggestion in
                 handleSubmit(queryOverride: suggestion)
+            },
+            trackerCount: vm?.blockedTrackersCount ?? 0,
+            initialZoom: vm?.currentZoomPercent ?? 100,
+            initialDesktopMode: vm?.isDesktopMode ?? false,
+            onFindOnPage: {
+                vm?.activateFindOnPage()
+            },
+            onShare: {
+                guard let url = vm?.currentURL else { return }
+                let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let root = scene.keyWindow?.rootViewController {
+                    root.present(vc, animated: true)
+                }
+            },
+            onZoomChanged: { percent in
+                vm?.applyZoom(percent)
+            },
+            onRequestDesktopSite: { on in
+                vm?.setDesktopMode(on)
+            },
+            onReloadPage: {
+                vm?.reload()
             }
         )
     }

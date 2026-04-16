@@ -84,6 +84,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
         }
 
         controller.webView = webView
+        webView.isFindInteractionEnabled = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.automaticallyAdjustsScrollIndicatorInsets = false
         context.coordinator.installStatusBarTint(above: webView, height: safeAreaTop)

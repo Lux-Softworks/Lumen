@@ -8,6 +8,7 @@ class KnowledgeCaptureService {
     private init() {}
 
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
+        guard BrowserSettings.shared.collectKnowledge else { return }
         guard let webView = webView else { return }
 
         let html: String?

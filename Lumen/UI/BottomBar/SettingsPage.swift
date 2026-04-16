@@ -22,6 +22,14 @@ struct SettingsPage: View {
     var type: SettingsType
     var currentURL: URL?
     var onDismiss: () -> Void
+    var trackerCount: Int = 0
+    var initialZoom: Int = 100
+    var initialDesktopMode: Bool = false
+    var onFindOnPage: (() -> Void)? = nil
+    var onShare: (() -> Void)? = nil
+    var onZoomChanged: ((Int) -> Void)? = nil
+    var onRequestDesktopSite: ((Bool) -> Void)? = nil
+    var onReloadPage: (() -> Void)? = nil
 
     @StateObject private var settings = BrowserSettings.shared
     @Namespace private var engineNamespace
@@ -33,6 +41,9 @@ struct SettingsPage: View {
     @State private var requestDesktopSite: Bool = false
     @State private var translateEnabled: Bool = false
     @State private var sitePinned: Bool = false
+    @State private var siteBlockTrackers: Bool = false
+    @State private var siteBlockPopups: Bool = false
+    @State private var siteEnableJavaScript: Bool = true
 
     var body: some View {
         GeometryReader { geometry in
@@ -87,6 +98,21 @@ struct SettingsPage: View {
             }
             .padding(.top, 12)
             .padding(.bottom, 24)
+        }
+        .onAppear {
+            if type == .site {
+                let policy = SiteSettingsStore.shared.policy(for: currentURL)
+                    ?? settings.globalPrivacyPolicy
+                siteBlockTrackers = policy.blocksThirdPartyCookies
+                siteBlockPopups = !policy.javaScriptCanOpenWindowsAutomatically
+                siteEnableJavaScript = policy.allowsJavaScript
+
+                let domain = currentURL?.host?.lowercased() ?? ""
+                sitePinned = PinStore.shared.isPinned(domain)
+
+                pageZoom = initialZoom
+                requestDesktopSite = initialDesktopMode
+            }
         }
         .scrollContentBackground(.hidden)
     }
@@ -168,6 +194,10 @@ struct SettingsPage: View {
             }
 
             settingsGroup {
+                settingsRow(icon: "clock.arrow.circlepath", title: "Clear History on Close", isOn: $settings.clearHistoryOnClose) {}
+            }
+
+            settingsGroup {
                 settingsRow(icon: "trash", title: "Clear Browsing Data", destructive: true) {
                     showClearDataAlert = true
                 }
@@ -195,11 +225,21 @@ struct SettingsPage: View {
             }
 
             settingsGroup {
-                settingsRow(icon: "doc.text.magnifyingglass", title: "Find on Page", showChevron: false) {}
+                settingsRow(icon: "doc.text.magnifyingglass", title: "Find on Page") {
+                    onFindOnPage?()
+                    onDismiss()
+                }
                 divider
-                settingsRow(icon: "pin", title: "Pin Site") {}
+                settingsRow(icon: "pin", title: "Pin Site", isOn: $sitePinned) {}
                 divider
-                settingsRow(icon: "square.and.arrow.up", title: "Share") {}
+                settingsRow(icon: "square.and.arrow.up", title: "Share") {
+                    onShare?()
+                }
+            }
+            .onChange(of: sitePinned) { old, new in
+                let domain = currentURL?.host?.lowercased() ?? ""
+                guard !domain.isEmpty, old != new else { return }
+                PinStore.shared.toggle(domain)
             }
 
             settingsGroup {
@@ -226,7 +266,7 @@ struct SettingsPage: View {
     }
 
     private var lumenFoundCard: some View {
-        let trackers = 0
+        let trackers = trackerCount
         let ads = 0
 
         var attributed = AttributedString("Lumen scrubbed ")
@@ -286,6 +326,9 @@ struct SettingsPage: View {
                     isOn: $requestDesktopSite
                 ) {}
             }
+            .onChange(of: requestDesktopSite) { _, on in
+                onRequestDesktopSite?(on)
+            }
         }
         .padding(.horizontal, 16)
     }
@@ -340,19 +383,35 @@ struct SettingsPage: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .onChange(of: pageZoom) { _, newVal in
+            onZoomChanged?(newVal)
+        }
     }
 
     private var siteSectionSettingsList: some View {
         VStack(spacing: 16) {
             settingsGroup {
-                settingsRow(icon: "shield", title: "Block Trackers", isOn: $settings.blockTrackers) {}
+                settingsRow(icon: "shield", title: "Block Trackers", isOn: $siteBlockTrackers) {}
                 divider
-                settingsRow(icon: "app.badge", title: "Block Popups", isOn: $settings.blockPopups) {}
+                settingsRow(icon: "app.badge", title: "Block Popups", isOn: $siteBlockPopups) {}
                 divider
-                settingsRow(icon: "terminal", title: "Enable JavaScript", isOn: $settings.enableJavaScript) {}
+                settingsRow(icon: "terminal", title: "Enable JavaScript", isOn: $siteEnableJavaScript) {}
             }
+            .onChange(of: siteBlockTrackers) { _, _ in saveSitePolicy() }
+            .onChange(of: siteBlockPopups) { _, _ in saveSitePolicy() }
+            .onChange(of: siteEnableJavaScript) { _, _ in saveSitePolicy() }
         }
         .padding(.horizontal, 16)
+    }
+
+    private func saveSitePolicy() {
+        var policy = SiteSettingsStore.shared.policy(for: currentURL)
+            ?? settings.globalPrivacyPolicy
+        policy.blocksThirdPartyCookies = siteBlockTrackers
+        policy.javaScriptCanOpenWindowsAutomatically = !siteBlockPopups
+        policy.allowsJavaScript = siteEnableJavaScript
+        SiteSettingsStore.shared.savePolicy(policy, for: currentURL)
+        onReloadPage?()
     }
 
     private var globalSiteSettingsList: some View {

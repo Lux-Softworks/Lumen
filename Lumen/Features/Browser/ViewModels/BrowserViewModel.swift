@@ -40,15 +40,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private var knowledgeProvider: LocalKnowledgeProvider?
 
-    func initializeKnowledgeProvider() {
-        /* if knowledgeProvider == nil {
-            knowledgeProvider = LocalKnowledgeProvider()
-
-            Task {
-                try? await knowledgeProvider?.loadModel()
-            }
-        } */
-    }
+    func initializeKnowledgeProvider() {}
 
     func processUserInput(_ input: String) async {
         await MainActor.run {
@@ -166,6 +158,25 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     func stopLoading() {
         webView?.stopLoading()
+    }
+
+    private(set) var currentZoomPercent: Int = 100
+    private(set) var isDesktopMode: Bool = false
+
+    func applyZoom(_ percent: Int) {
+        currentZoomPercent = percent
+        webView?.evaluateJavaScript("document.body.style.zoom='\(percent)%'")
+    }
+
+    func setDesktopMode(_ on: Bool) {
+        isDesktopMode = on
+        let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        webView?.customUserAgent = on ? ua : nil
+        webView?.reload()
+    }
+
+    func activateFindOnPage() {
+        webView?.findInteraction?.presentFindNavigator(showingReplace: false)
     }
 
     func loadHomePage() {

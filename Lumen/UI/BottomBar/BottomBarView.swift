@@ -28,6 +28,15 @@ struct BottomBarView: View {
     var canGoForward: Bool = false
     var onSuggestionTap: (String) -> Void
 
+    var trackerCount: Int = 0
+    var initialZoom: Int = 100
+    var initialDesktopMode: Bool = false
+    var onFindOnPage: (() -> Void)? = nil
+    var onShare: (() -> Void)? = nil
+    var onZoomChanged: ((Int) -> Void)? = nil
+    var onRequestDesktopSite: ((Bool) -> Void)? = nil
+    var onReloadPage: (() -> Void)? = nil
+
     @ObservedObject private var historyStore = HistoryStore.shared
 
     @Namespace private var animation
@@ -139,9 +148,15 @@ struct BottomBarView: View {
                     SettingsPage(
                         type: state == .browserSettings ? .browser : .site,
                         currentURL: currentURL,
-                        onDismiss: {
-                            state = .collapsed
-                        }
+                        onDismiss: { state = .collapsed },
+                        trackerCount: trackerCount,
+                        initialZoom: initialZoom,
+                        initialDesktopMode: initialDesktopMode,
+                        onFindOnPage: onFindOnPage,
+                        onShare: onShare,
+                        onZoomChanged: onZoomChanged,
+                        onRequestDesktopSite: onRequestDesktopSite,
+                        onReloadPage: onReloadPage
                     )
                     .id(state)
                     .transition(
