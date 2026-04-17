@@ -687,6 +687,10 @@ actor KnowledgeStorage {
     }
 
     func searchSemantic(query: String, limit: Int = 3) async throws -> [PageContent] {
+        return try await searchSemanticScored(query: query, limit: limit).map { $0.page }
+    }
+
+    func searchSemanticScored(query: String, limit: Int = 3) async throws -> [(page: PageContent, score: Double)] {
         try initialize()
 
         guard let queryVector = await EmbeddingService.shared.generateEmbedding(for: query) else {
@@ -726,14 +730,14 @@ actor KnowledgeStorage {
             .sorted { $0.score > $1.score }
             .prefix(limit)
 
-        var pages: [PageContent] = []
+        var results: [(page: PageContent, score: Double)] = []
         for result in topResults {
             if let page = try await fetchPage(pageID: result.pageID) {
-                pages.append(page)
+                results.append((page: page, score: result.score))
             }
         }
 
-        return pages
+        return results
     }
 
     func fetchAllWebsites() async throws -> [Website] {
@@ -984,9 +988,10 @@ actor KnowledgeStorage {
 
             var offset: TimeInterval = 0
             for entry in entries {
+                let pageURL = "https://\(entry.website.domain)/\(entry.title.lowercased().replacingOccurrences(of: " ", with: "-").prefix(60))"
                 let page = await PageContent(
                     websiteID: entry.website.id,
-                    url: "https://\(entry.website.domain)/\(entry.title.lowercased().replacingOccurrences(of: " ", with: "-").prefix(60))",
+                    url: pageURL,
                     title: entry.title,
                     content: entry.content,
                     summary: String(entry.content.prefix(180)),
@@ -1000,6 +1005,15 @@ actor KnowledgeStorage {
 
                 if let vector = await EmbeddingService.shared.generateEmbedding(for: entry.content) {
                     try saveEmbedding(pageID: page.id, vector: vector)
+                }
+
+                for highlight in Self.seedHighlights(from: entry.content, count: 2) {
+                    _ = try? await saveAnnotation(
+                        url: pageURL,
+                        text: highlight.text,
+                        prefix: highlight.prefix,
+                        suffix: highlight.suffix
+                    )
                 }
             }
 
@@ -1056,7 +1070,7 @@ actor KnowledgeStorage {
     func fetchAnnotations(normalizedURL: String) async throws -> [Annotation] {
         try initialize()
         let sql = "SELECT * FROM annotations WHERE normalized_url = ? ORDER BY created_at ASC"
-        return try queryAnnotations(sql: sql) { [self] statement in
+        return try await queryAnnotations(sql: sql) { [self] statement in
             sqlite3_bind_text(statement, 1, normalizedURL, -1, SQLITE_TRANSIENT)
         }
     }
@@ -1064,7 +1078,7 @@ actor KnowledgeStorage {
     func fetchAnnotations(pageID: String) async throws -> [Annotation] {
         try initialize()
         let sql = "SELECT * FROM annotations WHERE page_id = ? ORDER BY created_at ASC"
-        return try queryAnnotations(sql: sql) { [self] statement in
+        return try await queryAnnotations(sql: sql) { [self] statement in
             sqlite3_bind_text(statement, 1, pageID, -1, SQLITE_TRANSIENT)
         }
     }
@@ -1093,7 +1107,7 @@ actor KnowledgeStorage {
     private func queryAnnotations(
         sql: String,
         bindValues: ((OpaquePointer?) -> Void)? = nil
-    ) throws -> [Annotation] {
+    ) async throws -> [Annotation] {
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
@@ -1114,7 +1128,7 @@ actor KnowledgeStorage {
             let suffix = String(cString: sqlite3_column_text(statement, 6))
             let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 7)))
 
-            results.append(Annotation(
+            results.append(await Annotation(
                 id: id,
                 pageID: pageID,
                 url: url,
@@ -1397,6 +1411,45 @@ actor KnowledgeStorage {
     deinit {
         if let db = db {
             sqlite3_close(db)
+        }
+    }
+
+    struct SeedHighlight {
+        let text: String
+        let prefix: String
+        let suffix: String
+    }
+
+    static func seedHighlights(from content: String, count: Int) -> [SeedHighlight] {
+        let sentences = content
+            .components(separatedBy: ". ")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 40 && $0.count <= 220 }
+        guard !sentences.isEmpty else { return [] }
+
+        let step = max(1, sentences.count / max(1, count))
+        var picks: [String] = []
+        var i = 0
+        while picks.count < count && i < sentences.count {
+            picks.append(sentences[i])
+            i += step
+        }
+
+        return picks.map { pick in
+            let text = pick.hasSuffix(".") ? pick : pick + "."
+            let idx = content.range(of: text)
+            let prefix: String
+            let suffix: String
+            if let range = idx {
+                let before = content[..<range.lowerBound]
+                let after = content[range.upperBound...]
+                prefix = String(before.suffix(60))
+                suffix = String(after.prefix(60))
+            } else {
+                prefix = ""
+                suffix = ""
+            }
+            return SeedHighlight(text: text, prefix: prefix, suffix: suffix)
         }
     }
 }

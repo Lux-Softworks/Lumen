@@ -167,12 +167,13 @@ struct KnowledgeAIView: View {
 
     private var inputBackground: some View {
         ZStack {
-            BlurView(style: .systemThickMaterial)
+            BlurView(style: .systemChromeMaterial)
+            BlurView(style: .systemChromeMaterial)
 
             LinearGradient(
                 colors: [
-                    AppTheme.Colors.uiElement.opacity(0.25),
-                    AppTheme.Colors.uiElement.opacity(0.12),
+                    AppTheme.Colors.uiElement.opacity(0.75),
+                    AppTheme.Colors.uiElement.opacity(0.6),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -226,10 +227,42 @@ private struct ChatBubbleView: View {
             RevealText(text: message.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+            if let match = message.sourceMatch {
+                matchBadge(match)
+            }
+
             if !message.sources.isEmpty {
                 sourcesRow
             }
         }
+    }
+
+    private func matchBadge(_ match: SourceMatch) -> some View {
+        let color: Color
+        let icon: String
+        switch match {
+        case .high:
+            color = Color.green
+            icon = "checkmark.seal.fill"
+        case .medium:
+            color = Color.orange
+            icon = "exclamationmark.triangle.fill"
+        case .low:
+            color = Color.red.opacity(0.8)
+            icon = "xmark.octagon.fill"
+        }
+        return HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(match.label)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(color.opacity(0.12))
+        )
     }
 
     private var sourcesRow: some View {

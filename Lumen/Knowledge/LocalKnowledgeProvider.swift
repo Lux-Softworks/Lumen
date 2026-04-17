@@ -252,21 +252,31 @@ actor LocalKnowledgeProvider {
 
         let context = sources.prefix(4)
             .map { p in
-                let body: String
+                var parts: [String] = []
                 if let s = p.summary, !s.isEmpty {
-                    body = s
-                } else {
-                    body = String(p.content.prefix(120))
+                    parts.append(s)
                 }
-                return "\(p.title ?? p.domain): \(body)"
+                let bodyLimit = 600
+                let body = String(p.content.prefix(bodyLimit))
+                if !body.isEmpty {
+                    parts.append(body)
+                }
+                let joined = parts.joined(separator: " — ")
+                return "\(p.title ?? p.domain): \(joined)"
             }
-            .joined(separator: "\n")
+            .joined(separator: "\n\n")
+
+        let cleanedHighlights = highlights
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
         let highlightsBlock: String
-        if highlights.isEmpty {
+        let highlightsGuideline: String
+        if cleanedHighlights.isEmpty {
             highlightsBlock = ""
+            highlightsGuideline = ""
         } else {
-            let lines = highlights.prefix(6)
+            let lines = cleanedHighlights.prefix(6)
                 .map { "- \"\(String($0.prefix(240)))\"" }
                 .joined(separator: "\n")
             highlightsBlock = """
@@ -275,6 +285,7 @@ actor LocalKnowledgeProvider {
                 User-highlighted passages (strong signal, prioritize when relevant):
                 \(lines)
                 """
+            highlightsGuideline = "\n- When user-highlighted passages are present, weight them heavily — user explicitly marked them as important."
         }
 
         let historyBlock = history
@@ -287,7 +298,12 @@ actor LocalKnowledgeProvider {
 
         let prompt = """
             <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Reading assistant. Answer from sources. Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context. When user-highlighted passages are present, weight them heavily — user explicitly marked them as important.
+            Reading assistant. Answer the user's question using the sources below — pages from their reading history. Guidelines:
+            - Read the sources carefully; they often contain relevant info even when not a perfect keyword match.
+            - Ground claims in the sources. Do not introduce specific facts, numbers, dates, names, or quotes not present.
+            - If a source is adjacent to the question, draw what's useful and note what's missing — don't refuse wholesale.
+            - Only say "this isn't covered in your reading" when the sources truly have no relevant material.
+            - Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context.\(highlightsGuideline)
 
             Sources:
             \(context)\(highlightsBlock)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>

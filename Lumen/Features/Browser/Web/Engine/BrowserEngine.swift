@@ -167,9 +167,7 @@ enum BrowserEngine {
         let detector = ThreatDetector()
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
-        interceptor.onDidFinishLoad = { webView in
-            AnnotationHandler.applyAll(webView: webView)
-        }
+        interceptor.onDidFinishLoad = { _ in }
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
 

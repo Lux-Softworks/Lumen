@@ -34,14 +34,29 @@ final class KnowledgeAIViewModel {
         isThinking = true
         sparklePhase = .spinning
 
-        let searchResults: [PageContent]
+        let scored: [(page: PageContent, score: Double)]
         do {
-            searchResults = try await KnowledgeStorage.shared.searchSemantic(query: trimmed, limit: 3)
+            scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 4)
         } catch {
             finishThinking()
             messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed.", sources: []))
             return
         }
+
+        var searchResults = scored.map { $0.page }
+        let topScore = scored.first?.score ?? 0
+
+        if searchResults.count < 3 {
+            if let keywordHits = try? await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4) {
+                let existing = Set(searchResults.map { $0.id })
+                for page in keywordHits where !existing.contains(page.id) {
+                    searchResults.append(page)
+                    if searchResults.count >= 4 { break }
+                }
+            }
+        }
+
+        let match = SourceMatch.classify(topScore: topScore)
 
         let priorSources = priorMessages.last { $0.role == .assistant }?.sources ?? []
         let existingIDs = Set(searchResults.map { $0.id })
@@ -53,7 +68,7 @@ final class KnowledgeAIViewModel {
 
         guard !sources.isEmpty else {
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "I don't have anything relevant on that from your reading history.", sources: []))
+            messages.append(ChatMessage(role: .assistant, text: "I don't have anything on that from your saved pages.", sources: [], sourceMatch: nil))
             return
         }
 
@@ -72,11 +87,30 @@ final class KnowledgeAIViewModel {
             let answer = try await LocalKnowledgeProvider.shared.answerFromKnowledge(
                 query: trimmed, sources: sources, highlights: highlights, history: history)
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: answer, sources: sources))
+            messages.append(ChatMessage(role: .assistant, text: answer, sources: sources, sourceMatch: match))
         } catch {
             finishThinking()
             messages.append(ChatMessage(role: .assistant, text: "Couldn't generate an answer.", sources: []))
         }
+    }
+
+    private func ftsQuery(from raw: String) -> String {
+        let stopwords: Set<String> = [
+            "the", "a", "an", "is", "are", "was", "were", "be", "been",
+            "of", "to", "in", "on", "for", "and", "or", "but", "if",
+            "what", "which", "who", "whom", "whose", "when", "where", "why", "how",
+            "do", "does", "did", "can", "could", "would", "should", "may", "might",
+            "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
+            "my", "your", "his", "her", "its", "our", "their", "about", "with", "from",
+        ]
+        let tokens = raw
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty && $0.count > 1 && !stopwords.contains($0) }
+            .prefix(6)
+            .map { "\"\($0)\"*" }
+        guard !tokens.isEmpty else { return "\"\(raw.replacingOccurrences(of: "\"", with: ""))\"" }
+        return tokens.joined(separator: " OR ")
     }
 
     private func finishThinking() {
