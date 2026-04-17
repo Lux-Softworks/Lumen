@@ -10,10 +10,10 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS_17+-000?style=flat&logo=apple&logoColor=white" />
-  <img src="https://img.shields.io/badge/Swift_5.9-F05138?style=flat&logo=swift&logoColor=white" />
-  <img src="https://img.shields.io/badge/on--device_AI-FF9F0A?style=flat" />
+  <img src="https://img.shields.io/badge/Swift_6.2.4-F05138?style=flat&logo=swift&logoColor=white" />
+  <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
   <img src="https://img.shields.io/badge/AGPL--3.0-blue?style=flat" />
-  <img src="https://img.shields.io/badge/v1.0.0-E8E4DC?style=flat" />
+  <img src="https://img.shields.io/badge/v1.3.0-E8E4DC?style=flat" />
 </p>
 
 <p align="center">
