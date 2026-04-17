@@ -5,6 +5,7 @@ struct KnowledgeWebsiteView: View {
     @State var viewModel: KnowledgeWebsiteViewModel
     var onBack: () -> Void
     var onSelectPage: ((PageContent) -> Void)? = nil
+    @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,10 +50,10 @@ struct KnowledgeWebsiteView: View {
         VStack(spacing: 10) {
             Image(systemName: "book.closed")
                 .font(.system(size: 28, weight: .light))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                .foregroundColor(palette.text.opacity(0.25))
             Text("No pages saved yet")
                 .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+                .foregroundColor(palette.text.opacity(0.35))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -62,14 +63,14 @@ struct KnowledgeWebsiteView: View {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(palette.accent)
                     .frame(width: 40, height: 40)
-                    .background(AppTheme.Colors.accent.opacity(0.1))
+                    .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
             }
             Text(viewModel.website.displayName)
                 .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
-                .foregroundColor(AppTheme.Colors.text)
+                .foregroundColor(palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
@@ -95,7 +96,7 @@ struct KnowledgeWebsiteView: View {
     private func synthesisCard(text: String) -> some View {
         Text((try? AttributedString(markdown: text)) ?? AttributedString(text))
             .font(AppTheme.Typography.sansBody(size: 14, weight: .regular))
-            .foregroundColor(AppTheme.Colors.text.opacity(0.55))
+            .foregroundColor(palette.text.opacity(0.55))
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +115,7 @@ struct KnowledgeWebsiteView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(session.headerLabel)
                 .font(AppTheme.Typography.sansBody(size: 11, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                .foregroundColor(palette.text.opacity(0.25))
                 .textCase(.uppercase)
                 .kerning(0.4)
                 .padding(.horizontal, 16)
@@ -137,14 +138,14 @@ struct KnowledgeWebsiteView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(page.title ?? page.domain)
                         .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.text)
+                        .foregroundColor(palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     if let summary = page.summary, !summary.isEmpty {
                         Text(summary)
                             .font(AppTheme.Typography.sansBody(size: 12, weight: .regular))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+                            .foregroundColor(palette.text.opacity(0.35))
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -155,13 +156,13 @@ struct KnowledgeWebsiteView: View {
                 if let readingTime = page.readingTime, readingTime > 0 {
                     Text("\(readingTime)m")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.2))
+                        .foregroundColor(palette.text.opacity(0.2))
                 }
 
                 if onSelectPage != nil {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.15))
+                        .foregroundColor(palette.text.opacity(0.15))
                         .padding(.leading, 8)
                 }
             }
@@ -170,7 +171,7 @@ struct KnowledgeWebsiteView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(AppTheme.Colors.text.opacity(0.025))
+                    .fill(palette.text.opacity(0.025))
             )
         }
         .buttonStyle(.plain)
@@ -181,6 +182,7 @@ private struct ShimmerBar: View {
     let width: CGFloat
     let height: CGFloat
     @State private var phase: CGFloat = -1
+    @Environment(\.palette) private var palette
 
     var body: some View {
         let isInfinity = width == .infinity
@@ -189,9 +191,9 @@ private struct ShimmerBar: View {
             .fill(
                 LinearGradient(
                     stops: [
-                        .init(color: AppTheme.Colors.text.opacity(0.08), location: phase),
-                        .init(color: AppTheme.Colors.text.opacity(0.16), location: phase + 0.3),
-                        .init(color: AppTheme.Colors.text.opacity(0.08), location: phase + 0.6),
+                        .init(color: palette.text.opacity(0.08), location: phase),
+                        .init(color: palette.text.opacity(0.16), location: phase + 0.3),
+                        .init(color: palette.text.opacity(0.08), location: phase + 0.6),
                     ],
                     startPoint: .leading,
                     endPoint: .trailing

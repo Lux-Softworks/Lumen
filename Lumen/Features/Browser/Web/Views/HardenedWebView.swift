@@ -78,7 +78,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
             webView = existingWebView
             webView.removeFromSuperview()
         } else {
-            webView = BrowserEngine.makeWebView(policy: policy)
+            webView = BrowserEngine.makeWebView(policy: policy, isIncognito: viewModel.isIncognito)
             viewModel.attachWebView(webView)
             context.coordinator.hasAttached = true
         }

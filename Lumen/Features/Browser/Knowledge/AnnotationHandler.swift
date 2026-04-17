@@ -1,5 +1,7 @@
 import Foundation
+import ObjectiveC
 import WebKit
+import os
 
 final class AnnotationHandler: NSObject, WKScriptMessageHandler {
     func userContentController(
@@ -16,6 +18,11 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
             guard let url = body["url"] as? String,
                   let text = body["text"] as? String,
                   !text.isEmpty else { return }
+            let incognito = objc_getAssociatedObject(
+                webView.configuration,
+                &_WKWebViewAssociatedKeys.incognitoFlagKey
+            ) as? Bool ?? false
+            if incognito { return }
             let prefix = body["prefix"] as? String ?? ""
             let suffix = body["suffix"] as? String ?? ""
 
@@ -27,7 +34,9 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                     if let wv = webView {
                         await MainActor.run { Self.applyAll(webView: wv) }
                     }
-                } catch {}
+                } catch {
+                    KnowledgeLogger.storage.error("annotation save failed: \(String(describing: error), privacy: .public)")
+                }
             }
 
         default:

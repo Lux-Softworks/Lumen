@@ -4,15 +4,23 @@ import UIKit
 struct KnowledgeButton: View {
     var action: () -> Void
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.palette) var palette
 
     var body: some View {
         Button(action: action) {
             ZStack {
                 BlurView(style: .systemChromeMaterial)
+                    .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
                     .overlay(
-                        colorScheme == .dark
-                            ? Color.black.opacity(0.35)
-                            : Color.gray.opacity(0.1)
+                        Group {
+                            if palette.isIncognito {
+                                palette.background.opacity(0.85)
+                            } else if colorScheme == .dark {
+                                Color.black.opacity(0.35)
+                            } else {
+                                Color.gray.opacity(0.1)
+                            }
+                        }
                     )
                     .clipShape(FolderTabShape(isFill: true))
             }

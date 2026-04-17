@@ -34,6 +34,7 @@ struct SettingsPage: View {
     var onNavigate: ((String) -> Void)? = nil
 
     @StateObject private var settings = BrowserSettings.shared
+    @Environment(\.palette) private var palette
     @Namespace private var engineNamespace
     @Namespace private var nativeAppsNamespace
     @State private var navigationPath: [SettingsSection] = []
@@ -267,11 +268,11 @@ struct SettingsPage: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(AppTheme.Colors.uiElement)
+                .fill(palette.uiElement)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(AppTheme.Colors.text.opacity(0.08), lineWidth: 0.5)
+                .stroke(palette.text.opacity(0.08), lineWidth: 0.5)
         )
     }
 
@@ -282,23 +283,23 @@ struct SettingsPage: View {
         var attributed = AttributedString("Lumen scrubbed ")
         var trackersNumber = AttributedString("\(trackers) ")
         trackersNumber.font = .system(size: 16, weight: .bold)
-        trackersNumber.foregroundColor = AppTheme.Colors.accent
+        trackersNumber.foregroundColor = palette.accent
 
         var trackersLabel = AttributedString("trackers and ")
         trackersLabel.font = .system(size: 16, weight: .regular)
-        trackersLabel.foregroundColor = AppTheme.Colors.text
+        trackersLabel.foregroundColor = palette.text
 
         var adsNumber = AttributedString("\(ads) ")
         adsNumber.font = .system(size: 16, weight: .bold)
-        adsNumber.foregroundColor = AppTheme.Colors.accent
+        adsNumber.foregroundColor = palette.accent
 
         var adsLabel = AttributedString("ads")
         adsLabel.font = .system(size: 16, weight: .regular)
-        adsLabel.foregroundColor = AppTheme.Colors.text
+        adsLabel.foregroundColor = palette.text
 
         var base = AttributedString("Lumen scrubbed ")
         base.font = .system(size: 16, weight: .regular)
-        base.foregroundColor = AppTheme.Colors.text
+        base.foregroundColor = palette.text
 
         attributed = base + trackersNumber + trackersLabel + adsNumber + adsLabel
 
@@ -309,7 +310,7 @@ struct SettingsPage: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(AppTheme.Colors.accent.opacity(0.07))
+                        .fill(palette.accent.opacity(0.07))
                 }
             )
     }
@@ -347,13 +348,13 @@ struct SettingsPage: View {
         HStack(spacing: 14) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(palette.accent)
                 .frame(width: 32, height: 32)
                 .cornerRadius(8)
 
             Text("Page Zoom")
                 .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
-                .foregroundColor(AppTheme.Colors.text)
+                .foregroundColor(palette.text)
 
             Spacer()
 
@@ -365,14 +366,14 @@ struct SettingsPage: View {
                 } label: {
                     Image(systemName: "minus")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(pageZoom > 50 ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.2))
+                        .foregroundColor(pageZoom > 50 ? palette.accent : palette.text.opacity(0.2))
                         .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
 
                 Text("\(pageZoom)%")
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(AppTheme.Colors.text)
+                    .foregroundColor(palette.text)
                     .frame(minWidth: 58)
                     .monospacedDigit()
 
@@ -383,12 +384,12 @@ struct SettingsPage: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(pageZoom < 200 ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.2))
+                        .foregroundColor(pageZoom < 200 ? palette.accent : palette.text.opacity(0.2))
                         .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
             }
-            .background(AppTheme.Colors.text.opacity(0.06))
+            .background(palette.text.opacity(0.06))
             .cornerRadius(10)
         }
         .padding(.horizontal, 16)
@@ -452,12 +453,12 @@ struct SettingsPage: View {
                         HStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.4))
+                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
                                 .frame(width: 28)
 
                             Text(engine.rawValue)
                                 .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
-                                .foregroundColor(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.text)
+                                .foregroundColor(isSelected ? palette.accent : palette.text)
 
                             Spacer()
                         }
@@ -489,17 +490,17 @@ struct SettingsPage: View {
                         HStack(spacing: 12) {
                             Image(systemName: policyIcon(policy))
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.4))
+                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
                                 .frame(width: 28)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(policy.rawValue)
                                     .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? AppTheme.Colors.accent : AppTheme.Colors.text)
+                                    .foregroundColor(isSelected ? palette.accent : palette.text)
 
                                 Text(policyDescription(policy))
                                     .font(.system(size: 13, weight: .regular))
-                                    .foregroundColor(isSelected ? AppTheme.Colors.accent.opacity(0.8) : AppTheme.Colors.text.opacity(0.45))
+                                    .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
                             Spacer()
@@ -544,16 +545,16 @@ struct SettingsPage: View {
                 HStack(spacing: 12) {
                     Image(systemName: "globe")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(palette.accent)
                         .frame(width: 28)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(languageName)
                             .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.accent)
+                            .foregroundColor(palette.accent)
                         Text("System default")
                             .font(.system(size: 13, weight: .regular))
-                            .foregroundColor(AppTheme.Colors.accent.opacity(0.8))
+                            .foregroundColor(palette.accent.opacity(0.8))
                     }
 
                     Spacer()
@@ -567,7 +568,7 @@ struct SettingsPage: View {
                 "Language preferences are managed in iOS language settings."
             )
             .font(.system(size: 13))
-            .foregroundColor(AppTheme.Colors.text.opacity(0.45))
+            .foregroundColor(palette.text.opacity(0.45))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 16)
         }
@@ -579,7 +580,7 @@ struct SettingsPage: View {
             VStack(spacing: 12) {
                 Text("Links you tap in other apps will open in Lumen instead of Safari when set to default.")
                     .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.55))
+                    .foregroundColor(palette.text.opacity(0.55))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
             }
@@ -610,7 +611,7 @@ struct SettingsPage: View {
                 .padding(.vertical, 16)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppTheme.Colors.accent)
+                        .fill(palette.accent)
                 )
             }
             .buttonStyle(.plain)
@@ -623,16 +624,16 @@ struct SettingsPage: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(AppTheme.Colors.accent.opacity(0.18))
+                    .fill(palette.accent.opacity(0.18))
                     .frame(width: 28, height: 28)
                 Text(number)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(palette.accent)
             }
 
             Text(text)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.75))
+                .foregroundColor(palette.text.opacity(0.75))
 
             Spacer()
         }
@@ -642,7 +643,7 @@ struct SettingsPage: View {
 
     private var stepDivider: some View {
         Rectangle()
-            .fill(AppTheme.Colors.accent.opacity(0.1))
+            .fill(palette.accent.opacity(0.1))
             .frame(height: 0.5)
             .padding(.horizontal, 16)
     }
@@ -651,7 +652,7 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Last updated: 2026")
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.45))
+                .foregroundColor(palette.text.opacity(0.45))
                 .padding(.horizontal, 16)
 
             settingsGroup {
@@ -691,10 +692,10 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.text)
+                .foregroundColor(palette.text)
             Text(body)
                 .font(.system(size: 14, weight: .regular))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.55))
+                .foregroundColor(palette.text.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
@@ -710,9 +711,9 @@ struct SettingsPage: View {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .bold))
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(palette.accent)
                     .frame(width: 40, height: 40)
-                    .background(AppTheme.Colors.accent.opacity(0.1))
+                    .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
                 }
                 Spacer()
@@ -720,7 +721,7 @@ struct SettingsPage: View {
 
             Text(sectionTitle(for: section))
                 .font(AppTheme.Typography.serifDisplay(size: 20, weight: .bold))
-                .foregroundColor(AppTheme.Colors.text)
+                .foregroundColor(palette.text)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
@@ -779,7 +780,7 @@ struct SettingsPage: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(AppTheme.Colors.text.opacity(0.08))
+            .fill(palette.text.opacity(0.08))
             .frame(height: 0.5)
             .padding(.horizontal, 16)
     }
@@ -797,19 +798,19 @@ struct SettingsPage: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(destructive ? .red : AppTheme.Colors.accent)
+                    .foregroundColor(destructive ? .red : palette.accent)
                     .frame(width: 32, height: 32)
                     .cornerRadius(8)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
-                        .foregroundColor(destructive ? .red : AppTheme.Colors.text)
+                        .foregroundColor(destructive ? .red : palette.text)
 
                     if let subtitle {
                         Text(subtitle)
                             .font(.system(size: 14, weight: .regular))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.45))
+                            .foregroundColor(palette.text.opacity(0.45))
                     }
                 }
 
@@ -820,7 +821,7 @@ struct SettingsPage: View {
                 } else if showChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                        .foregroundColor(palette.text.opacity(0.25))
                 }
             }
             .padding(.horizontal, 16)

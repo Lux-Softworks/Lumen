@@ -28,11 +28,15 @@ final class TabManager: ObservableObject {
         }
     }
 
-    func newTab() {
-        let tab = Tab()
+    func newTab(incognito: Bool = false) {
+        let tab = Tab(isIncognito: incognito)
         tabs.append(tab)
         activeTabId = tab.id
         observeActiveViewModel()
+    }
+
+    func newIncognitoTab() {
+        newTab(incognito: true)
     }
 
     func switchTab(id: UUID) {

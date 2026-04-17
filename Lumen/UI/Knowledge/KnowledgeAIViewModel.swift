@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 enum SparklePhase: Equatable {
     case idle
@@ -20,7 +21,11 @@ final class KnowledgeAIViewModel {
         guard !isModelLoading else { return }
         isModelLoading = true
         sparklePhase = .spinning
-        try? await LocalKnowledgeProvider.shared.loadModel()
+        do {
+            try await LocalKnowledgeProvider.shared.loadModel()
+        } catch {
+            KnowledgeLogger.rag.error("model load failed: \(String(describing: error), privacy: .public)")
+        }
         sparklePhase = .idle
         isModelLoading = false
     }
@@ -47,12 +52,15 @@ final class KnowledgeAIViewModel {
         let topScore = scored.first?.score ?? 0
 
         if searchResults.count < 3 {
-            if let keywordHits = try? await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4) {
+            do {
+                let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
                 let existing = Set(searchResults.map { $0.id })
                 for page in keywordHits where !existing.contains(page.id) {
                     searchResults.append(page)
                     if searchResults.count >= 4 { break }
                 }
+            } catch {
+                KnowledgeLogger.query.error("FTS fallback failed: \(String(describing: error), privacy: .public)")
             }
         }
 
@@ -78,8 +86,11 @@ final class KnowledgeAIViewModel {
 
         var highlights: [String] = []
         for page in sources {
-            if let anns = try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id) {
+            do {
+                let anns = try await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)
                 highlights.append(contentsOf: anns.map { $0.text })
+            } catch {
+                KnowledgeLogger.query.error("annotation fetch failed pageID=\(page.id, privacy: .public): \(String(describing: error), privacy: .public)")
             }
         }
 

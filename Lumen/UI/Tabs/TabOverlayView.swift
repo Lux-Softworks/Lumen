@@ -258,28 +258,37 @@ private struct TabCardItemView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                let url = tab.viewModel.currentURL ?? tab.url
-                if let url, let faviconURL = FaviconService.faviconURL(for: url) {
-                    AsyncImage(url: faviconURL) { img in
-                        img.resizable()
-                            .scaledToFit()
-                            .frame(width: 16, height: 16)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.white.opacity(0.3))
+                if tab.isIncognito {
+                    Image(systemName: "eyeglasses")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(IncognitoPalette.accent)
+                        .frame(width: 16, height: 16)
+                } else {
+                    let url = tab.viewModel.currentURL ?? tab.url
+                    if let url, let faviconURL = FaviconService.faviconURL(for: url) {
+                        AsyncImage(url: faviconURL) { img in
+                            img.resizable()
+                                .scaledToFit()
+                                .frame(width: 16, height: 16)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 16, height: 16)
+                        }
+                    } else {
+                        Image(systemName: "globe")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
                             .frame(width: 16, height: 16)
                     }
-                } else {
-                    Image(systemName: "globe")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.8))
-                        .frame(width: 16, height: 16)
                 }
 
-                Text(tab.title.isEmpty ? "New Tab" : tab.title)
+                Text(tab.isIncognito
+                     ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
+                     : (tab.title.isEmpty ? "New Tab" : tab.title))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
                     .lineLimit(1)
                     .opacity(headerOpacity)
 
@@ -303,6 +312,10 @@ private struct TabCardItemView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(tab.isIncognito ? IncognitoPalette.stroke : Color.clear, lineWidth: 1.5)
+            )
         }
         .offset(y: min(0, dragOffset))
         .opacity(dragOffset < 0 ? Double(max(0.0, 1 + dragOffset / 160)) : 1)

@@ -5,6 +5,7 @@ import Combine
 final class Tab: Identifiable, ObservableObject {
     let id: UUID
     let url: URL?
+    let isIncognito: Bool
     let viewModel: BrowserViewModel
     @Published var snapshot: UIImage?
     @Published var title: String = "New Tab"
@@ -13,10 +14,11 @@ final class Tab: Identifiable, ObservableObject {
     private var titleCancellable: AnyCancellable?
     private var themeColorCancellable: AnyCancellable?
 
-    init(id: UUID = UUID(), url: URL? = nil) {
+    init(id: UUID = UUID(), url: URL? = nil, isIncognito: Bool = false) {
         self.id = id
         self.url = url
-        self.viewModel = BrowserViewModel(url: url)
+        self.isIncognito = isIncognito
+        self.viewModel = BrowserViewModel(url: url, isIncognito: isIncognito)
         titleCancellable = viewModel.$pageTitle
             .receive(on: RunLoop.main)
             .sink { [weak self] newTitle in

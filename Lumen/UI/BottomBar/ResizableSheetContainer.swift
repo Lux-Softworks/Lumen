@@ -18,6 +18,7 @@ struct ResizableSheetContainer<Content: View>: View {
     @GestureState private var activeDragTranslation: CGFloat = 0
     @State private var releaseOffset: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.palette) var palette
 
     private let collapsedHeight: CGFloat = 80
     private let sliverHeight: CGFloat = 20
@@ -80,13 +81,14 @@ struct ResizableSheetContainer<Content: View>: View {
                     .background(
                         ZStack(alignment: .top) {
                             BlurView(style: .systemChromeMaterial)
+                                .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
                                 .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 .overlay(
                                     Group {
-                                        if colorScheme == .dark {
-                                            ZStack {
-                                                Color.black.opacity(0.4)
-                                            }
+                                        if palette.isIncognito {
+                                            palette.background.opacity(0.85)
+                                        } else if colorScheme == .dark {
+                                            Color.black.opacity(0.4)
                                         } else {
                                             Color.gray.opacity(0.1)
                                         }
@@ -103,7 +105,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                             screenHeight: outerGeometry.size.height),
                                         corners: [.topLeft, .topRight]
                                     )
-                                    .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 0.5)
+                                    .stroke(palette.text.opacity(0.15), lineWidth: 0.5)
                                 )
                                 .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
 

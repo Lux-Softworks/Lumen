@@ -4,6 +4,7 @@ struct BookmarksListView: View {
     var onNavigate: ((String) -> Void)?
     var onDismiss: () -> Void
     @ObservedObject private var store = PinStore.shared
+    @Environment(\.palette) private var palette
 
     var body: some View {
         if store.all.isEmpty {
@@ -17,10 +18,10 @@ struct BookmarksListView: View {
         VStack(spacing: 10) {
             Image(systemName: "bookmark.slash")
                 .font(.system(size: 32, weight: .light))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.2))
+                .foregroundColor(palette.text.opacity(0.2))
             Text("No bookmarks yet")
                 .font(AppTheme.Typography.sansBody(size: 15, weight: .medium))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.3))
+                .foregroundColor(palette.text.opacity(0.3))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -40,14 +41,14 @@ struct BookmarksListView: View {
 
                             Text(domain)
                                 .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
-                                .foregroundColor(AppTheme.Colors.text)
+                                .foregroundColor(palette.text)
                                 .lineLimit(1)
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                                .foregroundColor(palette.text.opacity(0.25))
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
@@ -57,7 +58,7 @@ struct BookmarksListView: View {
 
                     if index < store.all.count - 1 {
                         Rectangle()
-                            .fill(AppTheme.Colors.text.opacity(0.08))
+                            .fill(palette.text.opacity(0.08))
                             .frame(height: 0.5)
                             .padding(.leading, 60)
                     }
@@ -90,7 +91,7 @@ struct BookmarksListView: View {
     private var globeIcon: some View {
         Image(systemName: "globe")
             .font(.system(size: 14))
-            .foregroundColor(AppTheme.Colors.text.opacity(0.4))
+            .foregroundColor(palette.text.opacity(0.4))
             .frame(width: 22, height: 22)
     }
 
@@ -100,11 +101,11 @@ struct BookmarksListView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(AppTheme.Colors.uiElement)
+                .fill(palette.uiElement)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(AppTheme.Colors.text.opacity(0.08), lineWidth: 0.5)
+                .stroke(palette.text.opacity(0.08), lineWidth: 0.5)
         )
     }
 }

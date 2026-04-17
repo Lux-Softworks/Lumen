@@ -13,6 +13,7 @@ struct BrowserView: View {
     @State private var urlText: String = ""
 
     @State private var bottomBarOpacity: CGFloat = 1
+    @State private var incognitoActive: Bool = false
 
     @State private var webViewReady = true
     @State private var coverFinished = false
@@ -26,6 +27,14 @@ struct BrowserView: View {
 
     private var isTransitioning: Bool { activeTabViewState.isTransitioning }
     private var activeTab: Tab? { tabManager.activeTab }
+
+    private func syncIncognitoToActiveTab() {
+        let next = activeTab?.isIncognito ?? false
+        guard next != incognitoActive else { return }
+        withAnimation(.easeInOut(duration: 0.22)) {
+            incognitoActive = next
+        }
+    }
 
     private var pageReadyToken: Int {
         activeTab?.viewModel.pageReadyToken ?? 0
@@ -71,6 +80,7 @@ struct BrowserView: View {
 
     var body: some View {
         content
+            .environment(\.palette, incognitoActive ? .incognito : .standard)
             .ignoresSafeArea()
             .applyNavigationCoverChangeHandlers(
                 showNavigationCover: $showNavigationCover,
@@ -111,6 +121,7 @@ struct BrowserView: View {
                 webViewReady: $webViewReady,
                 isAddressBarFocused: $isAddressBarFocused
             )
+            .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
             .onAppear {
                 withAnimation(.smooth(duration: 0.3).delay(0.3)) {
                     isReady = true
@@ -173,16 +184,37 @@ struct BrowserView: View {
     @ViewBuilder
     private func backgroundGradient(geometry: GeometryProxy) -> some View {
         ZStack {
-            LinearGradient(
-                colors: [AppTheme.Colors.background, AppTheme.Colors.background],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            backgroundDecorations(geometry: geometry)
-            Color.black.opacity(0.3)
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .environment(\.colorScheme, .dark)
-                .opacity(0.7)
+            if incognitoActive {
+                LinearGradient(
+                    colors: [IncognitoPalette.background, IncognitoPalette.uiElement],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                Circle()
+                    .fill(IncognitoPalette.accent.opacity(0.10))
+                    .frame(width: geometry.size.width * 1.2)
+                    .blur(radius: 110)
+                    .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.2)
+                Circle()
+                    .fill(IncognitoPalette.secondaryAccent.opacity(0.07))
+                    .frame(width: geometry.size.width * 1.1)
+                    .blur(radius: 100)
+                    .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.3)
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+                    .opacity(0.55)
+            } else {
+                LinearGradient(
+                    colors: [AppTheme.Colors.background, AppTheme.Colors.background],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                backgroundDecorations(geometry: geometry)
+                Color.black.opacity(0.3)
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+                    .opacity(0.7)
+            }
         }
         .frame(width: geometry.size.width, height: geometry.size.height)
         .clipped()
@@ -429,20 +461,14 @@ struct BrowserView: View {
                         .frame(height: headerHeight / targetScale)
                         .frame(maxWidth: .infinity)
 
-                    Group {
-                        if let backgroundColor = activeTab?.viewModel.themeColor {
-                            Color(backgroundColor)
-                        } else {
-                            Color.black
-                        }
-                    }
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            cornerRadii: .init(
-                                topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0,
-                                topTrailing: lerpCornerRadius))
-                    )
-                    .offset(y: currentHeaderTranslate)
+                    headerStripColor(tab: activeTab)
+                        .clipShape(
+                            UnevenRoundedRectangle(
+                                cornerRadii: .init(
+                                    topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0,
+                                    topTrailing: lerpCornerRadius))
+                        )
+                        .offset(y: currentHeaderTranslate)
                 }
 
                 ZStack {
@@ -493,7 +519,12 @@ struct BrowserView: View {
     private func tabHeaderContent(tab: Tab) -> some View {
         HStack(spacing: 8) {
             let url = tab.viewModel.currentURL ?? tab.url
-            if let url, let faviconURL = FaviconService.faviconURL(for: url) {
+            if tab.isIncognito {
+                Image(systemName: "eyeglasses")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 16, height: 16)
+            } else if let url, let faviconURL = FaviconService.faviconURL(for: url) {
                 AsyncImage(url: faviconURL) { phaseImage in
                     phaseImage.resizable()
                         .scaledToFit()
@@ -524,6 +555,15 @@ struct BrowserView: View {
         tabHeaderContent(tab: tab)
             .padding(.horizontal, 10)
             .frame(height: 36)
+    }
+
+    @ViewBuilder
+    private func headerStripColor(tab: Tab?) -> some View {
+        if let themeColor = tab?.viewModel.themeColor {
+            Color(themeColor)
+        } else {
+            Color.black
+        }
     }
 
     @ViewBuilder
@@ -581,8 +621,16 @@ struct BrowserView: View {
             onNavigate: { url in
                 vm?.navigate(to: url)
                 bottomBarState = .collapsed
-            }
+            },
+            onNewIncognitoTab: handleNewIncognitoTab,
+            isIncognitoActive: incognitoActive
         )
+    }
+
+    private func handleNewIncognitoTab() {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            incognitoActive.toggle()
+        }
     }
 
     private func handleTabsPressed() {
@@ -681,7 +729,7 @@ struct BrowserView: View {
             }
 
             if tabsEmpty || hasValidPage {
-                tabManager.newTab()
+                tabManager.newTab(incognito: incognitoActive)
             }
 
             activeTab?.viewModel.urlString = query

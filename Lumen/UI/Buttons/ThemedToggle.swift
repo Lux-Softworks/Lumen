@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ThemedToggle: View {
     @Binding var isOn: Bool
+    @Environment(\.palette) private var palette
 
     var body: some View {
         Button(action: {
@@ -11,7 +12,7 @@ struct ThemedToggle: View {
         }) {
             ZStack {
                 Capsule()
-                    .fill(isOn ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.1))
+                    .fill(isOn ? palette.accent : palette.text.opacity(0.1))
                     .frame(width: 48, height: 28)
 
                 Circle()

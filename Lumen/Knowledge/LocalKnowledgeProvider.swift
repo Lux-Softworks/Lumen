@@ -56,18 +56,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let prompt = """
-            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Summarize articles in one sentence.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            Understanding closures: Closures capture variables from their enclosing scope and can be passed as arguments.<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-            Closures capture surrounding variables and can be passed around as self-contained blocks of functionality.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            \(title ?? ""): \(content.prefix(500))<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-
-            """
+        let prompt = await KnowledgePrompts.pageSummary(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 50, temperature: 0.1)
         let tokens = await container.encode(prompt)
@@ -94,18 +83,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let prompt = """
-            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Describe a website's purpose in under 8 words.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            developer.apple.com: Documentation for iOS, macOS, watchOS APIs and frameworks.<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-            Apple developer documentation and API reference.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            \(title ?? ""): \(content.prefix(800))<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-
-            """
+        let prompt = await KnowledgePrompts.websiteSummary(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 25, temperature: 0.1)
         let tokens = await container.encode(prompt)
@@ -134,17 +112,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let joined = summaries.prefix(8)
-            .joined(separator: ". ")
-
-        let prompt = """
-            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Describe what these pages have in common in one sentence.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            \(joined)<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-
-            """
+        let prompt = await KnowledgePrompts.websiteReadingSynthesis(summaries: summaries)
 
         let parameters = GenerateParameters(maxTokens: 60, temperature: 0.15)
         let tokens = await container.encode(prompt)
@@ -171,15 +139,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let prompt = """
-            You are a topic classifier. Categorize the following article into a single, concise topic name (e.g., 'Finance', 'Technology', 'Sports', 'AI').
-            If the article doesn't clearly fit a common category, provide a custom one that is 1-2 words max.
-
-            Title: \(title ?? "N/A")
-            Content: \(content.prefix(2000))
-
-            Respond with ONLY the topic name.
-            """
+        let prompt = await KnowledgePrompts.topicClassification(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
         let tokens = await container.encode(prompt)
@@ -206,13 +166,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let prompt = """
-            Your task is to refine the given query to be more suitable for database search.
-            Once the query is refined, please find the most relevant keyword from the refined query.
-            Respond with ONLY the keyword.
-
-            Query: \(query)
-            """
+        let prompt = await KnowledgePrompts.queryRefinement(query: query)
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
         let tokens = await container.encode(prompt)
@@ -296,21 +250,13 @@ actor LocalKnowledgeProvider {
             }
             .joined()
 
-        let prompt = """
-            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Reading assistant. Answer the user's question using the sources below — pages from their reading history. Guidelines:
-            - Read the sources carefully; they often contain relevant info even when not a perfect keyword match.
-            - Ground claims in the sources. Do not introduce specific facts, numbers, dates, names, or quotes not present.
-            - If a source is adjacent to the question, draw what's useful and note what's missing — don't refuse wholesale.
-            - Only say "this isn't covered in your reading" when the sources truly have no relevant material.
-            - Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context.\(highlightsGuideline)
-
-            Sources:
-            \(context)\(highlightsBlock)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>
-            \(query)<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-
-            """
+        let prompt = await KnowledgePrompts.ragAnswer(
+            query: query,
+            context: context,
+            highlightsBlock: highlightsBlock,
+            highlightsGuideline: highlightsGuideline,
+            historyBlock: historyBlock
+        )
 
         let parameters = GenerateParameters(maxTokens: 750, temperature: 0.1)
         let tokens = await container.encode(prompt)

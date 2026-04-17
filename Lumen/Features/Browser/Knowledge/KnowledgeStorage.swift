@@ -919,14 +919,11 @@ actor KnowledgeStorage {
 
     func seedTestData() async throws {
         try initialize()
+        try deleteAllTopics()
 
-        try execute("BEGIN TRANSACTION")
-        do {
-            try deleteAllTopics()
-
-            let techID    = try await createTopic(name: "Technology",  color: "#4A90E2")
-            let scienceID = try await createTopic(name: "Science",     color: "#7ED321")
-            let financeID = try await createTopic(name: "Finance",     color: "#F5A623")
+        let techID    = try await createTopic(name: "Technology",  color: "#4A90E2")
+        let scienceID = try await createTopic(name: "Science",     color: "#7ED321")
+        let financeID = try await createTopic(name: "Finance",     color: "#F5A623")
 
             let apple = await Website(domain: "apple.com", displayName: "Apple", summary: "Official Apple developer and product news.", topicID: techID)
             let verge = await Website(domain: "theverge.com", displayName: "The Verge", summary: "Tech news, reviews, and culture.", topicID: techID)
@@ -1017,12 +1014,7 @@ actor KnowledgeStorage {
                 }
             }
 
-            try updateTopicCounts()
-            try execute("COMMIT")
-        } catch {
-            try? execute("ROLLBACK")
-            throw error
-        }
+        try updateTopicCounts()
     }
 
     func saveAnnotation(

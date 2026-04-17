@@ -5,6 +5,8 @@ struct KnowledgeAIView: View {
     @Bindable var viewModel: KnowledgeAIViewModel
     @FocusState private var isFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
 
     private var safeAreaBottom: CGFloat {
         UIApplication.shared.connectedScenes
@@ -24,8 +26,8 @@ struct KnowledgeAIView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.smooth(duration: 0.28), value: viewModel.messages.isEmpty)
-            .animation(.smooth(duration: 0.28), value: viewModel.isThinking)
+            .animation(AppTheme.Motion.standard, value: viewModel.messages.isEmpty)
+            .animation(AppTheme.Motion.standard, value: viewModel.isThinking)
 
             inputBar
         }
@@ -55,7 +57,7 @@ struct KnowledgeAIView: View {
             )
             Text("Ask about what you've read")
                 .font(.system(size: 14, weight: .regular))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.28))
+                .foregroundColor(palette.text.opacity(0.28))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -114,14 +116,15 @@ struct KnowledgeAIView: View {
                             .allowsHitTesting(false)
                     } else {
                         Text("What do you want to know?")
-                            .font(.system(size: 15))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.3))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(palette.text.opacity(0.3))
                             .allowsHitTesting(false)
                     }
                 }
                 TextField("", text: $viewModel.inputText, axis: .vertical)
-                    .font(.system(size: 15))
-                    .foregroundColor(AppTheme.Colors.text)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(palette.text)
+                    .tint(palette.accent)
                     .lineLimit(1...5)
                     .focused($isFocused)
                     .submitLabel(.send)
@@ -137,12 +140,12 @@ struct KnowledgeAIView: View {
                 Task { await viewModel.send() }
             } label: {
                 Circle()
-                    .fill(canSend ? AppTheme.Colors.accent : AppTheme.Colors.text.opacity(0.08))
+                    .fill(canSend ? palette.accent : palette.text.opacity(0.08))
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "arrow.up")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(canSend ? .white : AppTheme.Colors.text.opacity(0.25))
+                            .foregroundColor(canSend ? .white : palette.text.opacity(0.25))
                     )
                     .animation(.spring(duration: 0.25, bounce: 0.25), value: canSend)
             }
@@ -155,7 +158,7 @@ struct KnowledgeAIView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(
-                    AppTheme.Colors.text.opacity(isFocused ? 0.18 : 0.07),
+                    palette.text.opacity(isFocused ? 0.18 : 0.07),
                     lineWidth: 0.75
                 )
         )
@@ -166,20 +169,8 @@ struct KnowledgeAIView: View {
     }
 
     private var inputBackground: some View {
-        ZStack {
-            BlurView(style: .systemChromeMaterial)
-            BlurView(style: .systemChromeMaterial)
-
-            LinearGradient(
-                colors: [
-                    AppTheme.Colors.uiElement.opacity(0.75),
-                    AppTheme.Colors.uiElement.opacity(0.6),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(palette.text.opacity(colorScheme == .dark || palette.isIncognito ? 0.08 : 0.05))
     }
 
     private var canSend: Bool {
@@ -192,6 +183,7 @@ struct KnowledgeAIView: View {
 private struct ChatBubbleView: View {
     let message: ChatMessage
     private var isUser: Bool { message.role == .user }
+    @Environment(\.palette) private var palette
 
     var body: some View {
         Group {
@@ -208,16 +200,16 @@ private struct ChatBubbleView: View {
     private var userBubble: some View {
         Text(message.text)
             .font(.system(size: 15))
-            .foregroundColor(AppTheme.Colors.text)
+            .foregroundColor(palette.text)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(AppTheme.Colors.uiElement)
+                    .fill(palette.uiElement)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(AppTheme.Colors.text.opacity(0.06), lineWidth: 0.5)
+                            .strokeBorder(palette.text.opacity(0.06), lineWidth: 0.5)
                     )
             )
     }
@@ -270,16 +262,16 @@ private struct ChatBubbleView: View {
             ForEach(message.sources) { source in
                 HStack(spacing: 5) {
                     RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(AppTheme.Colors.accent.opacity(0.4))
+                        .fill(palette.accent.opacity(0.4))
                         .frame(width: 2, height: 10)
                     Text(source.domain)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+                        .foregroundColor(palette.text.opacity(0.35))
                         .lineLimit(1)
                     if let title = source.title, !title.isEmpty {
                         Text("· \(title)")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.2))
+                            .foregroundColor(palette.text.opacity(0.2))
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
@@ -334,6 +326,7 @@ private struct WordFlowLayout: Layout {
 
 private struct RevealText: View {
     let text: String
+    @Environment(\.palette) private var palette
 
     private struct WordToken {
         let word: String
@@ -365,7 +358,7 @@ private struct RevealText: View {
                     if item.block.isBullet {
                         Text("•")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.accent.opacity(0.6))
+                            .foregroundColor(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
 
@@ -431,11 +424,12 @@ private struct WordView: View {
     let delay: Double
 
     @State private var appeared = false
+    @Environment(\.palette) private var palette
 
     var body: some View {
         Text(word)
             .font(.system(size: 15, weight: bold ? .bold : .regular))
-            .foregroundColor(AppTheme.Colors.text)
+            .foregroundColor(palette.text)
             .opacity(appeared ? 1 : 0)
             .blur(radius: appeared ? 0 : 2)
             .onAppear {
@@ -448,12 +442,13 @@ private struct WordView: View {
 
 private struct ThreeDotsView: View {
     @State private var phase: Int = 0
+    @Environment(\.palette) private var palette
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3, id: \.self) { i in
                 Circle()
-                    .fill(AppTheme.Colors.text.opacity(phase == i ? 0.4 : 0.12))
+                    .fill(palette.text.opacity(phase == i ? 0.4 : 0.12))
                     .frame(width: 5, height: 5)
                     .animation(.easeInOut(duration: 0.3).delay(Double(i) * 0.1), value: phase)
             }
@@ -472,6 +467,7 @@ private struct LumenSparkle: View {
     let phase: SparklePhase
 
     @State private var isSpinning = false
+    @Environment(\.palette) private var palette
     @State private var tickSpread: Double = 0
     @State private var tickOpacity: Double = 0
     @State private var glowOpacity: Double = 0.2
@@ -486,7 +482,7 @@ private struct LumenSparkle: View {
             ZStack {
                 ForEach(0..<tickCount, id: \.self) { i in
                     Capsule()
-                        .fill(AppTheme.Colors.accent)
+                        .fill(palette.accent)
                         .frame(width: 1.5, height: size * 0.2)
                         .offset(y: -(size * 0.75 * tickSpread))
                         .rotationEffect(
@@ -497,14 +493,14 @@ private struct LumenSparkle: View {
 
                 Image(systemName: "sparkle")
                     .font(.system(size: size * 1.2, weight: .thin))
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(palette.accent)
                     .blur(radius: size * 0.22)
                     .opacity(glowOpacity)
                     .scaleEffect(glowScale)
 
                 Image(systemName: "sparkle")
                     .font(.system(size: size, weight: .thin))
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(palette.accent)
             }
         }
         .frame(width: size * 2.4, height: size * 2.4)

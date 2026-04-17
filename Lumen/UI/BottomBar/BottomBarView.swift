@@ -37,8 +37,12 @@ struct BottomBarView: View {
     var onRequestDesktopSite: ((Bool) -> Void)? = nil
     var onReloadPage: (() -> Void)? = nil
     var onNavigate: ((String) -> Void)? = nil
+    var onNewIncognitoTab: (() -> Void)? = nil
+    var isIncognitoActive: Bool = false
 
     @ObservedObject private var historyStore = HistoryStore.shared
+    @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
 
     @Namespace private var animation
     @State private var isSpinning = false
@@ -48,6 +52,11 @@ struct BottomBarView: View {
     var isExpanded: Bool {
         state == .search || state == .browserSettings || state == .siteSettings
             || state == .knowledge || state == .submittingSearch
+    }
+
+    var showsMagnifier: Bool {
+        state == .collapsed || state == .hidden
+            || state == .search || state == .submittingSearch
     }
 
     var expandedHeightRatio: CGFloat {
@@ -134,6 +143,15 @@ struct BottomBarView: View {
                     searchBarRow
                         .opacity(isExpanded ? 1 : 0)
                         .allowsHitTesting(isExpanded)
+
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(palette.text)
+                        .matchedGeometryEffect(
+                            id: "magnifyingGlass_icon", in: animation, isSource: false
+                        )
+                        .opacity(showsMagnifier ? 1 : 0)
+                        .allowsHitTesting(false)
                 }
 
                 if state == .knowledge {
@@ -220,7 +238,7 @@ struct BottomBarView: View {
                     Button(action: onCopyUrl) {
                         Image(systemName: "link")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                            .foregroundColor(palette.text.opacity(0.8))
                             .frame(width: 28, height: 28)
                             .clipShape(Circle())
                     }
@@ -229,7 +247,7 @@ struct BottomBarView: View {
                         Button(action: onBack) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(canGoBack ? AppTheme.Colors.text : AppTheme.Colors.text.opacity(0.2))
+                                .foregroundColor(canGoBack ? palette.text : palette.text.opacity(0.2))
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoBack)
@@ -237,7 +255,7 @@ struct BottomBarView: View {
                         Button(action: onForward) {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(canGoForward ? AppTheme.Colors.text : AppTheme.Colors.text.opacity(0.2))
+                                .foregroundColor(canGoForward ? palette.text : palette.text.opacity(0.2))
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoForward)
@@ -251,16 +269,20 @@ struct BottomBarView: View {
 
                 Button(action: onSettingsPressed) {
                     ZStack {
-                        Image(systemName: "magnifyingglass")
-                            .matchedGeometryEffect(id: "magnifyingGlass_icon", in: animation, isSource: isExpanded)
-                            .opacity((state == .search || state == .collapsed || state == .hidden) ? 1 : 0)
+                        Color.clear
+                            .frame(width: 18, height: 18)
+                            .matchedGeometryEffect(
+                                id: "magnifyingGlass_icon",
+                                in: animation,
+                                isSource: isExpanded
+                            )
                         Image(systemName: "gearshape.fill")
                             .opacity(state == .browserSettings ? 1 : 0)
                         Image(systemName: "folder.fill")
                             .opacity(state == .knowledge ? 1 : 0)
                     }
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                    .foregroundColor(palette.text.opacity(0.6))
                     .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
@@ -280,6 +302,8 @@ struct BottomBarView: View {
                     : AppTheme.Typography.sansBody(size: 17, weight: .bold)
             )
             .textFieldStyle(.plain)
+            .foregroundColor(palette.text)
+            .tint(palette.accent)
             .focused($isFocused)
             .submitLabel(.go)
             .onSubmit(onSubmit)
@@ -290,32 +314,55 @@ struct BottomBarView: View {
                     ? .tail : .head
             )
 
-            ZStack {
-                Button(action: onReload) {
-                    Image(systemName: "arrow.clockwise")
-                        .resizable()
-                        .antialiased(true)
-                        .scaledToFit()
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.8))
-                        .frame(width: 18, height: 18)
-                        .rotationEffect(.degrees(reloadRotation), anchor: .center)
-                        .drawingGroup()
-                        .frame(width: 44, height: 44)
-                }
-                .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
-                .opacity(state == .siteSettings ? 1 : 0)
-                .allowsHitTesting(state == .siteSettings)
+            HStack(spacing: 0) {
+                ZStack {
+                    Button(action: onReload) {
+                        Image(systemName: "arrow.clockwise")
+                            .resizable()
+                            .antialiased(true)
+                            .scaledToFit()
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(palette.text.opacity(0.8))
+                            .frame(width: 18, height: 18)
+                            .rotationEffect(.degrees(reloadRotation), anchor: .center)
+                            .drawingGroup()
+                            .frame(width: 44, height: 44)
+                    }
+                    .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
+                    .opacity(state == .siteSettings ? 1 : 0)
+                    .allowsHitTesting(state == .siteSettings)
 
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.6))
-                        .frame(width: 44, height: 44)
+                    Button(action: { text = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(palette.text.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                    }
+                    .opacity(state == .search && !text.isEmpty ? 1 : 0)
+                    .allowsHitTesting(state == .search && !text.isEmpty)
                 }
-                .opacity(state == .search && !text.isEmpty ? 1 : 0)
-                .allowsHitTesting(state == .search && !text.isEmpty)
+                .frame(width: state == .siteSettings || (state == .search && !text.isEmpty) ? 44 : 0, height: 44)
+
+                Button(action: {
+                    onNewIncognitoTab?()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }) {
+                    ZStack {
+                        Image(systemName: "eyes")
+                            .opacity(isIncognitoActive ? 0 : 1)
+                        ClosedEyes()
+                            .opacity(isIncognitoActive ? 1 : 0)
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
+                    .frame(width: 32, height: 44)
+                    .animation(.easeInOut(duration: 0.22), value: isIncognitoActive)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isIncognitoActive ? "Switch to regular tab" : "Open incognito tab")
+                .opacity(state == .search ? 1 : 0)
+                .allowsHitTesting(state == .search)
+                .frame(width: state == .search ? 32 : 0)
             }
-            .frame(width: 44, height: 44)
         }
         .padding(.horizontal, 16)
         .frame(height: 44)
@@ -324,7 +371,7 @@ struct BottomBarView: View {
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                        .stroke(palette.text.opacity(0.15), lineWidth: 1)
                 )
                 .matchedGeometryEffect(
                     id: "searchBackground_fill", in: animation, isSource: isExpanded)
@@ -354,7 +401,7 @@ struct BottomBarView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "plus")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                                    .foregroundColor(palette.text.opacity(0.6))
                                     .frame(width: 24)
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -388,7 +435,7 @@ struct BottomBarView: View {
 
                                     Text(attributedText)
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(AppTheme.Colors.text)
+                                        .foregroundColor(palette.text)
                                         .lineLimit(1)
                                 }
 
@@ -414,13 +461,13 @@ struct BottomBarView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.text.opacity(0.6))
+                                    .foregroundColor(palette.text.opacity(0.6))
                                     .frame(width: 24)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(entry.title)
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(AppTheme.Colors.text)
+                                        .foregroundColor(palette.text)
                                         .lineLimit(1)
                                 }
 
@@ -446,9 +493,10 @@ struct BottomBarView: View {
 
     private var frostedBackground: some View {
         ZStack {
-            AppTheme.Colors.uiElement
-            AppTheme.Colors.background.opacity(0.1)
-            AppTheme.Colors.accent.opacity(0.04)
+            BlurView(style: .systemChromeMaterial)
+                .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
+            palette.uiElement.opacity(palette.isIncognito ? 0.55 : 0.75)
+            palette.accent.opacity(0.04)
         }
     }
 
@@ -468,13 +516,13 @@ struct BottomBarView: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "square.on.square")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(AppTheme.Colors.text.opacity(tabCount == 0 ? 0.35 : 1.0))
+                        .foregroundColor(palette.text.opacity(tabCount == 0 ? 0.35 : 1.0))
                         .frame(width: 44, height: 44)
                         .background(frostedBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                                .stroke(palette.text.opacity(0.15), lineWidth: 1)
                         )
                 }
             }
@@ -498,7 +546,7 @@ struct BottomBarView: View {
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                                .stroke(palette.text.opacity(0.15), lineWidth: 1)
                         )
                         .matchedGeometryEffect(
                             id: "searchBackground_fill", in: animation, isSource: !isExpanded
@@ -506,9 +554,8 @@ struct BottomBarView: View {
                         .frame(width: 80, height: 44)
 
                     ZStack {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text)
+                        Color.clear
+                            .frame(width: 18, height: 18)
                             .matchedGeometryEffect(
                                 id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded
                             )
@@ -517,7 +564,7 @@ struct BottomBarView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text)
+                            .foregroundColor(palette.text)
                             .frame(width: 18, height: 18)
                             .rotationEffect(.degrees(0))
                             .opacity(0)
@@ -533,13 +580,13 @@ struct BottomBarView: View {
             Button(action: onSettingsPressed) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.Colors.text)
+                    .foregroundColor(palette.text)
                     .frame(width: 44, height: 44)
                     .background(frostedBackground)
                     .clipShape(Circle())
                     .overlay(
                         Circle()
-                            .stroke(AppTheme.Colors.text.opacity(0.15), lineWidth: 1)
+                            .stroke(palette.text.opacity(0.15), lineWidth: 1)
                     )
             }
             .padding(.trailing, 8)
@@ -596,5 +643,36 @@ struct BottomBarView: View {
             cleanHost.removeFirst(4)
         }
         return cleanHost
+    }
+}
+
+private struct ClosedEyesShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let lidWidth: CGFloat = 8
+        let lidHeight: CGFloat = 5
+        let gap: CGFloat = 3
+        let totalWidth = lidWidth * 2 + gap
+        let startX = (rect.width - totalWidth) / 2
+        let y = rect.height / 2
+
+        for i in 0..<2 {
+            let x = startX + CGFloat(i) * (lidWidth + gap)
+            path.move(to: CGPoint(x: x, y: y))
+            path.addQuadCurve(
+                to: CGPoint(x: x + lidWidth, y: y),
+                control: CGPoint(x: x + lidWidth / 2, y: y - lidHeight)
+            )
+        }
+        return path
+    }
+}
+
+private struct ClosedEyes: View {
+    var body: some View {
+        ClosedEyesShape()
+            .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+            .frame(width: 22, height: 16)
+            .contentShape(Rectangle())
     }
 }

@@ -39,6 +39,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     private var knowledgeProvider: LocalKnowledgeProvider?
+    let isIncognito: Bool
 
     func initializeKnowledgeProvider() {}
 
@@ -48,7 +49,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
         }
     }
 
-    init(url: URL? = nil) {
+    init(url: URL? = nil, isIncognito: Bool = false) {
+        self.isIncognito = isIncognito
         super.init()
         self.currentURL = url
         self.urlString = url?.absoluteString ?? defaultURL.absoluteString
@@ -94,11 +96,15 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                 Task {
                     do {
-                        async let googleResults = SearchSuggestionService.shared.fetchSuggestions(for: query)
                         async let semanticResults = KnowledgeStorage.shared.searchSemantic(query: query)
-
-                        let web = try await googleResults
                         let local = try await semanticResults
+
+                        let web: [SearchSuggestion]
+                        if self.isIncognito {
+                            web = []
+                        } else {
+                            web = try await SearchSuggestionService.shared.fetchSuggestions(for: query)
+                        }
 
                         await MainActor.run {
                             if !self.urlString.isEmpty {
@@ -263,7 +269,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
                             });
                         """)
 
-                        if let url = webView.url?.absoluteString,
+                        if let self,
+                            !self.isIncognito,
+                            let url = webView.url?.absoluteString,
                             let title = webView.title, !title.isEmpty
                         {
                             HistoryStore.shared.record(url: url, title: title)

@@ -48,4 +48,12 @@ public enum AppTheme {
             return .system(size: size, weight: weight, design: .default)
         }
     }
+
+    public enum Motion {
+        public static let standard: Animation = .spring(duration: 0.42, bounce: 0.18)
+        public static let snappy: Animation = .spring(duration: 0.28, bounce: 0.12)
+        public static let micro: Animation = .spring(duration: 0.18, bounce: 0)
+        public static let sheet: Animation = .spring(duration: 0.46, bounce: 0.14)
+        public static let fade: Animation = .easeOut(duration: 0.18)
+    }
 }

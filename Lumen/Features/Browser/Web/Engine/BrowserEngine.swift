@@ -4,7 +4,7 @@ import UIKit
 import WebKit
 
 enum BrowserEngine {
-    static func makeConfiguration(policy: PrivacyPolicy) -> WKWebViewConfiguration {
+    static func makeConfiguration(policy: PrivacyPolicy, isIncognito: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
         config.websiteDataStore = .nonPersistent()
@@ -145,11 +145,20 @@ enum BrowserEngine {
             config, &_WKWebViewAssociatedKeys.annotationHandlerKey, annotationHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        if isIncognito {
+            objc_setAssociatedObject(
+                config,
+                &_WKWebViewAssociatedKeys.incognitoFlagKey,
+                true,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
+        }
+
         return config
     }
 
-    static func makeWebView(policy: PrivacyPolicy) -> WKWebView {
-        let config = makeConfiguration(policy: policy)
+    static func makeWebView(policy: PrivacyPolicy, isIncognito: Bool = false) -> WKWebView {
+        let config = makeConfiguration(policy: policy, isIncognito: isIncognito)
         let webView = LumenWebView(frame: .zero, configuration: config)
 
         if #available(iOS 13.0, *) {
@@ -199,11 +208,12 @@ enum BrowserEngine {
     }
 }
 
-private enum _WKWebViewAssociatedKeys {
+internal enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
     static var fingerprintHandlerKey: UInt8 = 1
     static var readingSignalHandlerKey: UInt8 = 2
     static var annotationHandlerKey: UInt8 = 3
+    static var incognitoFlagKey: UInt8 = 4
 }
 
 final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {

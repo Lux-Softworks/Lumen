@@ -1,5 +1,7 @@
 import Foundation
+import ObjectiveC
 import WebKit
+import os
 
 @MainActor
 class KnowledgeCaptureService {
@@ -10,6 +12,11 @@ class KnowledgeCaptureService {
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
         guard BrowserSettings.shared.collectKnowledge else { return }
         guard let webView = webView else { return }
+        let incognito = objc_getAssociatedObject(
+            webView.configuration,
+            &_WKWebViewAssociatedKeys.incognitoFlagKey
+        ) as? Bool ?? false
+        guard !incognito else { return }
 
         let html: String?
         do {
@@ -79,7 +86,7 @@ class KnowledgeCaptureService {
                 }
             }
         } catch {
-            print("Knowledge capture failed: \(error)")
+            KnowledgeLogger.capture.error("capture failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -91,7 +98,7 @@ class KnowledgeCaptureService {
                 readingTime: payload.readingTime
             )
         } catch {
-            print("Knowledge engagement update failed: \(error)")
+            KnowledgeLogger.capture.error("engagement update failed: \(String(describing: error), privacy: .public)")
         }
     }
 }

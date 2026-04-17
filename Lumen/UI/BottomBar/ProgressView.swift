@@ -9,37 +9,44 @@ struct ProgressView: View {
     @State private var displayedProgress: Double = 0
     @State private var visible: Bool = false
     @State private var isFinishing: Bool = false
+    @Environment(\.palette) private var palette
 
-    private let barGradient = LinearGradient(
-        colors: [
-            AppTheme.Colors.accent.opacity(0.7),
-            AppTheme.Colors.accent.opacity(0.85),
-            AppTheme.Colors.accent,
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    private var barGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                palette.accent.opacity(0.7),
+                palette.accent.opacity(0.85),
+                palette.accent,
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
 
-    private let glowGradient = LinearGradient(
-        colors: [
-            AppTheme.Colors.accent.opacity(0.35),
-            AppTheme.Colors.accent.opacity(0.8),
-            AppTheme.Colors.accent.opacity(0.45),
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    private var glowGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                palette.accent.opacity(0.35),
+                palette.accent.opacity(0.8),
+                palette.accent.opacity(0.45),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
 
-    private let tipGradient = LinearGradient(
-        stops: [
-            .init(color: .clear, location: 0.0),
-            .init(color: .clear, location: 0.52),
-            .init(color: AppTheme.Colors.accent.opacity(0.45), location: 0.80),
-            .init(color: AppTheme.Colors.accent.opacity(0.85), location: 1.0),
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    private var tipGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0.0),
+                .init(color: .clear, location: 0.52),
+                .init(color: palette.accent.opacity(0.45), location: 0.80),
+                .init(color: palette.accent.opacity(0.85), location: 1.0),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
 
     var body: some View {
         ZStack(alignment: .leading) {

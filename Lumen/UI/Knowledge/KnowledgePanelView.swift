@@ -5,6 +5,7 @@ struct KnowledgePanelView: View {
 
     @State var viewModel: KnowledgePanelViewModel
     @State private var panelWidth: CGFloat = 375 // default for iphone
+    @Environment(\.palette) private var palette
 
     init(viewModel: KnowledgePanelViewModel? = nil) {
         if let viewModel {
@@ -50,14 +51,14 @@ struct KnowledgePanelView: View {
         ZStack(alignment: .leading) {
             GeometryReader { geo in
                 Capsule()
-                    .fill(AppTheme.Colors.uiElement)
+                    .fill(palette.uiElement)
                     .overlay(
                         Capsule()
-                            .fill(AppTheme.Colors.accent.opacity(0.06))
+                            .fill(palette.accent.opacity(0.06))
                     )
                     .overlay(
                         Capsule()
-                            .stroke(AppTheme.Colors.accent.opacity(0.1), lineWidth: 0.5)
+                            .stroke(palette.accent.opacity(0.1), lineWidth: 0.5)
                     )
                     .frame(width: geo.size.width / 2, height: geo.size.height)
                     .offset(x: viewModel.activeTab == .ai ? 0 : geo.size.width / 2)
@@ -75,8 +76,8 @@ struct KnowledgePanelView: View {
                         ))
                         .foregroundColor(
                             viewModel.activeTab == .ai
-                                ? AppTheme.Colors.text
-                                : AppTheme.Colors.text.opacity(0.45)
+                                ? palette.text
+                                : palette.text.opacity(0.45)
                         )
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
@@ -94,8 +95,8 @@ struct KnowledgePanelView: View {
                         ))
                         .foregroundColor(
                             viewModel.activeTab == .folder
-                                ? AppTheme.Colors.text
-                                : AppTheme.Colors.text.opacity(0.45)
+                                ? palette.text
+                                : palette.text.opacity(0.45)
                         )
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
@@ -105,11 +106,11 @@ struct KnowledgePanelView: View {
             }
         }
         .frame(height: 38)
-        .background(AppTheme.Colors.background.opacity(0.5))
+        .background(palette.background.opacity(0.5))
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(AppTheme.Colors.text.opacity(0.1), lineWidth: 1)
+                .stroke(palette.text.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
