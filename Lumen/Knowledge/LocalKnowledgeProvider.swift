@@ -231,6 +231,7 @@ actor LocalKnowledgeProvider {
     func answerFromKnowledge(
         query: String,
         sources: [PageContent],
+        highlights: [String] = [],
         history: [(role: String, text: String)] = []
     ) async throws -> String {
         guard !sources.isEmpty else { return "" }
@@ -261,6 +262,21 @@ actor LocalKnowledgeProvider {
             }
             .joined(separator: "\n")
 
+        let highlightsBlock: String
+        if highlights.isEmpty {
+            highlightsBlock = ""
+        } else {
+            let lines = highlights.prefix(6)
+                .map { "- \"\(String($0.prefix(240)))\"" }
+                .joined(separator: "\n")
+            highlightsBlock = """
+
+
+                User-highlighted passages (strong signal, prioritize when relevant):
+                \(lines)
+                """
+        }
+
         let historyBlock = history
             .map { turn -> String in
                 let header = turn.role == "user" ? "user" : "assistant"
@@ -271,10 +287,10 @@ actor LocalKnowledgeProvider {
 
         let prompt = """
             <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Reading assistant. Answer from sources. Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context.
+            Reading assistant. Answer from sources. Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context. When user-highlighted passages are present, weight them heavily — user explicitly marked them as important.
 
             Sources:
-            \(context)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>
+            \(context)\(highlightsBlock)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>
             \(query)<|eot_id|>\
             <|start_header_id|>assistant<|end_header_id|>
 

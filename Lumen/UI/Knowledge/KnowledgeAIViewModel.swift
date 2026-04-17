@@ -61,9 +61,16 @@ final class KnowledgeAIViewModel {
             (msg.role == .user ? "user" : "assistant", msg.text)
         }
 
+        var highlights: [String] = []
+        for page in sources {
+            if let anns = try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id) {
+                highlights.append(contentsOf: anns.map { $0.text })
+            }
+        }
+
         do {
             let answer = try await LocalKnowledgeProvider.shared.answerFromKnowledge(
-                query: trimmed, sources: sources, history: history)
+                query: trimmed, sources: sources, highlights: highlights, history: history)
             finishThinking()
             messages.append(ChatMessage(role: .assistant, text: answer, sources: sources))
         } catch {

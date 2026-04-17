@@ -16,6 +16,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     var onThreatDetected: ((ThreatEvent) -> Void)?
     var onDidCommit: ((WKWebView) -> Void)?
+    var onDidFinishLoad: ((WKWebView) -> Void)?
 
     init(detector: ThreatDetector, httpsOnly: Bool = true) {
         self.detector = detector
@@ -148,6 +149,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                 logThreatSummary()
             }
         }
+        onDidFinishLoad?(webView)
     }
 
     func webView(

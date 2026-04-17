@@ -440,6 +440,8 @@ private struct PageDetailView: View {
     let page: PageContent
     var onBack: () -> Void
 
+    @State private var annotations: [Annotation] = []
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -482,6 +484,12 @@ private struct PageDetailView: View {
                             .padding(.bottom, 20)
                     }
 
+                    if !annotations.isEmpty {
+                        highlightsSection
+                            .padding(.bottom, 20)
+                            .transition(.opacity)
+                    }
+
                     Rectangle()
                         .fill(AppTheme.Colors.text.opacity(0.06))
                         .frame(height: 0.5)
@@ -500,9 +508,74 @@ private struct PageDetailView: View {
                     .padding(.horizontal, 16)
                 }
                 .padding(.bottom, 32)
+                .animation(.smooth(duration: 0.25), value: annotations.isEmpty)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { await loadAnnotations() }
+    }
+
+    private var highlightsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Highlights")
+                .font(AppTheme.Typography.sansBody(size: 11, weight: .semibold))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+                .textCase(.uppercase)
+                .kerning(0.4)
+                .padding(.horizontal, 16)
+
+            VStack(spacing: 6) {
+                ForEach(annotations) { annotation in
+                    annotationRow(annotation)
+                        .padding(.horizontal, 16)
+                }
+            }
+        }
+    }
+
+    private func annotationRow(_ annotation: Annotation) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(Color(red: 1.0, green: 0.84, blue: 0.4))
+                .frame(width: 3)
+
+            Text(annotation.text)
+                .font(AppTheme.Typography.sansBody(size: 13, weight: .regular))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.75))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                Task { await delete(annotation) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(AppTheme.Colors.text.opacity(0.3))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(AppTheme.Colors.text.opacity(0.025))
+        )
+    }
+
+    private func loadAnnotations() async {
+        let loaded = (try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)) ?? []
+        await MainActor.run { annotations = loaded }
+    }
+
+    private func delete(_ annotation: Annotation) async {
+        try? await KnowledgeStorage.shared.deleteAnnotation(id: annotation.id)
+        let refreshed = (try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)) ?? []
+        await MainActor.run {
+            withAnimation(.smooth(duration: 0.25)) { annotations = refreshed }
+        }
     }
 
     private var contentParagraphs: [String] {

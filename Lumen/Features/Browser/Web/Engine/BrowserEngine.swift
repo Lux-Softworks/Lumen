@@ -131,12 +131,26 @@ enum BrowserEngine {
             config, &_WKWebViewAssociatedKeys.readingSignalHandlerKey, readingSignalHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        let annotationCaptureScript = WKUserScript(
+            source: AnnotationScript.captureJS,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(annotationCaptureScript)
+
+        let annotationHandler = AnnotationHandler()
+        config.userContentController.add(annotationHandler, name: "annotation")
+
+        objc_setAssociatedObject(
+            config, &_WKWebViewAssociatedKeys.annotationHandlerKey, annotationHandler,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
         return config
     }
 
     static func makeWebView(policy: PrivacyPolicy) -> WKWebView {
         let config = makeConfiguration(policy: policy)
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = LumenWebView(frame: .zero, configuration: config)
 
         if #available(iOS 13.0, *) {
             webView.allowsLinkPreview = false
@@ -153,6 +167,9 @@ enum BrowserEngine {
         let detector = ThreatDetector()
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
+        interceptor.onDidFinishLoad = { webView in
+            AnnotationHandler.applyAll(webView: webView)
+        }
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
 
@@ -188,6 +205,7 @@ private enum _WKWebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
     static var fingerprintHandlerKey: UInt8 = 1
     static var readingSignalHandlerKey: UInt8 = 2
+    static var annotationHandlerKey: UInt8 = 3
 }
 
 final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {

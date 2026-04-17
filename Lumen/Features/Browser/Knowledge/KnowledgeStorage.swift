@@ -136,6 +136,36 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 }
 
+struct Annotation: Identifiable, Codable, Equatable, Hashable, Sendable {
+    let id: String
+    let pageID: String?
+    let normalizedURL: String
+    let url: String
+    let text: String
+    let prefix: String
+    let suffix: String
+    let createdAt: Date
+
+    init(
+        id: String = .annotationID(),
+        pageID: String? = nil,
+        url: String,
+        text: String,
+        prefix: String = "",
+        suffix: String = "",
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.pageID = pageID
+        self.url = url
+        self.normalizedURL = PageContent.normalizeURL(url)
+        self.text = text
+        self.prefix = prefix
+        self.suffix = suffix
+        self.createdAt = createdAt
+    }
+}
+
 struct StorageStats: Sendable {
     let totalWebsites: Int
     let totalPages: Int
@@ -151,6 +181,7 @@ extension String {
     static func topicID() -> String { return "topic_\(UUID().uuidString)" }
     static func websiteID() -> String { return "website_\(UUID().uuidString)" }
     static func pageID() -> String { return "page_\(UUID().uuidString)" }
+    static func annotationID() -> String { return "annotation_\(UUID().uuidString)" }
 }
 
 enum VectorMath: Sendable {
@@ -276,6 +307,23 @@ actor KnowledgeStorage {
         );
         """
 
+        let createAnnotationsTable = """
+        CREATE TABLE IF NOT EXISTS annotations (
+            id TEXT PRIMARY KEY,
+            page_id TEXT,
+            normalized_url TEXT NOT NULL,
+            url TEXT NOT NULL,
+            text TEXT NOT NULL,
+            prefix TEXT NOT NULL DEFAULT '',
+            suffix TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_annotations_url ON annotations(normalized_url);
+        CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);
+        CREATE INDEX IF NOT EXISTS idx_annotations_created ON annotations(created_at DESC);
+        """
+
         let createFTS = """
         CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
             title,
@@ -308,6 +356,7 @@ actor KnowledgeStorage {
         try execute(createWebsitesTable)
         try execute(createPagesTable)
         try execute(createEmbeddingsTable)
+        try execute(createAnnotationsTable)
         try execute(createIndexes)
         try execute(createFTS)
         try execute(createFTSTriggers)
@@ -320,6 +369,22 @@ actor KnowledgeStorage {
         if try !columnExists(table: "websites", column: "page_count_at_synthesis") {
             try execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
         }
+        try execute("""
+            CREATE TABLE IF NOT EXISTS annotations (
+                id TEXT PRIMARY KEY,
+                page_id TEXT,
+                normalized_url TEXT NOT NULL,
+                url TEXT NOT NULL,
+                text TEXT NOT NULL,
+                prefix TEXT NOT NULL DEFAULT '',
+                suffix TEXT NOT NULL DEFAULT '',
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
+            )
+        """)
+        try execute("CREATE INDEX IF NOT EXISTS idx_annotations_url ON annotations(normalized_url)")
+        try execute("CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id)")
+        try execute("CREATE INDEX IF NOT EXISTS idx_annotations_created ON annotations(created_at DESC)")
         try migrateFTSToContentTable()
     }
 
@@ -944,6 +1009,122 @@ actor KnowledgeStorage {
             try? execute("ROLLBACK")
             throw error
         }
+    }
+
+    func saveAnnotation(
+        url: String,
+        text: String,
+        prefix: String,
+        suffix: String
+    ) async throws -> Annotation {
+        try initialize()
+
+        let normalized = PageContent.normalizeURL(url)
+        let pageID = try fetchPageID(normalizedURL: normalized)
+
+        let annotation = await Annotation(
+            pageID: pageID,
+            url: url,
+            text: text,
+            prefix: prefix,
+            suffix: suffix
+        )
+
+        let sql = """
+        INSERT INTO annotations (id, page_id, normalized_url, url, text, prefix, suffix, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, annotation.id, -1, SQLITE_TRANSIENT)
+            if let pid = annotation.pageID {
+                sqlite3_bind_text(statement, 2, pid, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(statement, 2)
+            }
+            sqlite3_bind_text(statement, 3, annotation.normalizedURL, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, annotation.url, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 5, annotation.text, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 6, annotation.prefix, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 7, annotation.suffix, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int64(statement, 8, Int64(annotation.createdAt.timeIntervalSince1970))
+        })
+
+        return annotation
+    }
+
+    func fetchAnnotations(normalizedURL: String) async throws -> [Annotation] {
+        try initialize()
+        let sql = "SELECT * FROM annotations WHERE normalized_url = ? ORDER BY created_at ASC"
+        return try queryAnnotations(sql: sql) { [self] statement in
+            sqlite3_bind_text(statement, 1, normalizedURL, -1, SQLITE_TRANSIENT)
+        }
+    }
+
+    func fetchAnnotations(pageID: String) async throws -> [Annotation] {
+        try initialize()
+        let sql = "SELECT * FROM annotations WHERE page_id = ? ORDER BY created_at ASC"
+        return try queryAnnotations(sql: sql) { [self] statement in
+            sqlite3_bind_text(statement, 1, pageID, -1, SQLITE_TRANSIENT)
+        }
+    }
+
+    func deleteAnnotation(id: String) async throws {
+        try initialize()
+        let sql = "DELETE FROM annotations WHERE id = ?"
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+        })
+    }
+
+    private func fetchPageID(normalizedURL: String) throws -> String? {
+        let sql = "SELECT id FROM pages WHERE normalized_url = ? LIMIT 1"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            return nil
+        }
+        sqlite3_bind_text(statement, 1, normalizedURL, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        return String(cString: sqlite3_column_text(statement, 0))
+    }
+
+    private func queryAnnotations(
+        sql: String,
+        bindValues: ((OpaquePointer?) -> Void)? = nil
+    ) throws -> [Annotation] {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+
+        bindValues?(statement)
+
+        var results: [Annotation] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let id = String(cString: sqlite3_column_text(statement, 0))
+            let pageID = sqlite3_column_type(statement, 1) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(statement, 1)) : nil
+            let url = String(cString: sqlite3_column_text(statement, 3))
+            let text = String(cString: sqlite3_column_text(statement, 4))
+            let prefix = String(cString: sqlite3_column_text(statement, 5))
+            let suffix = String(cString: sqlite3_column_text(statement, 6))
+            let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 7)))
+
+            results.append(Annotation(
+                id: id,
+                pageID: pageID,
+                url: url,
+                text: text,
+                prefix: prefix,
+                suffix: suffix,
+                createdAt: createdAt
+            ))
+        }
+        return results
     }
 
     func nukeDatabase() throws {
