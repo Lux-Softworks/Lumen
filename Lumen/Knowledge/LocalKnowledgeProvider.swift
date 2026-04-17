@@ -228,7 +228,11 @@ actor LocalKnowledgeProvider {
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func answerFromKnowledge(query: String, sources: [PageContent]) async throws -> String {
+    func answerFromKnowledge(
+        query: String,
+        sources: [PageContent],
+        history: [(role: String, text: String)] = []
+    ) async throws -> String {
         guard !sources.isEmpty else { return "" }
 
         #if targetEnvironment(simulator)
@@ -245,7 +249,7 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let context = sources.prefix(3)
+        let context = sources.prefix(4)
             .map { p in
                 let body: String
                 if let s = p.summary, !s.isEmpty {
@@ -257,12 +261,20 @@ actor LocalKnowledgeProvider {
             }
             .joined(separator: "\n")
 
+        let historyBlock = history
+            .map { turn -> String in
+                let header = turn.role == "user" ? "user" : "assistant"
+                let body = String(turn.text.prefix(400))
+                return "<|start_header_id|>\(header)<|end_header_id|>\n\(body)<|eot_id|>"
+            }
+            .joined()
+
         let prompt = """
             <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Reading assistant. Answer from sources. Bold **key terms**. Use bullet points for lists.<|eot_id|>\
-            <|start_header_id|>user<|end_header_id|>
-            \(context)
+            Reading assistant. Answer from sources. Bold **key terms**. Use bullet points for lists. Use prior turns for follow-up context.
 
+            Sources:
+            \(context)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>
             \(query)<|eot_id|>\
             <|start_header_id|>assistant<|end_header_id|>
 

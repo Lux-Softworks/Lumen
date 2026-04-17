@@ -9,24 +9,52 @@ struct KnowledgeWebsiteView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    synthesisSection
-                        .padding(.horizontal, 16)
-                        .padding(.top, 4)
-                        .padding(.bottom, 20)
 
-                    ForEach(viewModel.sessions) { session in
-                        sessionSection(session)
+            if viewModel.sessions.isEmpty {
+                emptyState
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if hasSynthesisContent {
+                            synthesisSection
+                                .padding(.horizontal, 16)
+                                .padding(.top, 4)
+                                .padding(.bottom, 20)
+                                .transition(.opacity)
+                        }
+
+                        ForEach(viewModel.sessions) { session in
+                            sessionSection(session)
+                        }
                     }
+                    .padding(.bottom, 24)
+                    .animation(.smooth(duration: 0.25), value: hasSynthesisContent)
                 }
-                .padding(.bottom, 24)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             await viewModel.loadSynthesis()
         }
+    }
+
+    private var hasSynthesisContent: Bool {
+        switch viewModel.synthesisState {
+        case .generating, .ready: return true
+        case .idle, .failed: return false
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "book.closed")
+                .font(.system(size: 28, weight: .light))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+            Text("No pages saved yet")
+                .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var header: some View {

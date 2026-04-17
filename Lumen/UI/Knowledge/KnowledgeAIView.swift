@@ -14,11 +14,19 @@ struct KnowledgeAIView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.messages.isEmpty && !viewModel.isThinking {
-                idleView
-            } else {
-                messageList
+            ZStack {
+                if viewModel.messages.isEmpty && !viewModel.isThinking {
+                    idleView
+                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                } else {
+                    messageList
+                        .transition(.opacity)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.smooth(duration: 0.28), value: viewModel.messages.isEmpty)
+            .animation(.smooth(duration: 0.28), value: viewModel.isThinking)
+
             inputBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -29,13 +37,13 @@ struct KnowledgeAIView: View {
             guard let frame = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
             let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
             let height = max(0, frame.height - safeAreaBottom)
-            withAnimation(.spring(duration: dur * 0.8, bounce: 0)) { keyboardHeight = height }
+            withAnimation(.spring(duration: dur * 0.85, bounce: 0)) { keyboardHeight = height }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
         ) { n in
             let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
-            withAnimation(.easeIn(duration: dur * 0.9)) { keyboardHeight = 0 }
+            withAnimation(.easeOut(duration: dur * 0.9)) { keyboardHeight = 0 }
         }
     }
 
@@ -70,21 +78,30 @@ struct KnowledgeAIView: View {
                         LumenSparkle(size: 22, phase: viewModel.sparklePhase)
                             .id("thinking")
                             .padding(.leading, 4)
-                            .transition(.opacity.animation(.easeOut(duration: 0.2)))
+                            .transition(.opacity)
                     }
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
+                .animation(.smooth(duration: 0.32), value: viewModel.messages.count)
+                .animation(.smooth(duration: 0.22), value: viewModel.isThinking)
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture { isFocused = false }
-            .onChange(of: viewModel.scrollToBottomTrigger) { _, _ in
-                withAnimation(.smooth(duration: 0.35)) {
-                    proxy.scrollTo("bottom", anchor: .bottom)
-                }
+            .onChange(of: viewModel.messages.count) { _, _ in
+                scrollToBottom(proxy: proxy)
             }
+            .onChange(of: viewModel.isThinking) { _, thinking in
+                if thinking { scrollToBottom(proxy: proxy) }
+            }
+        }
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        withAnimation(.smooth(duration: 0.4)) {
+            proxy.scrollTo("bottom", anchor: .bottom)
         }
     }
 
@@ -98,7 +115,7 @@ struct KnowledgeAIView: View {
                     } else {
                         Text("What do you want to know?")
                             .font(.system(size: 15))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.28))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.3))
                             .allowsHitTesting(false)
                     }
                 }
@@ -127,28 +144,41 @@ struct KnowledgeAIView: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(canSend ? .white : AppTheme.Colors.text.opacity(0.25))
                     )
+                    .animation(.spring(duration: 0.25, bounce: 0.25), value: canSend)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppTheme.Colors.uiElement)
-                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: -1)
-        )
+        .background(inputBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(
-                    AppTheme.Colors.text.opacity(isFocused ? 0.15 : 0.06),
+                    AppTheme.Colors.text.opacity(isFocused ? 0.18 : 0.07),
                     lineWidth: 0.75
                 )
-                .animation(.smooth(duration: 0.12), value: isFocused)
         )
+        .animation(.smooth(duration: 0.18), value: isFocused)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 4)
+    }
+
+    private var inputBackground: some View {
+        ZStack {
+            BlurView(style: .systemThickMaterial)
+
+            LinearGradient(
+                colors: [
+                    AppTheme.Colors.uiElement.opacity(0.25),
+                    AppTheme.Colors.uiElement.opacity(0.12),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var canSend: Bool {
