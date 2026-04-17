@@ -279,24 +279,28 @@ actor KnowledgeStorage {
         let createFTS = """
         CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
             title,
-            body
+            body,
+            content=pages,
+            content_rowid=rowid
         );
         """
 
         let createFTSTriggers = """
         CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-            INSERT INTO pages_fts(title, body)
-            VALUES (new.title, new.content);
+            INSERT INTO pages_fts(rowid, title, body)
+            VALUES (new.rowid, new.title, new.content);
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-            DELETE FROM pages_fts WHERE title = old.title AND body = old.content;
+            INSERT INTO pages_fts(pages_fts, rowid, title, body)
+            VALUES ('delete', old.rowid, old.title, old.content);
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-            DELETE FROM pages_fts WHERE title = old.title AND body = old.content;
-            INSERT INTO pages_fts(title, body)
-            VALUES (new.title, new.content);
+            INSERT INTO pages_fts(pages_fts, rowid, title, body)
+            VALUES ('delete', old.rowid, old.title, old.content);
+            INSERT INTO pages_fts(rowid, title, body)
+            VALUES (new.rowid, new.title, new.content);
         END;
         """
 
@@ -316,6 +320,44 @@ actor KnowledgeStorage {
         if try !columnExists(table: "websites", column: "page_count_at_synthesis") {
             try execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
         }
+        try migrateFTSToContentTable()
+    }
+
+    private func migrateFTSToContentTable() throws {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        let sql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='pages_fts'"
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK,
+              sqlite3_step(statement) == SQLITE_ROW else { return }
+        let createSQL = String(cString: sqlite3_column_text(statement, 0))
+        if createSQL.contains("content=pages") { return }
+
+        try execute("DROP TRIGGER IF EXISTS pages_ai")
+        try execute("DROP TRIGGER IF EXISTS pages_ad")
+        try execute("DROP TRIGGER IF EXISTS pages_au")
+        try execute("DROP TABLE IF EXISTS pages_fts")
+        try execute("""
+            CREATE VIRTUAL TABLE pages_fts USING fts5(
+                title, body, content=pages, content_rowid=rowid
+            )
+        """)
+        try execute("INSERT INTO pages_fts(pages_fts) VALUES ('rebuild')")
+        try execute("""
+            CREATE TRIGGER pages_ai AFTER INSERT ON pages BEGIN
+                INSERT INTO pages_fts(rowid, title, body) VALUES (new.rowid, new.title, new.content);
+            END
+        """)
+        try execute("""
+            CREATE TRIGGER pages_ad AFTER DELETE ON pages BEGIN
+                INSERT INTO pages_fts(pages_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.content);
+            END
+        """)
+        try execute("""
+            CREATE TRIGGER pages_au AFTER UPDATE ON pages BEGIN
+                INSERT INTO pages_fts(pages_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.content);
+                INSERT INTO pages_fts(rowid, title, body) VALUES (new.rowid, new.title, new.content);
+            END
+        """)
     }
 
     private func columnExists(table: String, column: String) throws -> Bool {
@@ -332,7 +374,7 @@ actor KnowledgeStorage {
             if columnName == column {
                 return true
             }
-            
+
         }
         return false
     }
@@ -782,13 +824,21 @@ actor KnowledgeStorage {
         try execute(sql)
     }
 
-    func deleteTopic(topicID: String) throws {
+    func deleteTopic(id: String) throws {
         try initialize()
 
-        let sql = "DELETE FROM topics WHERE id = ?"
-        try execute(sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, topicID, -1, self.SQLITE_TRANSIENT)
-        })
+        let steps: [String] = [
+            "DELETE FROM page_embeddings WHERE page_id IN (SELECT p.id FROM pages p JOIN websites w ON p.website_id = w.id WHERE w.topic_id = ?)",
+            "DELETE FROM pages WHERE website_id IN (SELECT id FROM websites WHERE topic_id = ?)",
+            "DELETE FROM websites WHERE topic_id = ?",
+            "DELETE FROM topics WHERE id = ?",
+        ]
+
+        for sql in steps {
+            try execute(sql) { stmt in
+                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
+            }
+        }
     }
 
     func deleteAllTopics() throws {
@@ -805,60 +855,87 @@ actor KnowledgeStorage {
         do {
             try deleteAllTopics()
 
-            let topicID = try await createTopic(name: "Technology", color: "#4A90E2")
+            let techID    = try await createTopic(name: "Technology",  color: "#4A90E2")
+            let scienceID = try await createTopic(name: "Science",     color: "#7ED321")
+            let financeID = try await createTopic(name: "Finance",     color: "#F5A623")
 
-            let apple = await Website(
-                domain: "apple.com",
-                displayName: "Apple",
-                summary: "Official Apple website",
-                topicID: topicID
-            )
-            try createWebsite(website: apple)
+            let apple = await Website(domain: "apple.com", displayName: "Apple", summary: "Official Apple developer and product news.", topicID: techID)
+            let verge = await Website(domain: "theverge.com", displayName: "The Verge", summary: "Tech news, reviews, and culture.", topicID: techID)
+            let github = await Website(domain: "github.com", displayName: "GitHub", summary: "Where the world builds software.", topicID: techID)
+            let nature = await Website(domain: "nature.com", displayName: "Nature", summary: "Peer-reviewed scientific research.", topicID: scienceID)
+            let arxiv  = await Website(domain: "arxiv.org", displayName: "arXiv", summary: "Open-access research preprints.", topicID: scienceID)
+            let wsj    = await Website(domain: "wsj.com", displayName: "Wall St. Journal", summary: "Financial and business news.", topicID: financeID)
 
-            let github = await Website(
-                domain: "github.com",
-                displayName: "GitHub",
-                summary: "Where the world builds software",
-                topicID: topicID
-            )
-            try createWebsite(website: github)
+            for site in [apple, verge, github, nature, arxiv, wsj] {
+                try createWebsite(website: site)
+            }
 
-            let theverge = await Website(
-                domain: "theverge.com",
-                displayName: "The Verge",
-                summary: "Tech news and reviews",
-                topicID: topicID
-            )
-            try createWebsite(website: theverge)
+            typealias SeedEntry = (website: Website, title: String, content: String)
+            let entries: [SeedEntry] = [
+                (apple,
+                 "Apple Intelligence: On-Device AI in iOS 18",
+                 "Apple Intelligence is Apple's personal AI system deeply integrated into iOS 18, iPadOS 18, and macOS Sequoia. It processes most tasks entirely on-device using a 3-billion parameter language model, ensuring user data never leaves the device. Key capabilities include Writing Tools for rewriting and summarising text across all apps, Image Playground for generating images from text descriptions, and an upgraded Siri with richer context awareness. Apple partnered with OpenAI to offer optional ChatGPT integration for queries the on-device model cannot handle, with explicit user consent required each time. The on-device model runs on the Neural Engine inside A17 Pro and M-series chips. Private Cloud Compute routes more complex requests to Apple silicon servers where data is not retained. This architecture is Apple's answer to balancing AI capability with privacy."),
 
-            let seedPages: [(website: Website, title: String, summary: String)] = [
-                (apple, "Apple Intelligence Overview",
-                 "Covers Apple's on-device AI features in iOS 18, including Writing Tools, Image Playground, and Siri upgrades."),
-                (apple, "WWDC 2025 Highlights",
-                 "Swift 6 language changes, visionOS 3 updates, and new SwiftUI APIs for spatial computing."),
-                (github, "GitHub Copilot Workspace",
-                 "AI-assisted code planning tool that turns issues into pull requests with multi-file context."),
-                (github, "GitHub Actions improvements",
-                 "New arm64 runners, faster caching, and improved secrets management in Actions 2025."),
-                (theverge, "The state of AI browsers",
-                 "Survey of browsers integrating LLMs: Arc, Opera, Brave, and new challengers."),
+                (apple,
+                 "WWDC 2025: Swift 6 and SwiftUI Advances",
+                 "WWDC 2025 introduced Swift 6 with complete concurrency safety enforced at compile time, eliminating data races by default. SwiftUI gained a new observation framework using the @Observable macro, replacing ObservableObject for most patterns. The conference also unveiled visionOS 3 with hand-tracking improvements and a new spatial canvas API. Xcode 17 ships with a native AI code-completion engine powered by Apple Intelligence, offering context-aware suggestions across the entire project. The new Swift Testing library replaces XCTest for most unit testing scenarios with a macro-based syntax. Developers gained new APIs for Live Activities on the Dynamic Island and expanded WidgetKit support for interactive widgets with real-time server push."),
+
+                (verge,
+                 "The State of AI Browsers in 2025",
+                 "AI-integrated browsers have moved from novelty to mainstream in 2025. Arc Browser by The Browser Company pioneered sidebar AI with Claude integration, letting users ask questions about the current page. Opera introduced Aria, a built-in AI assistant with real-time web search. Brave added a local on-device LLM option using Llama models so queries never leave the computer. Microsoft Edge's Copilot evolved into a full agentic assistant capable of filling forms, summarising PDFs, and composing emails from within the browser. Apple's Safari 18 gained Intelligent Search, distilling long articles into bullet-point summaries using on-device Apple Intelligence. The key differentiator across all these products is privacy: local inference wins for sensitive queries while cloud models remain superior for complex reasoning tasks."),
+
+                (verge,
+                 "Why On-Device AI Matters for Privacy",
+                 "Running AI models locally on a device rather than in the cloud has profound privacy implications. When a user's queries and documents never leave their phone or laptop, they cannot be logged, analysed, or monetised by a server operator. On-device models like Apple's 3B model and Llama 3.2 3B make this practical on modern hardware. The tradeoff is capability: cloud models like GPT-4o and Claude 3.5 Sonnet have orders of magnitude more parameters and broader knowledge. Hybrid approaches are emerging where a small local model handles routine tasks and routes sensitive or complex queries to the cloud only with explicit user permission. For a personal browser with a knowledge base of reading history, on-device inference is the only reasonable privacy choice."),
+
+                (github,
+                 "GitHub Copilot Workspace: AI-Native Development",
+                 "GitHub Copilot Workspace is a new agentic coding environment that starts from a GitHub issue and produces a fully implemented pull request. The user describes a task in natural language; Copilot plans the required file changes, writes the code across multiple files, runs tests, and submits a PR. It uses GPT-4o under the hood with a specialised code-execution sandbox. Workspace maintains full conversation context across the planning and implementation phases, allowing developers to redirect the agent mid-task. Early benchmarks show it completes simple bug-fix issues end-to-end in under five minutes. The product is positioned as an AI pair programmer rather than a code autocomplete tool, handling whole-feature implementation rather than line-level suggestions."),
+
+                (github,
+                 "GitHub Actions 2025: Faster CI/CD",
+                 "GitHub Actions received major performance and security upgrades in 2025. New arm64 Linux runners are 40% faster and 50% cheaper than the previous x64 equivalents, driven by custom Ampere Altra hardware in GitHub's data centres. The cache action now supports cross-workflow cache sharing within the same repository, cutting cold-start times on monorepos dramatically. Secrets management was overhauled: organisation-level OIDC token binding means third-party cloud credentials are scoped to specific workflows and auto-rotate. The new Deployments API gives fine-grained control over multi-environment promotion with approval gates built into the workflow YAML. GitHub also launched a built-in code-scanning feature that runs Copilot-powered security analysis on every pull request."),
+
+                (nature,
+                 "Large Language Models Show Signs of Compositional Reasoning",
+                 "A study published in Nature Machine Intelligence found that frontier large language models demonstrate a limited but measurable capacity for compositional reasoning — the ability to combine learned concepts in novel ways not seen during training. Researchers at DeepMind tested GPT-4, Claude 3, and Gemini Ultra on a benchmark of 10,000 novel symbol-manipulation tasks. All three models exceeded random baselines and generalised to unseen compositions, though accuracy dropped sharply with task depth beyond five compositional steps. The authors argue this suggests emergent systematic generalisation rather than pure memorisation, challenging earlier claims that transformers fundamentally cannot reason. The finding has implications for AI safety: models that can compose concepts may also be able to reason about their own constraints."),
+
+                (arxiv,
+                 "Retrieval-Augmented Generation: A Survey",
+                 "Retrieval-Augmented Generation (RAG) enhances language model responses by first retrieving relevant documents from a corpus and then conditioning generation on those documents. This approach grounds the model's output in verifiable source material, reducing hallucination and extending the effective knowledge cutoff beyond training data. The survey covers three retrieval paradigms: sparse retrieval using BM25 keyword matching, dense retrieval using bi-encoder embeddings, and hybrid approaches combining both. Key challenges include retrieval latency, context window limits when many documents are retrieved, and faithfulness — ensuring the model cites sources it actually used. Advanced techniques like HyDE (Hypothetical Document Embeddings) generate a synthetic answer first, then retrieve documents similar to the hypothesis, improving recall on complex queries. RAG is now standard practice for enterprise AI deployments requiring factual accuracy."),
+
+                (arxiv,
+                 "Mixture of Experts Scaling in Language Models",
+                 "Mixture of Experts (MoE) architecture allows language models to scale parameter count without proportionally increasing compute per token. In an MoE transformer, each token is routed to a small subset of specialised feed-forward networks called experts, typically 2 out of 64 or 128. Mistral's Mixtral 8x7B demonstrated that an MoE model with 46.7B total parameters matches a dense 70B model on most benchmarks while using roughly 12B parameters per forward pass. Google's Gemini 1.5 Pro uses a MoE design to achieve a one-million-token context window at practical serving costs. The key challenge is load balancing: auxiliary losses encourage uniform expert utilisation but can conflict with optimal routing. MoE models are now the dominant architecture for models above 30B effective parameters."),
+
+                (wsj,
+                 "Federal Reserve Holds Rates as Inflation Cools",
+                 "The Federal Reserve held its benchmark interest rate steady in the 5.25–5.50% range for the third consecutive meeting after inflation data showed the consumer price index declining to 2.4% year-over-year, approaching the Fed's 2% target. Chair Jerome Powell noted that the labour market remains resilient with unemployment at 3.9% but signalled the committee needs several more months of data before cutting rates. Markets priced in a first 25-basis-point cut for September with 70% probability following the announcement. Treasury yields fell across the curve, with the 10-year dropping to 4.2%. Equity markets rallied 1.4% on the day. The Fed's dot plot showed a median projection of two cuts in 2025 and three in 2026, slightly more dovish than the previous quarter's projections."),
+
+                (wsj,
+                 "AI Chip Demand Reshapes Semiconductor Industry",
+                 "Demand for AI accelerator chips has fundamentally restructured the global semiconductor supply chain. NVIDIA's H100 and H200 GPUs command lead times of 12 months or more, with spot-market prices reaching four times the list price. AMD's MI300X is gaining data centre traction as an alternative, offering higher memory bandwidth for inference workloads. Intel's Gaudi 3 is targeting the mid-tier training market. Meanwhile, hyperscalers including Google (TPU v5), Amazon (Trainium 2), and Microsoft (Maia 100) are deploying custom silicon to reduce dependence on NVIDIA and lower cost-per-token for inference. The IEA estimates AI data centres will consume 1,000 TWh of electricity annually by 2026, driving co-location demand near hydroelectric and nuclear power sources. TSMC's 3nm node is fully allocated to AI chips through 2025."),
             ]
 
             var offset: TimeInterval = 0
-            for item in seedPages {
+            for entry in entries {
                 let page = await PageContent(
-                    websiteID: item.website.id,
-                    url: "https://\(item.website.domain)/\(item.title.lowercased().replacingOccurrences(of: " ", with: "-"))",
-                    title: item.title,
-                    content: item.summary,
-                    summary: item.summary,
+                    websiteID: entry.website.id,
+                    url: "https://\(entry.website.domain)/\(entry.title.lowercased().replacingOccurrences(of: " ", with: "-").prefix(60))",
+                    title: entry.title,
+                    content: entry.content,
+                    summary: String(entry.content.prefix(180)),
                     timestamp: Date().addingTimeInterval(-offset),
-                    readingTime: Int.random(in: 4...15),
-                    scrollDepth: Double.random(in: 0.5...1.0)
+                    readingTime: Int.random(in: 4...12),
+                    scrollDepth: Double.random(in: 0.6...1.0)
                 )
-                offset += 3600
+                offset += 3600 * 2
                 try savePage(page)
-                try updateWebsiteStats(websiteID: item.website.id)
+                try updateWebsiteStats(websiteID: entry.website.id)
+
+                if let vector = await EmbeddingService.shared.generateEmbedding(for: entry.content) {
+                    try saveEmbedding(pageID: page.id, vector: vector)
+                }
             }
 
             try updateTopicCounts()
@@ -1162,3 +1239,4 @@ enum StorageError: Error, LocalizedError {
         }
     }
 }
+

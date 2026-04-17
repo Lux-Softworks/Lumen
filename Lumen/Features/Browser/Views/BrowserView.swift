@@ -577,6 +577,10 @@ struct BrowserView: View {
             },
             onReloadPage: {
                 vm?.reload()
+            },
+            onNavigate: { url in
+                vm?.navigate(to: url)
+                bottomBarState = .collapsed
             }
         )
     }

@@ -16,6 +16,7 @@ enum SettingsSection: Hashable {
     case privacyPolicy
     case displayOptions
     case siteSectionSettings
+    case bookmarks
 }
 
 struct SettingsPage: View {
@@ -30,6 +31,7 @@ struct SettingsPage: View {
     var onZoomChanged: ((Int) -> Void)? = nil
     var onRequestDesktopSite: ((Bool) -> Void)? = nil
     var onReloadPage: (() -> Void)? = nil
+    var onNavigate: ((String) -> Void)? = nil
 
     @StateObject private var settings = BrowserSettings.shared
     @Namespace private var engineNamespace
@@ -41,6 +43,7 @@ struct SettingsPage: View {
     @State private var requestDesktopSite: Bool = false
     @State private var translateEnabled: Bool = false
     @State private var sitePinned: Bool = false
+    @State private var sitePinnedReady: Bool = false
     @State private var siteBlockTrackers: Bool = false
     @State private var siteBlockPopups: Bool = false
     @State private var siteEnableJavaScript: Bool = true
@@ -109,6 +112,7 @@ struct SettingsPage: View {
 
                 let domain = currentURL?.host?.lowercased() ?? ""
                 sitePinned = PinStore.shared.isPinned(domain)
+                sitePinnedReady = true
 
                 pageZoom = initialZoom
                 requestDesktopSite = initialDesktopMode
@@ -142,6 +146,8 @@ struct SettingsPage: View {
                         displayOptionsContent
                     case .siteSectionSettings:
                         siteSectionSettingsList
+                    case .bookmarks:
+                        BookmarksListView(onNavigate: onNavigate, onDismiss: onDismiss)
                 }
             }
             .padding(.top, 12)
@@ -215,6 +221,10 @@ struct SettingsPage: View {
     private var siteSettingsContent: some View {
         VStack(spacing: 16) {
             settingsGroup {
+                settingsRow(icon: "bookmark", title: "Bookmarks", showChevron: true) {
+                    push(.bookmarks)
+                }
+                divider
                 settingsRow(icon: "textformat.size", title: "Display Options", showChevron: true) {
                     push(.displayOptions)
                 }
@@ -238,7 +248,7 @@ struct SettingsPage: View {
             }
             .onChange(of: sitePinned) { old, new in
                 let domain = currentURL?.host?.lowercased() ?? ""
-                guard !domain.isEmpty, old != new else { return }
+                guard sitePinnedReady, !domain.isEmpty, old != new else { return }
                 PinStore.shared.toggle(domain)
             }
 
@@ -531,30 +541,26 @@ struct SettingsPage: View {
 
         return VStack(spacing: 16) {
             settingsGroup {
-                HStack(spacing: 14) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .bold))
+                HStack(spacing: 12) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(AppTheme.Colors.accent)
                         .frame(width: 28)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(languageName)
                             .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.text)
+                            .foregroundColor(AppTheme.Colors.accent)
                         Text("System default")
-                            .font(.system(size: 13))
-                            .foregroundColor(AppTheme.Colors.text.opacity(0.45))
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundColor(AppTheme.Colors.accent.opacity(0.8))
                     }
 
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 15)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(AppTheme.Colors.accent.opacity(0.1))
-                        .padding(.horizontal, 8)
-                )
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
 
             Text(
@@ -731,6 +737,7 @@ struct SettingsPage: View {
         case .privacyPolicy: return "Privacy Policy"
         case .displayOptions: return "Display Options"
         case .siteSectionSettings: return "Site Settings"
+        case .bookmarks: return "Bookmarks"
         }
     }
 
@@ -755,12 +762,12 @@ struct SettingsPage: View {
             WKWebsiteDataTypeIndexedDBDatabases,
             WKWebsiteDataTypeWebSQLDatabases
         ]
-        
+
         WKWebsiteDataStore.default().removeData(
             ofTypes: dataTypes,
             modifiedSince: .distantPast
         ) { }
-        
+
         Task { @MainActor in
             HistoryStore.shared.clearAll()
         }
@@ -774,8 +781,7 @@ struct SettingsPage: View {
         Rectangle()
             .fill(AppTheme.Colors.text.opacity(0.08))
             .frame(height: 0.5)
-            .padding(.leading, 60)
-            .padding(.trailing, 0)
+            .padding(.horizontal, 16)
     }
 
     private func settingsRow(

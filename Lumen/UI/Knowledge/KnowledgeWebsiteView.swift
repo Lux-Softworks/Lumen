@@ -4,6 +4,7 @@ import SwiftUI
 struct KnowledgeWebsiteView: View {
     @State var viewModel: KnowledgeWebsiteViewModel
     var onBack: () -> Void
+    var onSelectPage: ((PageContent) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,24 +30,24 @@ struct KnowledgeWebsiteView: View {
     }
 
     private var header: some View {
-        ZStack {
-            HStack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(AppTheme.Colors.accent)
-                        .frame(width: 40, height: 40)
-                        .background(AppTheme.Colors.accent.opacity(0.1))
-                        .cornerRadius(20)
-                }
-                Spacer()
+        HStack(spacing: 12) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppTheme.Colors.accent)
+                    .frame(width: 40, height: 40)
+                    .background(AppTheme.Colors.accent.opacity(0.1))
+                    .cornerRadius(20)
             }
             Text(viewModel.website.displayName)
-                .font(AppTheme.Typography.serifDisplay(size: 20, weight: .bold))
+                .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
                 .foregroundColor(AppTheme.Colors.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.vertical, 14)
     }
 
     @ViewBuilder
@@ -64,66 +65,33 @@ struct KnowledgeWebsiteView: View {
     }
 
     private func synthesisCard(text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Summary")
-                .font(AppTheme.Typography.sansBody(size: 12, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.accent.opacity(0.8))
-                .textCase(.uppercase)
-                .kerning(0.5)
-
-            Text(text)
-                .font(AppTheme.Typography.sansBody(size: 15, weight: .regular))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.85))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(AppTheme.Colors.accent.opacity(0.07))
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(AppTheme.Colors.accent.opacity(0.14), lineWidth: 1)
-            }
-        )
+        Text((try? AttributedString(markdown: text)) ?? AttributedString(text))
+            .font(AppTheme.Typography.sansBody(size: 14, weight: .regular))
+            .foregroundColor(AppTheme.Colors.text.opacity(0.55))
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var synthesisShimmer: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Summary")
-                .font(AppTheme.Typography.sansBody(size: 12, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.accent.opacity(0.8))
-                .textCase(.uppercase)
-                .kerning(0.5)
-
-            VStack(alignment: .leading, spacing: 6) {
-                ShimmerBar(width: .infinity, height: 13)
-                ShimmerBar(width: .infinity, height: 13)
-                ShimmerBar(width: 160, height: 13)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            ShimmerBar(width: .infinity, height: 11)
+            ShimmerBar(width: .infinity, height: 11)
+            ShimmerBar(width: 120, height: 11)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(AppTheme.Colors.accent.opacity(0.07))
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(AppTheme.Colors.accent.opacity(0.14), lineWidth: 1)
-            }
-        )
     }
 
     private func sessionSection(_ session: ReadingSession) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(session.headerLabel)
-                .font(AppTheme.Typography.sansBody(size: 13, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.text.opacity(0.4))
+                .font(AppTheme.Typography.sansBody(size: 11, weight: .semibold))
+                .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                .textCase(.uppercase)
+                .kerning(0.4)
                 .padding(.horizontal, 16)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 ForEach(session.pages) { page in
                     pageCard(page)
                         .padding(.horizontal, 16)
@@ -134,56 +102,50 @@ struct KnowledgeWebsiteView: View {
     }
 
     private func pageCard(_ page: PageContent) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(page.title ?? page.domain)
-                .font(AppTheme.Typography.sansBody(size: 15, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.text)
-                .lineLimit(2)
+        Button {
+            onSelectPage?(page)
+        } label: {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(page.title ?? page.domain)
+                        .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
+                        .foregroundColor(AppTheme.Colors.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-            if let summary = page.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(AppTheme.Typography.sansBody(size: 13, weight: .regular))
-                    .foregroundColor(AppTheme.Colors.text.opacity(0.65))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                    if let summary = page.summary, !summary.isEmpty {
+                        Text(summary)
+                            .font(AppTheme.Typography.sansBody(size: 12, weight: .regular))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.35))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
 
-            HStack(spacing: 10) {
+                Spacer(minLength: 12)
+
                 if let readingTime = page.readingTime, readingTime > 0 {
                     Text("\(readingTime)m")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.text.opacity(0.4))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.2))
                 }
 
-                if let depth = page.scrollDepth {
-                    ScrollDepthBar(depth: depth)
-                        .frame(width: 60, height: 6)
+                if onSelectPage != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(AppTheme.Colors.text.opacity(0.15))
+                        .padding(.leading, 8)
                 }
-
-                Spacer()
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(AppTheme.Colors.text.opacity(0.025))
+            )
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(AppTheme.Colors.text.opacity(0.04))
-        )
-    }
-}
-
-private struct ScrollDepthBar: View {
-    let depth: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(AppTheme.Colors.text.opacity(0.1))
-                Capsule()
-                    .fill(AppTheme.Colors.accent.opacity(0.7))
-                    .frame(width: geo.size.width * min(max(depth, 0), 1))
-            }
-        }
+        .buttonStyle(.plain)
     }
 }
 

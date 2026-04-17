@@ -7,10 +7,12 @@ final class PinStore: ObservableObject {
 
     private let key = "pinnedDomains"
     @Published private var pinned: Set<String>
+    @Published private(set) var all: [String] = []
 
     private init() {
         let arr = UserDefaults.standard.stringArray(forKey: key) ?? []
         pinned = Set(arr)
+        all = pinned.sorted()
     }
 
     func isPinned(_ domain: String) -> Bool {
@@ -23,10 +25,11 @@ final class PinStore: ObservableObject {
         } else {
             pinned.insert(domain)
         }
+        all = pinned.sorted()
         save()
     }
 
     private func save() {
-        UserDefaults.standard.set(Array(pinned), forKey: key)
+        UserDefaults.standard.set(pinned.sorted(), forKey: key)
     }
 }

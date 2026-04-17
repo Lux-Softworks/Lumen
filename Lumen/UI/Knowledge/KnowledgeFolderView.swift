@@ -93,8 +93,8 @@ struct FolderItemButton: View {
 
     private var rearFlapColor: Color {
         colorScheme == .dark
-            ? Color(.sRGB, red: 1.0, green: 0.96, blue: 0.88, opacity: 1.0)   // cream
-            : Color(.sRGB, red: 0.11, green: 0.11, blue: 0.13, opacity: 1.0)  // carbon fiber
+            ? Color(.sRGB, red: 1.0, green: 0.96, blue: 0.88, opacity: 1.0)
+            : Color(.sRGB, red: 0.11, green: 0.11, blue: 0.13, opacity: 1.0)
     }
 
     private var rearFlapStrokeColor: Color {
@@ -184,11 +184,11 @@ struct WebsitePageButton: View {
         VStack(spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+                    .fill(AppTheme.Colors.uiElement)
+                    .shadow(color: AppTheme.Colors.text.opacity(0.06), radius: 6, x: 0, y: 3)
 
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+                    .strokeBorder(AppTheme.Colors.text.opacity(0.06), lineWidth: 0.5)
             }
             .aspectRatio(3/4, contentMode: .fit)
 
@@ -203,6 +203,10 @@ struct WebsitePageButton: View {
 @MainActor
 struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
+
+    @State private var pressedTopicID: String? = nil
+    @State private var topicToDelete: Topic? = nil
+    @State private var showDeleteAlert = false
 
     var body: some View {
         GeometryReader { geo in
@@ -256,7 +260,10 @@ struct KnowledgeFolderView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        EmptyView()
+        if let page = viewModel.selectedPage {
+            PageDetailView(page: page, onBack: { viewModel.navigateBack() })
+                .id(page.id)
+        }
     }
 
     private var topicSelectionGrid: some View {
@@ -298,12 +305,17 @@ struct KnowledgeFolderView: View {
                             ],
                             spacing: 32
                         ) {
-                            ForEach(viewModel.topics) { topic in
+                            ForEach(Array(viewModel.topics.enumerated()), id: \.element.id) { index, topic in
                                 Button {
                                     Task { await viewModel.selectTopic(topic) }
                                 } label: {
                                     VStack(alignment: .center) {
                                         FolderItemButton(topic: topic)
+                                            .scaleEffect(pressedTopicID == topic.id ? 0.88 : 1.0)
+                                            .animation(
+                                                .spring(response: 0.25, dampingFraction: 0.6),
+                                                value: pressedTopicID
+                                            )
 
                                         Text(topic.name)
                                             .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
@@ -312,10 +324,38 @@ struct KnowledgeFolderView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                .modifier(StaggerFadeModifier(delay: Double(index) * 0.04))
+                                .highPriorityGesture(
+                                    LongPressGesture(minimumDuration: 0.45)
+                                        .onEnded { _ in
+                                            pressedTopicID = topic.id
+                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            }
+                                            topicToDelete = topic
+                                            showDeleteAlert = true
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                                pressedTopicID = nil
+                                            }
+                                        }
+                                )
                             }
                         }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
+                        .alert(
+                            "Delete \"\(topicToDelete?.name ?? "Folder")\"?",
+                            isPresented: $showDeleteAlert,
+                            presenting: topicToDelete
+                        ) { topic in
+                            Button("Delete", role: .destructive) {
+                                Task { await viewModel.deleteTopic(topic) }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: { _ in
+                            Text("All websites and saved pages inside this folder will be permanently deleted.")
+                        }
                     }
                 }
             }
@@ -324,28 +364,26 @@ struct KnowledgeFolderView: View {
 
     private var topicKnowledgeView: some View {
         VStack(spacing: 0) {
-            ZStack {
-                HStack {
-                    Button {
-                        viewModel.navigateBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.accent)
-                            .frame(width: 40, height: 40)
-                            .background(AppTheme.Colors.accent.opacity(0.1))
-                            .cornerRadius(20)
-                    }
-                    Spacer()
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.navigateBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppTheme.Colors.accent)
+                        .frame(width: 40, height: 40)
+                        .background(AppTheme.Colors.accent.opacity(0.1))
+                        .cornerRadius(20)
                 }
-
                 Text(viewModel.selectedTopic?.name ?? "")
-                    .font(AppTheme.Typography.serifDisplay(size: 20, weight: .bold))
+                    .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
                     .foregroundColor(AppTheme.Colors.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 16)
-            .padding(.top, 16)
+            .padding(.vertical, 14)
 
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVGrid(columns: [
@@ -360,6 +398,7 @@ struct KnowledgeFolderView: View {
                             WebsitePageButton(website: website)
                         }
                         .buttonStyle(.plain)
+                        .modifier(StaggerFadeModifier(delay: Double(index) * 0.05))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -373,8 +412,116 @@ struct KnowledgeFolderView: View {
         if let websiteVM = viewModel.websiteViewModel {
             KnowledgeWebsiteView(viewModel: websiteVM, onBack: {
                 viewModel.navigateBack()
+            }, onSelectPage: { page in
+                viewModel.selectPage(page)
             })
         }
+    }
+}
+
+private struct StaggerFadeModifier: ViewModifier {
+    let delay: Double
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 8)
+            .blur(radius: appeared ? 0 : 2)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.35).delay(delay)) {
+                    appeared = true
+                }
+            }
+    }
+}
+
+private struct PageDetailView: View {
+    let page: PageContent
+    var onBack: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppTheme.Colors.accent)
+                        .frame(width: 40, height: 40)
+                        .background(AppTheme.Colors.accent.opacity(0.1))
+                        .cornerRadius(20)
+                }
+                Text(page.title ?? page.domain)
+                    .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
+                    .foregroundColor(AppTheme.Colors.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let summary = page.summary, !summary.isEmpty {
+                        Text((try? AttributedString(markdown: summary)) ?? AttributedString(summary))
+                            .font(AppTheme.Typography.sansBody(size: 14, weight: .regular))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.5))
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                    }
+
+                    if let meta = pageMetaLine {
+                        Text(meta)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.Colors.text.opacity(0.25))
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 20)
+                    }
+
+                    Rectangle()
+                        .fill(AppTheme.Colors.text.opacity(0.06))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 20)
+
+                    VStack(alignment: .leading, spacing: 20) {
+                        ForEach(Array(contentParagraphs.enumerated()), id: \.offset) { _, para in
+                            Text(para)
+                                .font(AppTheme.Typography.sansBody(size: 15, weight: .regular))
+                                .foregroundColor(AppTheme.Colors.text.opacity(0.8))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .lineSpacing(5)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.bottom, 32)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var contentParagraphs: [String] {
+        page.content
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var pageMetaLine: String? {
+        var parts: [String] = []
+        parts.append(page.domain)
+        if let time = page.readingTime, time > 0 {
+            parts.append("\(time) min read")
+        }
+        if let depth = page.scrollDepth, depth > 0 {
+            parts.append("\(Int(depth * 100))% read")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 

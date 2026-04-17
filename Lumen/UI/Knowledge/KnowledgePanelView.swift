@@ -42,6 +42,7 @@ struct KnowledgePanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             await viewModel.menuViewModel.loadTopics()
+            Task { await viewModel.aiViewModel.preloadModel() }
         }
     }
 

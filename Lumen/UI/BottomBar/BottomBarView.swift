@@ -36,6 +36,7 @@ struct BottomBarView: View {
     var onZoomChanged: ((Int) -> Void)? = nil
     var onRequestDesktopSite: ((Bool) -> Void)? = nil
     var onReloadPage: (() -> Void)? = nil
+    var onNavigate: ((String) -> Void)? = nil
 
     @ObservedObject private var historyStore = HistoryStore.shared
 
@@ -156,7 +157,8 @@ struct BottomBarView: View {
                         onShare: onShare,
                         onZoomChanged: onZoomChanged,
                         onRequestDesktopSite: onRequestDesktopSite,
-                        onReloadPage: onReloadPage
+                        onReloadPage: onReloadPage,
+                        onNavigate: onNavigate
                     )
                     .id(state)
                     .transition(

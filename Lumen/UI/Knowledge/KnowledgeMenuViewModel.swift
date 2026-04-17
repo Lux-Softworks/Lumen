@@ -80,7 +80,19 @@ final class KnowledgeMenuViewModel {
 
     func navigateBack() {
         guard !navigationPath.isEmpty else { return }
-        navigationPath.removeLast()
+        let removed = navigationPath.removeLast()
+        switch removed {
+        case .detail:
+            selectedPage = nil
+        case .pages:
+            selectedWebsite = nil
+            websiteViewModel = nil
+        case .websites:
+            selectedTopic = nil
+            websites = []
+        case .topics:
+            break
+        }
     }
 
     func navigateToRoot() {
@@ -100,6 +112,18 @@ final class KnowledgeMenuViewModel {
             websites = []
             pages = []
             navigationPath = []
+        } catch {
+            self.error = error
+        }
+    }
+
+    func deleteTopic(_ topic: Topic) async {
+        do {
+            try await KnowledgeStorage.shared.deleteTopic(id: topic.id)
+            topics.removeAll { $0.id == topic.id }
+            if selectedTopic?.id == topic.id {
+                navigateToRoot()
+            }
         } catch {
             self.error = error
         }
