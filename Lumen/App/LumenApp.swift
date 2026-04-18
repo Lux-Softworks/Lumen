@@ -1,12 +1,17 @@
 import SwiftUI
 import UIKit
+import os
 @main
 struct LumenApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
         Task {
-            try? await KnowledgeStorage.shared.initialize()
+            do {
+                try await KnowledgeStorage.shared.initialize()
+            } catch {
+                KnowledgeLogger.storage.error("KnowledgeStorage init failed: \(String(describing: error), privacy: .public)")
+            }
         }
     }
 

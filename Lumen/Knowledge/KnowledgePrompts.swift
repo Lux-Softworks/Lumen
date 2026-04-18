@@ -45,13 +45,12 @@ enum KnowledgePrompts {
 
     static func topicClassification(content: String, title: String?) -> String {
         """
-        You are a topic classifier. Categorize the following article into a single, concise topic name (e.g., 'Finance', 'Technology', 'Sports', 'AI').
-        If the article doesn't clearly fit a common category, provide a custom one that is 1-2 words max.
+        Classify the article into exactly one word (e.g., Finance, Technology, Sports, AI, Health, Science, Travel).
 
         Title: \(title ?? "N/A")
         Content: \(content.prefix(2000))
 
-        Respond with ONLY the topic name.
+        Reply with ONE WORD ONLY. No punctuation, no explanation.
         """
     }
 

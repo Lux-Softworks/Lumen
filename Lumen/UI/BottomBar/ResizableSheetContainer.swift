@@ -196,7 +196,7 @@ struct ResizableSheetContainer<Content: View>: View {
 
                                 if shouldExpand {
                                     onExpand?()
-                                } else if isExpanded && !shouldExpand {
+                                } else if !shouldExpand {
                                     onCollapse?()
                                 }
                             }

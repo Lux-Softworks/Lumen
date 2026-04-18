@@ -38,9 +38,7 @@ class SiteSettingsStore: ObservableObject {
         do {
             let data = try JSONEncoder().encode(hostSettings)
             try data.write(to: fileURL)
-        } catch {
-            print("Failed to save site settings: \(error)")
-        }
+        } catch { }
     }
     
     private func load() {
@@ -48,8 +46,6 @@ class SiteSettingsStore: ObservableObject {
         do {
             let data = try Data(contentsOf: fileURL)
             hostSettings = try JSONDecoder().decode([String: PrivacyPolicy].self, from: data)
-        } catch {
-            print("Failed to load site settings: \(error)")
-        }
+        } catch { }
     }
 }

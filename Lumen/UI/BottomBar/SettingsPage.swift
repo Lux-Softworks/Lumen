@@ -42,7 +42,6 @@ struct SettingsPage: View {
 
     @State private var pageZoom: Int = 100
     @State private var requestDesktopSite: Bool = false
-    @State private var translateEnabled: Bool = false
     @State private var sitePinned: Bool = false
     @State private var sitePinnedReady: Bool = false
     @State private var siteBlockTrackers: Bool = false
@@ -113,7 +112,7 @@ struct SettingsPage: View {
 
                 let domain = currentURL?.host?.lowercased() ?? ""
                 sitePinned = PinStore.shared.isPinned(domain)
-                sitePinnedReady = true
+                DispatchQueue.main.async { sitePinnedReady = true }
 
                 pageZoom = initialZoom
                 requestDesktopSite = initialDesktopMode

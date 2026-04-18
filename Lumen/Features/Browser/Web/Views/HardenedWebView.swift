@@ -15,13 +15,63 @@ struct HardenedWebView: UIViewControllerRepresentable {
     class Coordinator: NSObject, WKScriptMessageHandler {
         var parent: HardenedWebView
         var hasAttached = false
-        var statusBarTintView: UIView?
-        var tintHeightConstraint: NSLayoutConstraint?
         var lastBottom: Int = -1
         var lastPageReadyToken: Int = -1
+        weak var refreshControl: UIRefreshControl?
+        weak var starView: UIImageView?
+        var scrollObservation: NSKeyValueObservation?
+        var isRefreshing = false
 
         init(_ parent: HardenedWebView) {
             self.parent = parent
+        }
+
+        @objc func handleRefresh(_ sender: UIRefreshControl) {
+            isRefreshing = true
+            parent.viewModel.reload()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            starView?.alpha = 1
+            startSpinning()
+        }
+
+        func startSpinning() {
+            guard let starView = starView else { return }
+            let currentAngle = (starView.layer.presentation()?.value(forKeyPath: "transform.rotation.z") as? CGFloat) ?? 0
+            starView.transform = .identity
+            let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+            rotation.fromValue = currentAngle
+            rotation.toValue = currentAngle + Double.pi * 2
+            rotation.duration = 0.9
+            rotation.repeatCount = .infinity
+            starView.layer.add(rotation, forKey: "spin")
+        }
+
+        func stopSpinning() {
+            isRefreshing = false
+            starView?.layer.removeAnimation(forKey: "spin")
+            starView?.transform = .identity
+        }
+
+        func observeScrollOffset(_ scrollView: UIScrollView) {
+            scrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] sv, _ in
+                guard let self, !self.isRefreshing else { return }
+                let y = sv.contentOffset.y
+                guard y < 0 else {
+                    DispatchQueue.main.async {
+                        UIView.animate(withDuration: 0.3, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                            self.starView?.alpha = 0
+                            self.starView?.transform = .identity
+                        }
+                    }
+                    return
+                }
+                let progress = min(-y / 100.0, 1.0)
+                DispatchQueue.main.async {
+                    guard self.starView?.layer.animation(forKey: "spin") == nil else { return }
+                    self.starView?.alpha = progress
+                    self.starView?.transform = CGAffineTransform(rotationAngle: CGFloat(progress * .pi * 2))
+                }
+            }
         }
 
         func userContentController(
@@ -31,38 +81,8 @@ struct HardenedWebView: UIViewControllerRepresentable {
             parent.pushCurrentInsets(webView: webView, context: nil)
         }
 
-        func installStatusBarTint(above webView: WKWebView, height: CGFloat) {
-            guard statusBarTintView == nil else { return }
-
-            let tint = UIView()
-            tint.translatesAutoresizingMaskIntoConstraints = false
-            tint.backgroundColor = .clear
-            tint.isUserInteractionEnabled = false
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self, let superview = webView.superview else { return }
-                let realHeight = webView.window?.safeAreaInsets.top ?? height
-                superview.addSubview(tint)
-
-                let heightConstraint = tint.heightAnchor.constraint(equalToConstant: realHeight)
-                NSLayoutConstraint.activate([
-                    tint.topAnchor.constraint(equalTo: superview.topAnchor),
-                    tint.leadingAnchor.constraint(equalTo: superview.leadingAnchor),
-                    tint.trailingAnchor.constraint(equalTo: superview.trailingAnchor),
-                    heightConstraint,
-                ])
-                self.tintHeightConstraint = heightConstraint
-                self.statusBarTintView = tint
-            }
-        }
-
-        func updateTintColor(_ color: UIColor?) {
-            guard let tint = statusBarTintView else { return }
-            let target = color ?? .clear
-            guard tint.backgroundColor != target else { return }
-            UIView.animate(withDuration: 0.25) {
-                tint.backgroundColor = target
-            }
+        func updateTintColor(_ color: UIColor?, controller: WebViewHostController?) {
+            controller?.tintColor = color
         }
     }
 
@@ -86,8 +106,35 @@ struct HardenedWebView: UIViewControllerRepresentable {
         controller.webView = webView
         webView.isFindInteractionEnabled = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = .clear
+        refreshControl.backgroundColor = .clear
+
+        let starConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
+        let starImageView = UIImageView(image: UIImage(systemName: "sparkle", withConfiguration: starConfig))
+        starImageView.tintColor = .white
+        starImageView.alpha = 0
+        starImageView.layer.shadowColor = UIColor.white.cgColor
+        starImageView.layer.shadowRadius = 8
+        starImageView.layer.shadowOpacity = 0.45
+        starImageView.layer.shadowOffset = .zero
+        starImageView.translatesAutoresizingMaskIntoConstraints = false
+        refreshControl.addSubview(starImageView)
+        NSLayoutConstraint.activate([
+            starImageView.centerXAnchor.constraint(equalTo: refreshControl.centerXAnchor),
+            starImageView.centerYAnchor.constraint(equalTo: refreshControl.centerYAnchor),
+        ])
+        context.coordinator.starView = starImageView
+
+        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.handleRefresh(_:)), for: .valueChanged)
+        webView.scrollView.refreshControl = refreshControl
+        webView.scrollView.backgroundColor = viewModel.themeColor ?? .black
+        context.coordinator.refreshControl = refreshControl
+
+        context.coordinator.observeScrollOffset(webView.scrollView)
         webView.scrollView.automaticallyAdjustsScrollIndicatorInsets = false
-        context.coordinator.installStatusBarTint(above: webView, height: safeAreaTop)
+        controller.installStatusBarTint(height: safeAreaTop)
 
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "insetProvider")
         webView.configuration.userContentController.add(context.coordinator, name: "insetProvider")
@@ -96,9 +143,6 @@ struct HardenedWebView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: WebViewHostController, context: Context) {
-        if let wv = controller.webView {
-            let _ = wv.convert(wv.bounds, to: nil)
-        }
         guard let webView = controller.webView else { return }
 
         context.coordinator.parent = self
@@ -108,12 +152,18 @@ struct HardenedWebView: UIViewControllerRepresentable {
             context.coordinator.hasAttached = true
         }
 
-        context.coordinator.installStatusBarTint(above: webView, height: safeAreaTop)
-        context.coordinator.updateTintColor(viewModel.themeColor)
+        controller.installStatusBarTint(height: safeAreaTop)
+        context.coordinator.updateTintColor(viewModel.themeColor, controller: controller)
+        webView.scrollView.backgroundColor = viewModel.themeColor ?? .black
+        webView.backgroundColor = viewModel.themeColor ?? .black
 
         if context.coordinator.lastPageReadyToken != viewModel.pageReadyToken {
             context.coordinator.lastBottom = -1
             context.coordinator.lastPageReadyToken = viewModel.pageReadyToken
+            if !viewModel.isLoading {
+                context.coordinator.refreshControl?.endRefreshing()
+                context.coordinator.stopSpinning()
+            }
         }
 
         pushCurrentInsets(webView: webView, context: context)
@@ -146,7 +196,19 @@ final class WebViewHostController: UIViewController {
         }
     }
 
+    var statusBarTintView: UIView?
+    private var tintHeightConstraint: NSLayoutConstraint?
     private var topConstraint: NSLayoutConstraint?
+
+    var tintColor: UIColor? {
+        didSet {
+            let target = tintColor ?? .clear
+            guard statusBarTintView?.backgroundColor != target else { return }
+            UIView.animate(withDuration: 0.25) {
+                self.statusBarTintView?.backgroundColor = target
+            }
+        }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -161,19 +223,47 @@ final class WebViewHostController: UIViewController {
         let windowTop = view.window?.safeAreaInsets.top
         let _ = view.safeAreaInsets.top
         let top = windowTop ?? 44
-        guard topConstraint?.constant != top else {
-            return
-        }
+
         topConstraint?.constant = top
+        tintHeightConstraint?.constant = top
         view.layoutIfNeeded()
     }
 
+    func installStatusBarTint(height: CGFloat) {
+        guard statusBarTintView == nil else {
+            if view.window == nil && tintHeightConstraint?.constant != height {
+                tintHeightConstraint?.constant = height
+            }
+            return
+        }
+
+        let tint = UIView()
+        tint.translatesAutoresizingMaskIntoConstraints = false
+        tint.backgroundColor = .clear
+        tint.isUserInteractionEnabled = false
+        view.addSubview(tint)
+
+        let realHeight = view.window?.safeAreaInsets.top ?? height
+        let heightConstraint = tint.heightAnchor.constraint(equalToConstant: realHeight)
+        NSLayoutConstraint.activate([
+            tint.topAnchor.constraint(equalTo: view.topAnchor),
+            tint.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tint.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            heightConstraint,
+        ])
+        self.tintHeightConstraint = heightConstraint
+        self.statusBarTintView = tint
+    }
+
     private func setupWebView(_ webView: WKWebView) {
-        if webView.superview == view { return }
+        if webView.superview == view {
+            webView.backgroundColor = tintColor ?? .black
+            return
+        }
 
         webView.removeFromSuperview()
         webView.translatesAutoresizingMaskIntoConstraints = false
-        webView.backgroundColor = .clear
+        webView.backgroundColor = tintColor ?? .black
         webView.isOpaque = false
         view.addSubview(webView)
 

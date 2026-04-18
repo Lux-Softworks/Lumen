@@ -12,6 +12,7 @@ struct TabOverlayView: View {
 
     @State private var lastScrolledToId: UUID? = nil
     @State private var scrollOffset: CGFloat = 0
+    @State private var isDeletingTab: Bool = false
 
     var body: some View {
         GeometryReader { geo in
@@ -31,7 +32,8 @@ struct TabOverlayView: View {
                                     hiddenTabId: hiddenTabId,
                                     shrinkProgress: shrinkProgress,
                                     onSelectTab: onSelectTab,
-                                    lastScrolledToId: $lastScrolledToId
+                                    lastScrolledToId: $lastScrolledToId,
+                                    isDeletingTab: $isDeletingTab
                                 )
                             }
                         }
@@ -39,6 +41,7 @@ struct TabOverlayView: View {
                     }
                     .coordinateSpace(name: "scrollView")
                     .scrollClipDisabled()
+                    .scrollDisabled(isDeletingTab)
                     .frame(height: config.cardHeight)
                     .onAppear {
                         proxy.scrollTo(tabManager.activeTabId, anchor: .center)
@@ -110,6 +113,7 @@ private struct TabCardWrapper: View {
     let shrinkProgress: CGFloat
     let onSelectTab: (UUID) -> Void
     @Binding var lastScrolledToId: UUID?
+    @Binding var isDeletingTab: Bool
 
     var body: some View {
         let hidden = tab.id == hiddenTabId
@@ -171,14 +175,15 @@ private struct TabCardWrapper: View {
                 tab: tab,
                 headerOpacity: headerOpacity,
                 onClose: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
                         tabManager.closeTab(id: tab.id)
                     }
                 },
                 onTap: {
                     lastScrolledToId = tab.id
                     onSelectTab(tab.id)
-                }
+                },
+                isDeletingTab: $isDeletingTab
             )
             .frame(width: config.cardWidth, height: config.cardHeight)
             .scaleEffect(cardScale)
@@ -252,6 +257,7 @@ private struct TabCardItemView: View {
     var headerOpacity: CGFloat = 1
     var onClose: () -> Void
     var onTap: () -> Void
+    @Binding var isDeletingTab: Bool
 
     @State private var dragOffset: CGFloat = 0
 
@@ -290,12 +296,12 @@ private struct TabCardItemView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
                     .lineLimit(1)
-                    .opacity(headerOpacity)
 
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
             .frame(height: 36)
+            .opacity(headerOpacity)
 
             ZStack {
                 if let snapshot = tab.snapshot {
@@ -314,22 +320,25 @@ private struct TabCardItemView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(tab.isIncognito ? IncognitoPalette.stroke : Color.clear, lineWidth: 1.5)
+                    .stroke(Color.clear, lineWidth: 0)
             )
         }
         .offset(y: min(0, dragOffset))
-        .opacity(dragOffset < 0 ? Double(max(0.0, 1 + dragOffset / 160)) : 1)
         .overlay {
             VerticalSwipeDetector(
-                onChanged: { dragOffset = $0 },
+                onChanged: {
+                    dragOffset = $0
+                    if !isDeletingTab { isDeletingTab = true }
+                },
                 onEnded: { translation, velocity in
-                    if translation < -80 || velocity < -600 {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            dragOffset = -500
+                    isDeletingTab = false
+                    if translation < -60 || velocity < -400 {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.9)) {
+                            dragOffset = -1000
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { onClose() }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { onClose() }
                     } else {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                             dragOffset = 0
                         }
                     }

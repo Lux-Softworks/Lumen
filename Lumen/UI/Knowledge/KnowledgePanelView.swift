@@ -113,7 +113,7 @@ struct KnowledgePanelView: View {
                 .stroke(palette.text.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .padding(.bottom, (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0) + 8)
         .padding(.top, 8)
     }
 }

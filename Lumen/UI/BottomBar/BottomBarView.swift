@@ -48,10 +48,14 @@ struct BottomBarView: View {
     @State private var isSpinning = false
     @State private var reloadRotation: Double = 0
     @State private var toolbarDragFraction: CGFloat = 0
+    @State private var searchFieldOpacity: Double = 1.0
+    @State private var magGlassOpacity: Double = 1.0
+    @State private var gearIconOpacity: Double = 0.0
+    @State private var folderIconOpacity: Double = 0.0
 
     var isExpanded: Bool {
         state == .search || state == .browserSettings || state == .siteSettings
-            || state == .knowledge || state == .submittingSearch
+            || state == .knowledge
     }
 
     var showsMagnifier: Bool {
@@ -117,8 +121,10 @@ struct BottomBarView: View {
             },
             onCollapse: {
                 isFocused = false
-                withAnimation(AppTheme.Motion.sheet) {
-                    toolbarDragFraction = 0
+                DispatchQueue.main.async {
+                    withAnimation(AppTheme.Motion.sheet) {
+                        toolbarDragFraction = 0
+                    }
                 }
             },
             onDismissFocused: {
@@ -136,6 +142,15 @@ struct BottomBarView: View {
         ) {
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
+                    frostedBackground
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(palette.text.opacity(0.15), lineWidth: 1))
+                        .matchedGeometryEffect(id: "searchPill", in: animation)
+                        .frame(width: isExpanded ? nil : 80, height: 44)
+                        .padding(.top, 18)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .allowsHitTesting(false)
+
                     collapsedContent
                         .opacity(isExpanded ? 0 : 1)
                         .allowsHitTesting(!isExpanded)
@@ -151,7 +166,7 @@ struct BottomBarView: View {
                         .matchedGeometryEffect(
                             id: "magnifyingGlass_icon", in: animation, isSource: false
                         )
-                        .opacity(showsMagnifier ? 1 : 0)
+                        .opacity(magGlassOpacity)
                         .allowsHitTesting(false)
                 }
 
@@ -210,9 +225,32 @@ struct BottomBarView: View {
             }
         }
         .onChange(of: state) { _, newState in
+            let isExpandingToSearch = newState == .search || newState == .browserSettings || newState == .siteSettings || newState == .knowledge
+
+            withAnimation(isExpandingToSearch ? AppTheme.Motion.sheet : .easeOut(duration: 0.05)) {
+                searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
+            }
+
+            let showsMag = newState == .collapsed || newState == .hidden
+                || newState == .search || newState == .submittingSearch
+            let showsGear = newState == .browserSettings
+            let showsFolder = newState == .knowledge
+
+            withAnimation(.easeOut(duration: 0.1)) {
+                magGlassOpacity = showsMag ? 1.0 : 0.0
+                if !showsGear { gearIconOpacity = 0.0 }
+                if !showsFolder { folderIconOpacity = 0.0 }
+            }
+            withAnimation(.easeIn(duration: 0.22).delay(0.12)) {
+                if showsGear { gearIconOpacity = 1.0 }
+                if showsFolder { folderIconOpacity = 1.0 }
+            }
+
             if newState != .search {
-                isFocused = false
                 toolbarDragFraction = 0
+                DispatchQueue.main.async {
+                    isFocused = false
+                }
             }
         }
         .onReceive(
@@ -278,9 +316,9 @@ struct BottomBarView: View {
                                 isSource: isExpanded
                             )
                         Image(systemName: "gearshape.fill")
-                            .opacity(state == .browserSettings ? 1 : 0)
+                            .opacity(gearIconOpacity)
                         Image(systemName: "folder.fill")
-                            .opacity(state == .knowledge ? 1 : 0)
+                            .opacity(folderIconOpacity)
                     }
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(palette.text.opacity(0.6))
@@ -314,6 +352,7 @@ struct BottomBarView: View {
                 (state == .siteSettings || state == .browserSettings || state == .knowledge)
                     ? .tail : .head
             )
+            .opacity(searchFieldOpacity)
 
             HStack(spacing: 0) {
                 ZStack {
@@ -366,16 +405,6 @@ struct BottomBarView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 44)
-        .background(
-            frostedBackground
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(palette.text.opacity(0.15), lineWidth: 1)
-                )
-                .matchedGeometryEffect(
-                    id: "searchBackground_fill", in: animation, isSource: isExpanded)
-        )
         .padding(.top, 18)
         .onChange(of: isLoading) { _, loading in
             if loading {
@@ -543,37 +572,26 @@ struct BottomBarView: View {
                 }
             }) {
                 ZStack {
-                    frostedBackground
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(palette.text.opacity(0.15), lineWidth: 1)
-                        )
+                    Color.clear
+                        .frame(width: 18, height: 18)
                         .matchedGeometryEffect(
-                            id: "searchBackground_fill", in: animation, isSource: !isExpanded
+                            id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded
                         )
-                        .frame(width: 80, height: 44)
 
-                    ZStack {
-                        Color.clear
-                            .frame(width: 18, height: 18)
-                            .matchedGeometryEffect(
-                                id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded
-                            )
-
-                        Image(systemName: "arrow.clockwise")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(palette.text)
-                            .frame(width: 18, height: 18)
-                            .rotationEffect(.degrees(0))
-                            .opacity(0)
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(palette.text)
+                        .frame(width: 18, height: 18)
+                        .rotationEffect(.degrees(0))
+                        .opacity(0)
                             .matchedGeometryEffect(
                                 id: "reloadButton", in: animation, isSource: !isExpanded)
                     }
-                    .frame(width: 80, height: 44)
-                }
+                .frame(width: 80, height: 44)
+                .contentShape(Rectangle())
+                .matchedGeometryEffect(id: "searchPill", in: animation, isSource: true)
             }
 
             Spacer()
@@ -604,6 +622,8 @@ struct BottomBarView: View {
             .opacity(isTabOverlayVisible ? 0 : 1)
             .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
         }
+        .opacity(sideOpacity)
+        .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
     }
 
     private var knowledgeContent: some View {

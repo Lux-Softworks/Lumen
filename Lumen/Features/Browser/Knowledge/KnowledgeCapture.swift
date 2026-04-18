@@ -43,7 +43,11 @@ class KnowledgeCaptureService {
                 try await KnowledgeStorage.shared.updateWebsite(website)
             } else if payload.triggered {
                 let websiteSummary = await KnowledgeClassifier.summarizeWebsite(content: extractedContent.content, title: extractedContent.title)
-                let topicName = await KnowledgeClassifier.classify(content: extractedContent.content, title: extractedContent.title)
+                let rawTopicName = await KnowledgeClassifier.classify(content: extractedContent.content, title: extractedContent.title)
+                let topicName = rawTopicName
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .components(separatedBy: .whitespacesAndNewlines)
+                    .first ?? ""
 
                 var topicID: String? = nil
                 if !topicName.isEmpty && topicName != "Other" {

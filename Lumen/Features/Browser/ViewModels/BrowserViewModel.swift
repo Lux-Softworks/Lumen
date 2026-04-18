@@ -365,7 +365,6 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 guard let self = self else { return }
                 let color = UIColor.fromAnyString(colorString)
                 self.themeColor = color
-                webView.scrollView.backgroundColor = color ?? .systemBackground
             }
         }
     }

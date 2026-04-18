@@ -123,11 +123,13 @@ struct BrowserView: View {
             )
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
             .onAppear {
-                withAnimation(.smooth(duration: 0.3).delay(0.3)) {
-                    isReady = true
-                }
-                withAnimation(.smooth(duration: 0.3).delay(0.65)) {
-                    bottomBarState = .search
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.smooth(duration: 0.3)) {
+                        isReady = true
+                    }
+                    withAnimation(AppTheme.Motion.sheet) {
+                        bottomBarState = .search
+                    }
                 }
             }
     }
@@ -255,7 +257,7 @@ struct BrowserView: View {
 
         ZStack {
             if let tab = activeTab {
-                Color.black
+                (tab.themeColor.map { Color(uiColor: $0) } ?? Color.black)
                     .ignoresSafeArea()
 
                 let showLive = isFullScreen && webViewReady
@@ -405,7 +407,13 @@ struct BrowserView: View {
             updateState {
                 withAnimation(.easeOut(duration: 0.15)) {
                     topBarOffset = getStatusBarHeight(geometry)
-                    bottomBarState = .collapsed
+                    let currentURL = tab.viewModel.currentURL?.absoluteString ?? ""
+                    let isBlank = currentURL.isEmpty || currentURL == "about:blank"
+
+                    if !isBlank && bottomBarState != .search && bottomBarState != .browserSettings
+                        && bottomBarState != .siteSettings && bottomBarState != .knowledge {
+                        bottomBarState = .collapsed
+                    }
                 }
             }
         }
@@ -543,11 +551,9 @@ struct BrowserView: View {
                     .frame(width: 16, height: 16)
             }
 
-            Text(tab.isIncognito
-                 ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
-                 : (tab.title.isEmpty ? "New Tab" : tab.title))
+            Text(tab.title.isEmpty ? "New Tab" : tab.title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
+                .foregroundColor(.white)
                 .lineLimit(1)
 
             Spacer(minLength: 0)
@@ -565,7 +571,7 @@ struct BrowserView: View {
         if let themeColor = tab?.viewModel.themeColor {
             Color(themeColor)
         } else {
-            Color.black
+            Color.clear
         }
     }
 
@@ -590,7 +596,9 @@ struct BrowserView: View {
             onHistoryTap: { url in handleHistoryTap(url: url) },
             onSearchPressedInTabOverlay: handleSearchFromCarousel,
             onCopyUrl: handleCopyUrl,
-            onReload: { vm?.reload() },
+            onReload: {
+                vm?.reload()
+            },
             onBack: { vm?.goBack() },
             onForward: { vm?.goForward() },
             canGoBack: vm?.canGoBack ?? false,
@@ -713,15 +721,17 @@ struct BrowserView: View {
         isAddressBarFocused = false
         urlText = query
 
-        updateState {
-            withAnimation(.smooth(duration: 0.3)) {
-                self.bottomBarState = .submittingSearch
-                self.bottomBarOpacity = 0
-                self.webViewReady = false
+        beginNavigation()
+
+        DispatchQueue.main.async {
+            self.updateState {
+                withAnimation(.smooth(duration: 0.3)) {
+                    self.bottomBarState = .submittingSearch
+                    self.bottomBarOpacity = 0
+                    self.webViewReady = false
+                }
             }
         }
-
-        beginNavigation()
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.3))
@@ -742,7 +752,9 @@ struct BrowserView: View {
 
             await tabToLoad?.viewModel.processUserInput(query)
 
-            self.bottomBarState = .collapsed
+            withTransaction(Transaction(animation: nil)) {
+                self.bottomBarState = .collapsed
+            }
 
             if tabsEmpty {
                 coverFinished = true
@@ -901,6 +913,9 @@ private struct TabManagerHandlers: ViewModifier {
             .onChange(of: tabManager.tabs.isEmpty) { _, isEmpty in
                 if isEmpty {
                     DispatchQueue.main.async {
+                        withAnimation(AppTheme.Motion.sheet) {
+                            bottomBarState = .search
+                        }
                         activeTabViewState = .fullScreen
                         shrinkProgress = 0
                         webViewReady = true

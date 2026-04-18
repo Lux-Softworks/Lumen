@@ -7,7 +7,7 @@ enum BrowserEngine {
     static func makeConfiguration(policy: PrivacyPolicy, isIncognito: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
-        config.websiteDataStore = .nonPersistent()
+        config.websiteDataStore = isIncognito ? .nonPersistent() : .default()
 
         config.allowsInlineMediaPlayback = policy.allowsInlineMediaPlayback
         config.allowsAirPlayForMediaPlayback = policy.allowsAirPlayForMediaPlayback

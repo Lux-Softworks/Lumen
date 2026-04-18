@@ -65,7 +65,7 @@ struct KnowledgeAIView: View {
                 phase: viewModel.isModelLoading ? .spinning : viewModel.sparklePhase
             )
             Text("Ask about what you've read")
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(palette.text.opacity(0.28))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

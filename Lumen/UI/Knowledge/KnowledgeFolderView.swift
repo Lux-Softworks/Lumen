@@ -280,21 +280,25 @@ struct KnowledgeFolderView: View {
                     .frame(width: width)
                     .offset(x: offsetFor(index: 0, width: width))
                     .opacity(opacityFor(index: 0))
+                    .allowsHitTesting(levelIndex == 0)
 
                 topicKnowledgeView
                     .frame(width: width)
                     .offset(x: offsetFor(index: 1, width: width))
                     .opacity(opacityFor(index: 1))
+                    .allowsHitTesting(levelIndex == 1)
 
                 pagesView
                     .frame(width: width)
                     .offset(x: offsetFor(index: 2, width: width))
                     .opacity(opacityFor(index: 2))
+                    .allowsHitTesting(levelIndex == 2)
 
                 detailView
                     .frame(width: width)
                     .offset(x: offsetFor(index: 3, width: width))
                     .opacity(opacityFor(index: 3))
+                    .allowsHitTesting(levelIndex == 3)
             }
             .animation(.smooth(duration: 0.3), value: viewModel.navigationPath)
         }
@@ -413,8 +417,11 @@ struct KnowledgeFolderView: View {
                         ) { topic in
                             Button("Delete", role: .destructive) {
                                 Task { await viewModel.deleteTopic(topic) }
+                                topicToDelete = nil
                             }
-                            Button("Cancel", role: .cancel) {}
+                            Button("Cancel", role: .cancel) {
+                                topicToDelete = nil
+                            }
                         } message: { _ in
                             Text("All websites and saved pages inside this folder will be permanently deleted.")
                         }
