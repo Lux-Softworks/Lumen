@@ -9,10 +9,18 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
     private let logger = Logger(subsystem: "com.Lumen.browser", category: "NetworkInterceptor")
 
     private static let xhrKeywords = ["/api/", "/collect", "/pixel", "/beacon", "/track", "/event"]
+    private static let requestLogCap = 500
 
     private(set) var currentPageURL: URL?
     private(set) var requestLog: [InterceptedRequest] = []
     private(set) var detectedThreats: [ThreatEvent] = []
+
+    private func appendRequest(_ request: InterceptedRequest) {
+        requestLog.append(request)
+        if requestLog.count > Self.requestLogCap {
+            requestLog.removeFirst(requestLog.count - Self.requestLogCap)
+        }
+    }
 
     var onThreatDetected: ((ThreatEvent) -> Void)?
     var onDidCommit: ((WKWebView) -> Void)?
@@ -80,7 +88,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                 timestamp: Date()
             )
 
-            requestLog.append(request)
+            appendRequest(request)
             let threats = detector.analyze(request)
 
             if !threats.isEmpty {
@@ -118,7 +126,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                     timestamp: Date()
                 )
 
-                requestLog.append(request)
+                appendRequest(request)
                 let _ = detector.analyze(request)
             }
         }

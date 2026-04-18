@@ -102,24 +102,24 @@ struct ProgressView: View {
                     displayedProgress = 1.0
                 }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
                     guard self.isFinishing else { return }
 
                     withAnimation(.smooth(duration: 0.3)) {
                         visible = false
                     }
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        guard self.isFinishing else { return }
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard self.isFinishing else { return }
 
-                        var transaction = Transaction(animation: .none)
-                        transaction.disablesAnimations = true
+                    var transaction = Transaction(animation: .none)
+                    transaction.disablesAnimations = true
 
-                        withTransaction(transaction) {
-                            displayedProgress = 0
-                        }
-                        isFinishing = false
+                    withTransaction(transaction) {
+                        displayedProgress = 0
                     }
+                    isFinishing = false
                 }
             }
         }

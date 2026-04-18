@@ -719,7 +719,7 @@ struct SettingsPage: View {
             }
 
             Text(sectionTitle(for: section))
-                .font(AppTheme.Typography.serifDisplay(size: 20, weight: .bold))
+                .font(AppTheme.Typography.display(size: 20, weight: .bold))
                 .foregroundColor(palette.text)
         }
         .padding(.horizontal, 16)

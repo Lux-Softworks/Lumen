@@ -21,6 +21,54 @@ actor LocalKnowledgeProvider {
     private var isWarmed: Bool = false
     private static let idleUnloadSeconds: UInt64 = 180
 
+    private static func compile(_ patterns: [String]) -> [NSRegularExpression] {
+        patterns.compactMap { try? NSRegularExpression(pattern: $0) }
+    }
+
+    private static let outputMetaPatterns: [NSRegularExpression] = compile([
+        "(?i)^here('s| is| are)\\b[^:]*:",
+        "(?i)^(in |based on |according to |sure|okay|of course)[^:]*:",
+        "(?i)^.{0,20}(concise|natural|brief|short|sentence)[^:]*:",
+        "(?i)^.{0,20}(response|answer|summary)[^:]*:",
+    ])
+
+    private static let outputMetaSentences: [NSRegularExpression] = compile([
+        "(?i)^(sure|okay|of course|certainly)[.,!]?\\s*",
+        "(?i)^(let me|i'?ll|i can|i would)\\b[^.]*\\.\\s*",
+        "(?i)^i('?ve| have)?\\s*(looked|searched|checked|reviewed|scanned|gone through|looked through)\\b[^.]*\\.\\s*",
+        "(?i)^(based on|from|according to|looking at|drawing on)\\s+(your|the)\\s+(saved |reading |)?(pages?|sources?|history|notes)\\b[^.]*\\.\\s*",
+        "(?i)^(in|from) your saved pages[^.]*\\.\\s*",
+    ])
+
+    private static let summaryMetaPrefixes: [NSRegularExpression] = compile([
+        "(?i)^here('s| is| are)\\b[^:]*:",
+        "(?i)^(sure|okay|of course|this)[^:]*:",
+        "(?i)^.{0,15}(summary|description|purpose|overview)[^:]*:",
+        "(?i)^(the (article|page|website|site|content) (is about|covers|discusses|describes|explains))\\s*",
+    ])
+
+    private static let citationRegex = try? NSRegularExpression(pattern: "\\[\\d+\\]")
+    private static let strayStarRegex = try? NSRegularExpression(pattern: "(?<![*])\\*(?![*])")
+    private static let nonAlphanumRegex = try? NSRegularExpression(pattern: "[^a-z0-9 ]")
+    private static let whitespaceRegex = try? NSRegularExpression(pattern: "\\s+")
+
+    private static func stripPrefix(_ text: String, using regex: NSRegularExpression) -> String {
+        let ns = text as NSString
+        let range = NSRange(location: 0, length: ns.length)
+        guard let match = regex.firstMatch(in: text, range: range), match.range.location == 0 else {
+            return text
+        }
+        let end = match.range.location + match.range.length
+        return ns.substring(from: end).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func replaceAll(_ text: String, using regex: NSRegularExpression?, with replacement: String) -> String {
+        guard let regex else { return text }
+        let ns = text as NSString
+        let range = NSRange(location: 0, length: ns.length)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: replacement)
+    }
+
     private init() {
         Task { [weak self] in
             await self?.registerMemoryObservers()
@@ -215,7 +263,7 @@ actor LocalKnowledgeProvider {
 
         let prompt = await KnowledgePrompts.topicClassification(content: content, title: title)
 
-        let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
+        let parameters = GenerateParameters(maxTokens: 14, temperature: 0.0)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
 
@@ -228,7 +276,34 @@ actor LocalKnowledgeProvider {
 
         clearGPUCache()
         touch()
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return await Self.sanitizeTopic(output)
+    }
+
+    private static let topicStopwords: Set<String> = [
+        "just", "the", "a", "an", "this", "that", "it", "here", "there",
+        "sure", "okay", "ok", "yes", "no", "well", "so",
+        "article", "topic", "content", "page", "website", "site",
+        "news", "story", "post", "blog", "other", "unknown", "none", "n/a", "na",
+        "is", "about", "regarding", "general", "misc", "miscellaneous"
+    ]
+
+    @MainActor private static func sanitizeTopic(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let firstLine = trimmed.split(whereSeparator: { $0.isNewline }).first.map(String.init) ?? trimmed
+        let firstToken = firstLine
+            .components(separatedBy: .whitespacesAndNewlines)
+            .first ?? ""
+
+        let allowed = CharacterSet.letters.union(CharacterSet(charactersIn: "&-/."))
+        let cleaned = String(firstToken.unicodeScalars.filter { allowed.contains($0) })
+        guard cleaned.count >= 2 else { return "" }
+
+        let lower = cleaned.lowercased()
+        if topicStopwords.contains(lower) { return "" }
+
+        return TopicCanonicalizer.canonical(for: cleaned)
     }
 
     func refineQueryAndFindKeywordWithLLM(query: String) async throws -> String {
@@ -476,46 +551,21 @@ actor LocalKnowledgeProvider {
     private func cleanOutput(_ raw: String) -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let metaPatterns = [
-            "(?i)^here('s| is| are)\\b[^:]*:",
-            "(?i)^(in |based on |according to |sure|okay|of course)[^:]*:",
-            "(?i)^.{0,20}(concise|natural|brief|short|sentence)[^:]*:",
-            "(?i)^.{0,20}(response|answer|summary)[^:]*:",
-        ]
-        for pattern in metaPatterns {
-            if let range = text.range(of: pattern, options: .regularExpression) {
-                text = String(text[range.upperBound...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+        for regex in Self.outputMetaPatterns {
+            text = Self.stripPrefix(text, using: regex)
         }
 
-        let metaSentences = [
-            "(?i)^(sure|okay|of course|certainly)[.,!]?\\s*",
-            "(?i)^(let me|i'?ll|i can|i would)\\b[^.]*\\.\\s*",
-            "(?i)^i('?ve| have)?\\s*(looked|searched|checked|reviewed|scanned|gone through|looked through)\\b[^.]*\\.\\s*",
-            "(?i)^(based on|from|according to|looking at|drawing on)\\s+(your|the)\\s+(saved |reading |)?(pages?|sources?|history|notes)\\b[^.]*\\.\\s*",
-            "(?i)^(in|from) your saved pages[^.]*\\.\\s*",
-        ]
-        for pattern in metaSentences {
-            while let range = text.range(of: pattern, options: .regularExpression) {
-                text = String(text[range.upperBound...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+        for regex in Self.outputMetaSentences {
+            var next = Self.stripPrefix(text, using: regex)
+            while next != text {
+                text = next
+                next = Self.stripPrefix(text, using: regex)
             }
         }
 
         text = dedupeSentences(text)
-
-        text = text.replacingOccurrences(
-            of: "\\[\\d+\\]",
-            with: "",
-            options: .regularExpression
-        )
-
-        text = text.replacingOccurrences(
-            of: "(?<![*])\\*(?![*])",
-            with: "",
-            options: .regularExpression
-        )
+        text = Self.replaceAll(text, using: Self.citationRegex, with: "")
+        text = Self.replaceAll(text, using: Self.strayStarRegex, with: "")
 
         let starPairCount = text.components(separatedBy: "**").count - 1
         if starPairCount % 2 != 0 {
@@ -554,9 +604,9 @@ actor LocalKnowledgeProvider {
 
         for (sentence, _) in sentences {
             guard !sentence.isEmpty else { continue }
-            let key = sentence.lowercased()
-                .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
-                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            var key = sentence.lowercased()
+            key = Self.replaceAll(key, using: Self.nonAlphanumRegex, with: "")
+            key = Self.replaceAll(key, using: Self.whitespaceRegex, with: " ")
             if seen.contains(key) { continue }
             seen.insert(key)
 
@@ -581,24 +631,15 @@ actor LocalKnowledgeProvider {
     private func cleanSummary(_ raw: String) -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let metaPrefixes = [
-            "(?i)^here('s| is| are)\\b[^:]*:",
-            "(?i)^(sure|okay|of course|this)[^:]*:",
-            "(?i)^.{0,15}(summary|description|purpose|overview)[^:]*:",
-            "(?i)^(the (article|page|website|site|content) (is about|covers|discusses|describes|explains))\\s*",
-        ]
-        for pattern in metaPrefixes {
-            if let range = text.range(of: pattern, options: .regularExpression) {
-                text = String(text[range.upperBound...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+        for regex in Self.summaryMetaPrefixes {
+            text = Self.stripPrefix(text, using: regex)
         }
 
         if let first = text.first, first.isLowercase {
             text = first.uppercased() + text.dropFirst()
         }
 
-        text = text.replacingOccurrences(of: "(?<![*])\\*(?![*])", with: "", options: .regularExpression)
+        text = Self.replaceAll(text, using: Self.strayStarRegex, with: "")
         let starCount = text.components(separatedBy: "**").count - 1
         if starCount % 2 != 0 {
             text = text.replacingOccurrences(of: "**", with: "")

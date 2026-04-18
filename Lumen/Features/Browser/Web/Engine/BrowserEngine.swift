@@ -176,7 +176,9 @@ enum BrowserEngine {
         let detector = ThreatDetector()
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
-        interceptor.onDidFinishLoad = { _ in }
+        interceptor.onDidFinishLoad = { wv in
+            AnnotationHandler.applyAll(webView: wv)
+        }
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
 
@@ -266,6 +268,16 @@ final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+
+        let scheme = url.scheme?.lowercased()
+        let safeSchemes: Set<String> = ["http", "https", "about", "data", "blob", "file"]
+        if let scheme, !safeSchemes.contains(scheme) {
+            if UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
             decisionHandler(.cancel)
             return
         }

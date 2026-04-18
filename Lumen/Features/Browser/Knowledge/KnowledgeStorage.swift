@@ -561,6 +561,8 @@ actor KnowledgeStorage {
             }
             sqlite3_bind_int(statement, 12, Int32(website.pageCountAtSynthesis))
         })
+
+        try updateTopicCounts()
     }
 
     func updateWebsite(_ website: Website) throws {
@@ -598,6 +600,8 @@ actor KnowledgeStorage {
             sqlite3_bind_int(statement, 9, Int32(website.pageCountAtSynthesis))
             sqlite3_bind_text(statement, 10, website.id, -1, SQLITE_TRANSIENT)
         })
+
+        try updateTopicCounts()
     }
 
     func updateWebsiteSynthesis(websiteID: String, summary: String, pageCount: Int) throws {
@@ -638,7 +642,7 @@ actor KnowledgeStorage {
     func fetchTopic(name: String) async throws -> Topic? {
         try initialize()
 
-        let sql = "SELECT * FROM topics WHERE name = ?"
+        let sql = "SELECT * FROM topics WHERE LOWER(name) = LOWER(?) LIMIT 1"
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
@@ -1028,6 +1032,15 @@ actor KnowledgeStorage {
         let normalized = PageContent.normalizeURL(url)
         let pageID = try fetchPageID(normalizedURL: normalized)
 
+        if let existing = try await fetchAnnotationMatching(
+            normalizedURL: normalized,
+            text: text,
+            prefix: prefix,
+            suffix: suffix
+        ) {
+            return existing
+        }
+
         let annotation = await Annotation(
             pageID: pageID,
             url: url,
@@ -1057,6 +1070,22 @@ actor KnowledgeStorage {
         })
 
         return annotation
+    }
+
+    private func fetchAnnotationMatching(
+        normalizedURL: String,
+        text: String,
+        prefix: String,
+        suffix: String
+    ) async throws -> Annotation? {
+        let sql = "SELECT * FROM annotations WHERE normalized_url = ? AND text = ? AND prefix = ? AND suffix = ? LIMIT 1"
+        let results = try await queryAnnotations(sql: sql) { [self] statement in
+            sqlite3_bind_text(statement, 1, normalizedURL, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, text, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, prefix, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, suffix, -1, SQLITE_TRANSIENT)
+        }
+        return results.first
     }
 
     func fetchAnnotations(normalizedURL: String) async throws -> [Annotation] {

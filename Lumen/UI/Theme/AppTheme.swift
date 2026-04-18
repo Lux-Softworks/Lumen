@@ -40,7 +40,7 @@ public enum AppTheme {
     }
 
     public enum Typography {
-        public static func serifDisplay(size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        public static func display(size: CGFloat, weight: Font.Weight = .bold) -> Font {
             return .system(size: size, weight: weight, design: .default)
         }
 

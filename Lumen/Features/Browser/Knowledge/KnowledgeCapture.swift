@@ -2,37 +2,95 @@ import Foundation
 import ObjectiveC
 import WebKit
 import os
+import SwiftUI
+import Combine
+
+extension Notification.Name {
+    static let knowledgeCaptured = Notification.Name("lumen.knowledgeCaptured")
+}
 
 @MainActor
-class KnowledgeCaptureService {
+class KnowledgeCaptureService: ObservableObject {
     static let shared = KnowledgeCaptureService()
+
+    @Published private(set) var captureToken: Int = 0
 
     private init() {}
 
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
-        guard BrowserSettings.shared.collectKnowledge else { return }
+        KnowledgeLogger.capture.info("signal received: \(payload.url, privacy: .public) dwell=\(payload.readingTime) scroll=\(payload.scrollDepth, format: .fixed(precision: 2))")
+
+        guard BrowserSettings.shared.collectKnowledge else {
+            KnowledgeLogger.capture.info("skip: collectKnowledge disabled")
+            return
+        }
         guard let webView = webView else { return }
         let incognito = objc_getAssociatedObject(
             webView.configuration,
             &_WKWebViewAssociatedKeys.incognitoFlagKey
         ) as? Bool ?? false
-        guard !incognito else { return }
+        guard !incognito else {
+            KnowledgeLogger.capture.info("skip: incognito")
+            return
+        }
 
         let html: String?
         do {
             html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
         } catch {
+            KnowledgeLogger.capture.error("skip: outerHTML failed \(String(describing: error), privacy: .public)")
             return
         }
 
-        guard let html = html else { return }
+        guard let html = html else {
+            KnowledgeLogger.capture.info("skip: html nil")
+            return
+        }
         let url = webView.url
 
         let extractor = PageContentExtractor()
-        guard let extractedContent = try? await extractor.extractContent(from: html, baseURL: url) else { return }
+        guard let extractedContent = try? await extractor.extractContent(from: html, baseURL: url) else {
+            KnowledgeLogger.capture.info("skip: extraction failed")
+            return
+        }
 
         let domain = PageContent.extractDomain(from: extractedContent.url)
         let wordCount = PageContent.countWords(in: extractedContent.content)
+
+        let quality = CaptureQuality.evaluate(
+            url: payload.url,
+            domain: domain,
+            wordCount: wordCount,
+            readingTime: payload.readingTime,
+            scrollDepth: payload.scrollDepth,
+            hasArticleMetadata: extractedContent.title?.isEmpty == false
+        )
+
+        KnowledgeLogger.capture.info("quality domain=\(domain, privacy: .public) words=\(wordCount) score=\(quality.score, format: .fixed(precision: 2)) capture=\(quality.shouldCapturePage)")
+
+        guard quality.shouldCapturePage else { return }
+
+        let topicName = SemanticTopicClassifier.shared.classify(
+            title: extractedContent.title,
+            content: extractedContent.content
+        )
+        KnowledgeLogger.capture.info("topic semantic=\(topicName, privacy: .public)")
+
+        var resolvedTopicID: String? = nil
+        if !topicName.isEmpty {
+            do {
+                if let existingTopic = try await KnowledgeStorage.shared.fetchTopic(name: topicName) {
+                    resolvedTopicID = existingTopic.id
+                } else {
+                    resolvedTopicID = try await KnowledgeStorage.shared.createTopic(
+                        name: topicName,
+                        color: TopicColorPalette.hex(for: topicName)
+                    )
+                }
+            } catch {
+                KnowledgeLogger.capture.error("topic resolve failed: \(String(describing: error), privacy: .public)")
+            }
+        }
 
         do {
             if var website = try await KnowledgeStorage.shared.fetchWebsite(domain: domain) {
@@ -40,29 +98,27 @@ class KnowledgeCaptureService {
                 website.pageCount += 1
                 website.totalWords += wordCount
 
-                try await KnowledgeStorage.shared.updateWebsite(website)
-            } else if payload.triggered {
-                let websiteSummary = await KnowledgeClassifier.summarizeWebsite(content: extractedContent.content, title: extractedContent.title)
-                let rawTopicName = await KnowledgeClassifier.classify(content: extractedContent.content, title: extractedContent.title)
-                let topicName = rawTopicName
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .components(separatedBy: .whitespacesAndNewlines)
-                    .first ?? ""
-
-                var topicID: String? = nil
-                if !topicName.isEmpty && topicName != "Other" {
-                    if let existingTopic = try await KnowledgeStorage.shared.fetchTopic(name: topicName) {
-                        topicID = existingTopic.id
-                    } else {
-                        topicID = try await KnowledgeStorage.shared.createTopic(name: topicName)
-                    }
+                if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines), !meta.isEmpty {
+                    website.displayName = meta
+                } else if website.displayName.isEmpty || website.displayName == domain {
+                    website.displayName = DomainNameFormatter.format(host: domain)
                 }
+
+                if website.topicID == nil, let newID = resolvedTopicID {
+                    website.topicID = newID
+                }
+
+                try await KnowledgeStorage.shared.updateWebsite(website)
+            } else if quality.shouldCreateWebsite {
+                let displayName = Self.resolveSiteName(extracted: extractedContent, domain: domain)
+                    ?? DomainNameFormatter.format(host: domain)
+                let websiteSummary = await KnowledgeClassifier.summarizeWebsite(content: extractedContent.content, title: extractedContent.title)
 
                 let newWebsite = Website(
                     domain: domain,
-                    displayName: extractedContent.title,
+                    displayName: displayName,
                     summary: websiteSummary,
-                    topicID: topicID,
+                    topicID: resolvedTopicID,
                     pageCount: 1,
                     totalWords: wordCount,
                     firstVisit: Date(),
@@ -89,9 +145,21 @@ class KnowledgeCaptureService {
                     try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
                 }
             }
+
+            captureToken &+= 1
+            NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
+            KnowledgeLogger.capture.info("captured pageID=\(pageID, privacy: .public) token=\(self.captureToken) notified")
         } catch {
             KnowledgeLogger.capture.error("capture failed: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    private static func resolveSiteName(extracted: ExtractedContent, domain: String) -> String? {
+        if let meta = extracted.siteName?.trimmingCharacters(in: .whitespacesAndNewlines), !meta.isEmpty {
+            return meta
+        }
+        let formatted = DomainNameFormatter.format(host: domain)
+        return formatted.isEmpty ? nil : formatted
     }
 
     func handleUpdateSignal(_ payload: ReadingSignalPayload) async {

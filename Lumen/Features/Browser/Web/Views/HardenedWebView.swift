@@ -29,7 +29,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
         @objc func handleRefresh(_ sender: UIRefreshControl) {
             isRefreshing = true
             parent.viewModel.reload()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Haptics.impact(.light)
             starView?.alpha = 1
             startSpinning()
         }
@@ -57,7 +57,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
                 guard let self, !self.isRefreshing else { return }
                 let y = sv.contentOffset.y
                 guard y < 0 else {
-                    DispatchQueue.main.async {
+                    if self.starView?.alpha != 0 {
                         UIView.animate(withDuration: 0.3, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
                             self.starView?.alpha = 0
                             self.starView?.transform = .identity
@@ -65,12 +65,10 @@ struct HardenedWebView: UIViewControllerRepresentable {
                     }
                     return
                 }
+                guard self.starView?.layer.animation(forKey: "spin") == nil else { return }
                 let progress = min(-y / 100.0, 1.0)
-                DispatchQueue.main.async {
-                    guard self.starView?.layer.animation(forKey: "spin") == nil else { return }
-                    self.starView?.alpha = progress
-                    self.starView?.transform = CGAffineTransform(rotationAngle: CGFloat(progress * .pi * 2))
-                }
+                self.starView?.alpha = progress
+                self.starView?.transform = CGAffineTransform(rotationAngle: CGFloat(progress * .pi * 2))
             }
         }
 

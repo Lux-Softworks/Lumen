@@ -121,10 +121,8 @@ struct BottomBarView: View {
             },
             onCollapse: {
                 isFocused = false
-                DispatchQueue.main.async {
-                    withAnimation(AppTheme.Motion.sheet) {
-                        toolbarDragFraction = 0
-                    }
+                withAnimation(AppTheme.Motion.sheet) {
+                    toolbarDragFraction = 0
                 }
             },
             onDismissFocused: {
@@ -337,7 +335,7 @@ struct BottomBarView: View {
             )
             .font(
                 (state == .browserSettings || state == .siteSettings || state == .knowledge)
-                    ? AppTheme.Typography.serifDisplay(size: 17, weight: .bold)
+                    ? AppTheme.Typography.display(size: 17, weight: .bold)
                     : AppTheme.Typography.sansBody(size: 17, weight: .bold)
             )
             .textFieldStyle(.plain)
@@ -383,7 +381,7 @@ struct BottomBarView: View {
 
                 Button(action: {
                     onNewIncognitoTab?()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Haptics.impact(.light)
                 }) {
                     ZStack {
                         Image(systemName: "eyes")
@@ -535,6 +533,8 @@ struct BottomBarView: View {
 
         withAnimation(.interpolatingSpring(stiffness: 100, damping: 10)) {
             reloadRotation += 360
+        } completion: {
+            reloadRotation = reloadRotation.truncatingRemainder(dividingBy: 360)
         }
     }
 

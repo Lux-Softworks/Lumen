@@ -85,7 +85,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private func observeSearch() {
         searchCancellable =
             $urlString
-            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] query in
                 guard let self = self else { return }
@@ -125,6 +125,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         guard let webView = webView else { return nil }
         let config = WKSnapshotConfiguration()
         config.rect = webView.bounds
+        config.snapshotWidth = NSNumber(value: Double(min(webView.bounds.width, 480)))
         return try? await webView.takeSnapshot(configuration: config)
     }
 
@@ -380,9 +381,10 @@ final class BrowserViewModel: NSObject, ObservableObject {
                       let newY = change.newValue?.y,
                       let oldY = change.oldValue?.y else { return }
 
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
+                    guard let webView = webView else { return }
                     let delta = newY - oldY
-                    self.onScrollUpdate?(newY, delta, webView?.scrollView.contentSize.height ?? 0, webView?.scrollView.bounds.height ?? 0)
+                    self.onScrollUpdate?(newY, delta, webView.scrollView.contentSize.height, webView.scrollView.bounds.height)
                 }
             }
         )

@@ -10,6 +10,7 @@ struct ExtractedContent {
     let timestamp: Date
     let author: String?
     let description: String?
+    let siteName: String?
 }
 
 struct PageContentExtractor {
@@ -36,6 +37,7 @@ struct PageContentExtractor {
         }()
 
         let cleanedContent = try cleanHTML(article.content)
+        let siteName = (try? extractSiteName(from: html)) ?? nil
 
         return ExtractedContent(
             url: resolvedURL,
@@ -43,7 +45,8 @@ struct PageContentExtractor {
             content: cleanedContent,
             timestamp: publishedDate,
             author: article.byline,
-            description: article.excerpt
+            description: article.excerpt,
+            siteName: siteName
         )
     }
 
@@ -72,7 +75,8 @@ struct PageContentExtractor {
             content: extractedText,
             timestamp: Date(),
             author: nil,
-            description: nil
+            description: nil,
+            siteName: nil
         )
     }
 }
@@ -111,5 +115,57 @@ private extension PageContentExtractor {
             .joined(separator: " ")
 
         return cleaned
+    }
+
+    func extractSiteName(from html: String) throws -> String? {
+        let doc = try SwiftSoup.parse(html)
+
+        let metaQueries: [String] = [
+            "meta[property=og:site_name]",
+            "meta[name=og:site_name]",
+            "meta[name=application-name]",
+            "meta[name=apple-mobile-web-app-title]",
+            "meta[property=twitter:site]"
+        ]
+
+        for query in metaQueries {
+            if let element = try doc.select(query).first(),
+               let raw = try? element.attr("content"),
+               let cleaned = sanitizeSiteName(raw) {
+                return cleaned
+            }
+        }
+
+        return nil
+    }
+
+    private func sanitizeSiteName(_ raw: String) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("@") { value.removeFirst() }
+        value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard value.count >= 2, value.count <= 60 else { return nil }
+
+        let lower = value.lowercased()
+        let rejected: Set<String> = [
+            "website", "site", "home", "homepage", "page", "untitled",
+            "document", "index", "default", "n/a", "none", "unknown"
+        ]
+        if rejected.contains(lower) { return nil }
+
+        if value.contains("|") || value.contains(" - ") || value.contains(" – ") {
+            let separators: [String] = [" | ", " - ", " – ", " — "]
+            for separator in separators {
+                if let range = value.range(of: separator) {
+                    let first = String(value[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let second = String(value[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let pick = (first.count <= second.count && !first.isEmpty) ? first : second
+                    if !pick.isEmpty, pick.count <= 60 { value = pick }
+                    break
+                }
+            }
+        }
+
+        return value
     }
 }

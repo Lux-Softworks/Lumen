@@ -45,12 +45,39 @@ enum KnowledgePrompts {
 
     static func topicClassification(content: String, title: String?) -> String {
         """
-        Classify the article into exactly one word (e.g., Finance, Technology, Sports, AI, Health, Science, Travel).
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        Assign ONE topic label from this exact list: AI, Technology, Programming, Finance, Business, Sports, Health, Science, Travel, Politics, Design, Gaming, Music, Film, Food, Education, Law, History, Art, Photography, Books, Fashion, Automotive, Climate, Productivity, Psychology, Philosophy, Culture.
 
-        Title: \(title ?? "N/A")
-        Content: \(content.prefix(2000))
+        Rules:
+        - Output the word EXACTLY as spelled in the list. Never abbreviate a list word (do not write "Artifical" for AI, do not write "Tech" for Technology).
+        - Prefer "AI" for anything about machine learning, LLMs, neural networks, artificial intelligence.
+        - Prefer "Programming" for coding, software development, languages, frameworks.
+        - Prefer "Technology" for gadgets, consumer tech, tech industry news.
+        - Output ONE word, nothing else. No punctuation. No "Other", "News", "Article", "Topic", "Unknown".<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        Introducing GPT-5: OpenAI announces a new large language model with multimodal reasoning.<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+        AI<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        Rust 1.80 released: improvements to async traits and lazy static initialization.<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+        Programming<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        Apple unveils new iPhone with titanium chassis and redesigned camera system.<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+        Technology<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        Fed holds rates steady as inflation cools; markets rally on dovish tone from chair.<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+        Finance<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        A beginner's guide to sourdough starter: maintaining a healthy culture at home.<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+        Food<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        \(title ?? "N/A"): \(content.prefix(1500))<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
 
-        Reply with ONE WORD ONLY. No punctuation, no explanation.
         """
     }
 

@@ -1,5 +1,2 @@
-#if DEBUG
-let seedKnowledge: Bool = true
-#else
-let seedKnowledge: Bool = false
-#endif
+// for ui, ux, and sqlite testing in the folder view
+let seedKnowledge: Bool = false;

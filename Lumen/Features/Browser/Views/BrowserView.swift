@@ -72,9 +72,9 @@ struct BrowserView: View {
         return top > 0 ? top : 44
     }
 
-    private func updateState(_ changes: @escaping @MainActor () -> Void) {
-        Task { @MainActor in
-            changes()
+    private func updateState(_ action: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            action()
         }
     }
 
@@ -153,6 +153,8 @@ struct BrowserView: View {
                 .zIndex(2)
             bottomBarLayer(geometry: geometry)
                 .zIndex(3)
+            knowledgeIndicatorLayer(geometry: geometry)
+                .zIndex(9)
             navigationLayer(geometry: geometry)
                 .zIndex(10)
             if !isReady {
@@ -308,6 +310,15 @@ struct BrowserView: View {
         if showNavigationCover {
             navigationCover(geometry: geometry)
         }
+    }
+
+    @ViewBuilder
+    private func knowledgeIndicatorLayer(geometry: GeometryProxy) -> some View {
+        KnowledgeCaptureIndicator()
+            .padding(.top, getStatusBarHeight(geometry) + 8)
+            .padding(.trailing, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .allowsHitTesting(false)
     }
 
     private var launchScreen: some View {
@@ -839,8 +850,6 @@ private struct NavigationCoverChangeHandlers: ViewModifier {
                     coverFinished = true
                 }
             }
-            .onChange(of: pageCommitted) { _, committed in
-            }
             .onChange(of: webViewReady) { _, ready in
                 if ready && showNavigationCover && navigationCoverOpacity > 0.9 {
                     withAnimation(.smooth(duration: 0.3)) {
@@ -935,9 +944,7 @@ private struct BottomBarFocusHandlers: ViewModifier {
             .onChange(of: bottomBarState) { oldState, newState in
                 if oldState != .search && newState == .search {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        DispatchQueue.main.async {
-                            isAddressBarFocused.wrappedValue = true
-                        }
+                        isAddressBarFocused.wrappedValue = true
                     }
                 }
             }

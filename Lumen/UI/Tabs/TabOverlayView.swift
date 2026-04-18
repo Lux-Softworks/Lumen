@@ -23,7 +23,7 @@ struct TabOverlayView: View {
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 0) {
+                        LazyHStack(spacing: 0) {
                             ForEach(tabManager.tabs, id: \.id) { tab in
                                 TabCardWrapper(
                                     tab: tab,
@@ -258,6 +258,7 @@ private struct TabCardItemView: View {
     var onClose: () -> Void
     var onTap: () -> Void
     @Binding var isDeletingTab: Bool
+    @Environment(\.palette) private var palette
 
     @State private var dragOffset: CGFloat = 0
 
@@ -279,13 +280,13 @@ private struct TabCardItemView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         } placeholder: {
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.white.opacity(0.3))
+                                .fill(palette.text.opacity(0.3))
                                 .frame(width: 16, height: 16)
                         }
                     } else {
                         Image(systemName: "globe")
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(palette.text.opacity(0.8))
                             .frame(width: 16, height: 16)
                     }
                 }
@@ -294,7 +295,7 @@ private struct TabCardItemView: View {
                      ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
                      : (tab.title.isEmpty ? "New Tab" : tab.title))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
+                    .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : palette.text)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
@@ -313,7 +314,7 @@ private struct TabCardItemView: View {
                     Color(white: 0.10)
                     Image(systemName: "globe")
                         .font(.system(size: 36, weight: .thin))
-                        .foregroundColor(.white.opacity(0.12))
+                        .foregroundColor(palette.text.opacity(0.12))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -90,6 +90,9 @@ struct FolderItemButton: View {
         if let colorStr = topic.color, let uiColor = UIColor.fromAnyString(colorStr) {
             return Color(uiColor)
         }
+        if let uiColor = UIColor.fromAnyString(TopicColorPalette.hex(for: topic.name)) {
+            return Color(uiColor)
+        }
         return palette.accent
     }
 
@@ -184,6 +187,12 @@ struct WebsitePageButton: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.palette) private var palette
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
@@ -256,9 +265,7 @@ struct WebsitePageButton: View {
 
     private var statsLine: String {
         let pages = "\(website.pageCount) page\(website.pageCount == 1 ? "" : "s")"
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        let when = formatter.localizedString(for: website.lastVisit, relativeTo: Date())
+        let when = Self.relativeFormatter.localizedString(for: website.lastVisit, relativeTo: Date())
         return "\(pages) · \(when)"
     }
 }
@@ -395,9 +402,9 @@ struct KnowledgeFolderView: View {
                                     LongPressGesture(minimumDuration: 0.45)
                                         .onEnded { _ in
                                             pressedTopicID = topic.id
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                            Haptics.impact(.medium)
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                Haptics.impact(.light)
                                             }
                                             topicToDelete = topic
                                             showDeleteAlert = true

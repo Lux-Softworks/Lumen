@@ -30,9 +30,9 @@ final class KnowledgeMenuViewModel {
     var error: Error? = nil
 
     func loadTopics() async {
-        guard topics.isEmpty else { return }
-        isLoading = true
-        defer { isLoading = false }
+        let wasEmpty = topics.isEmpty
+        if wasEmpty { isLoading = true }
+        defer { if wasEmpty { isLoading = false } }
         do {
             topics = try await KnowledgeStorage.shared.fetchAllTopics()
         } catch {

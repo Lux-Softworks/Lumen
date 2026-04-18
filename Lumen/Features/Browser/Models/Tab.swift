@@ -20,14 +20,12 @@ final class Tab: Identifiable, ObservableObject {
         self.isIncognito = isIncognito
         self.viewModel = BrowserViewModel(url: url, isIncognito: isIncognito)
         titleCancellable = viewModel.$pageTitle
-            .receive(on: RunLoop.main)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] newTitle in
-                if !newTitle.isEmpty {
-                    self?.title = newTitle
-                }
+                self?.title = newTitle.isEmpty ? "New Tab" : newTitle
             }
         themeColorCancellable = viewModel.$themeColor
-            .receive(on: RunLoop.main)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] color in
                 self?.themeColor = color
             }
