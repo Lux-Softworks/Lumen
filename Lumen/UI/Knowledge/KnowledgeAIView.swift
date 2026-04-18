@@ -26,6 +26,15 @@ struct KnowledgeAIView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .bottomLeading) {
+                if !viewModel.messages.isEmpty && viewModel.isThinking && !hasVisibleStreamOutput {
+                    LumenSparkle(size: 22, phase: .spinning)
+                        .padding(.leading, 20)
+                        .padding(.bottom, 2)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
             .animation(AppTheme.Motion.standard, value: viewModel.messages.isEmpty)
             .animation(AppTheme.Motion.standard, value: viewModel.isThinking)
 
@@ -76,23 +85,20 @@ struct KnowledgeAIView: View {
                                 removal: .opacity
                             ))
                     }
-                    if viewModel.isThinking {
-                        LumenSparkle(size: 22, phase: viewModel.sparklePhase)
-                            .id("thinking")
-                            .padding(.leading, 4)
-                            .transition(.opacity)
-                    }
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
-                .animation(.smooth(duration: 0.32), value: viewModel.messages.count)
-                .animation(.smooth(duration: 0.22), value: viewModel.isThinking)
+                .animation(AppTheme.Motion.standard, value: viewModel.messages.count)
+                .animation(AppTheme.Motion.snappy, value: viewModel.isThinking)
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture { isFocused = false }
             .onChange(of: viewModel.messages.count) { _, _ in
+                scrollToBottom(proxy: proxy)
+            }
+            .onChange(of: viewModel.messages.last?.text) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: viewModel.isThinking) { _, thinking in
@@ -102,7 +108,7 @@ struct KnowledgeAIView: View {
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation(.smooth(duration: 0.4)) {
+        withAnimation(AppTheme.Motion.standard) {
             proxy.scrollTo("bottom", anchor: .bottom)
         }
     }
@@ -147,7 +153,7 @@ struct KnowledgeAIView: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(canSend ? .white : palette.text.opacity(0.25))
                     )
-                    .animation(.spring(duration: 0.25, bounce: 0.25), value: canSend)
+                    .animation(AppTheme.Motion.snappy, value: canSend)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -162,7 +168,7 @@ struct KnowledgeAIView: View {
                     lineWidth: 0.75
                 )
         )
-        .animation(.smooth(duration: 0.18), value: isFocused)
+        .animation(AppTheme.Motion.micro, value: isFocused)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 4)
@@ -171,6 +177,15 @@ struct KnowledgeAIView: View {
     private var inputBackground: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .fill(palette.text.opacity(colorScheme == .dark || palette.isIncognito ? 0.08 : 0.05))
+    }
+
+    private var hasStreamingMessage: Bool {
+        viewModel.messages.last?.isStreaming ?? false
+    }
+
+    private var hasVisibleStreamOutput: Bool {
+        guard let last = viewModel.messages.last, last.isStreaming else { return false }
+        return !last.text.isEmpty
     }
 
     private var canSend: Bool {
@@ -216,14 +231,16 @@ private struct ChatBubbleView: View {
 
     private var assistantView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            RevealText(text: message.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if !message.text.isEmpty {
+                StreamingText(text: message.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
-            if let match = message.sourceMatch {
+            if !message.isStreaming, let match = message.sourceMatch {
                 matchBadge(match)
             }
 
-            if !message.sources.isEmpty {
+            if !message.isStreaming, !message.sources.isEmpty {
                 sourcesRow
             }
         }
@@ -281,6 +298,98 @@ private struct ChatBubbleView: View {
     }
 }
 
+private struct StreamingText: View {
+    let text: String
+    @Environment(\.palette) private var palette
+
+    private struct Line: Identifiable {
+        let id: Int
+        let tokens: [(word: String, bold: Bool)]
+        let isBullet: Bool
+        let startIndex: Int
+    }
+
+    var body: some View {
+        let lines = parseLines(text)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(lines) { line in
+                HStack(alignment: .top, spacing: 6) {
+                    if line.isBullet {
+                        Text("•")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(palette.accent.opacity(0.6))
+                            .padding(.top, 1)
+                    }
+                    WordFlowLayout(wordSpacing: 4, lineSpacing: 5) {
+                        ForEach(Array(line.tokens.enumerated()), id: \.offset) { i, token in
+                            FadingWord(
+                                word: token.word,
+                                bold: token.bold,
+                                globalIndex: line.startIndex + i
+                            )
+                            .id(line.startIndex + i)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func parseLines(_ raw: String) -> [Line] {
+        let rawLines = raw.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        var result: [Line] = []
+        var offset = 0
+        for (i, rawLine) in rawLines.enumerated() {
+            var content = rawLine
+            var isBullet = false
+            if content.hasPrefix("- ") || content.hasPrefix("• ") || content.hasPrefix("* ") {
+                content = String(content.dropFirst(2))
+                isBullet = true
+            }
+            let tokens = tokenize(content)
+            result.append(Line(id: i, tokens: tokens, isBullet: isBullet, startIndex: offset))
+            offset += tokens.count
+        }
+        return result
+    }
+
+    private func tokenize(_ raw: String) -> [(word: String, bold: Bool)] {
+        var tokens: [(String, Bool)] = []
+        let segments = raw.components(separatedBy: "**")
+        for (i, segment) in segments.enumerated() {
+            let bold = !i.isMultiple(of: 2)
+            for word in segment.split(whereSeparator: { $0.isWhitespace }) {
+                tokens.append((String(word), bold))
+            }
+        }
+        return tokens
+    }
+}
+
+private struct FadingWord: View {
+    let word: String
+    let bold: Bool
+    let globalIndex: Int
+    @State private var appeared = false
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Text(word)
+            .font(.system(size: 15, weight: bold ? .bold : .regular))
+            .foregroundColor(palette.text)
+            .opacity(appeared ? 1 : 0)
+            .blur(radius: appeared ? 0 : 2)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    appeared = true
+                }
+            }
+    }
+}
+
 private struct WordFlowLayout: Layout {
     var wordSpacing: CGFloat = 4
     var lineSpacing: CGFloat = 5
@@ -327,6 +436,7 @@ private struct WordFlowLayout: Layout {
 private struct RevealText: View {
     let text: String
     @Environment(\.palette) private var palette
+    @State private var revealComplete = false
 
     private struct WordToken {
         let word: String
@@ -351,7 +461,24 @@ private struct RevealText: View {
             offset += block.tokens.count
             return IndexedBlock(block: block, startIndex: start)
         }
+        let totalTokens = offset
+        let finalDelay = Double(max(0, totalTokens - 1)) * 0.025 + 0.26
 
+        Group {
+            if revealComplete {
+                staticContent(indexed: indexed)
+            } else {
+                animatedContent(indexed: indexed)
+                    .task(id: text) {
+                        try? await Task.sleep(nanoseconds: UInt64(finalDelay * 1_000_000_000))
+                        if !Task.isCancelled { revealComplete = true }
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func animatedContent(indexed: [IndexedBlock]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(indexed.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .top, spacing: 6) {
@@ -369,6 +496,28 @@ private struct RevealText: View {
                                 bold: token.bold,
                                 delay: Double(item.startIndex + i) * 0.025
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func staticContent(indexed: [IndexedBlock]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(indexed.enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .top, spacing: 6) {
+                    if item.block.isBullet {
+                        Text("•")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(palette.accent.opacity(0.6))
+                            .padding(.top, 1)
+                    }
+
+                    WordFlowLayout(wordSpacing: 4, lineSpacing: 5) {
+                        ForEach(Array(item.block.tokens.enumerated()), id: \.offset) { _, token in
+                            StaticWord(word: token.word, bold: token.bold)
                         }
                     }
                 }
@@ -440,6 +589,18 @@ private struct WordView: View {
     }
 }
 
+private struct StaticWord: View {
+    let word: String
+    let bold: Bool
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Text(word)
+            .font(.system(size: 15, weight: bold ? .bold : .regular))
+            .foregroundColor(palette.text)
+    }
+}
+
 private struct ThreeDotsView: View {
     @State private var phase: Int = 0
     @Environment(\.palette) private var palette
@@ -476,32 +637,35 @@ private struct LumenSparkle: View {
     private let tickCount = 8
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil, paused: !isSpinning)) { timeline in
-            let angle = timeline.date.timeIntervalSinceReferenceDate * 120
-
-            ZStack {
-                ForEach(0..<tickCount, id: \.self) { i in
-                    Capsule()
-                        .fill(palette.accent)
-                        .frame(width: 1.5, height: size * 0.2)
-                        .offset(y: -(size * 0.75 * tickSpread))
-                        .rotationEffect(
-                            .degrees(Double(i) * (360.0 / Double(tickCount)) + angle)
-                        )
-                        .opacity(tickOpacity)
+        ZStack {
+            if isSpinning {
+                TimelineView(.animation) { timeline in
+                    let angle = timeline.date.timeIntervalSinceReferenceDate * 120
+                    ZStack {
+                        ForEach(0..<tickCount, id: \.self) { i in
+                            Capsule()
+                                .fill(palette.accent)
+                                .frame(width: 1.5, height: size * 0.2)
+                                .offset(y: -(size * 0.75 * tickSpread))
+                                .rotationEffect(
+                                    .degrees(Double(i) * (360.0 / Double(tickCount)) + angle)
+                                )
+                                .opacity(tickOpacity)
+                        }
+                    }
                 }
-
-                Image(systemName: "sparkle")
-                    .font(.system(size: size * 1.2, weight: .thin))
-                    .foregroundColor(palette.accent)
-                    .blur(radius: size * 0.22)
-                    .opacity(glowOpacity)
-                    .scaleEffect(glowScale)
-
-                Image(systemName: "sparkle")
-                    .font(.system(size: size, weight: .thin))
-                    .foregroundColor(palette.accent)
             }
+
+            Image(systemName: "sparkle")
+                .font(.system(size: size * 1.2, weight: .thin))
+                .foregroundColor(palette.accent)
+                .blur(radius: size * 0.22)
+                .opacity(glowOpacity)
+                .scaleEffect(glowScale)
+
+            Image(systemName: "sparkle")
+                .font(.system(size: size, weight: .thin))
+                .foregroundColor(palette.accent)
         }
         .frame(width: size * 2.4, height: size * 2.4)
         .onChange(of: phase) { _, newPhase in

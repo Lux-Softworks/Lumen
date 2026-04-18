@@ -60,7 +60,7 @@ struct ResizableSheetContainer<Content: View>: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(.smooth(duration: 0.3)) {
+                        withAnimation(AppTheme.Motion.sheet) {
                             isExpanded = false
                         }
                         onCollapse?()
@@ -76,11 +76,12 @@ struct ResizableSheetContainer<Content: View>: View {
                         height: currentHeight(screenHeight: outerGeometry.size.height),
                         alignment: .top
                     )
-                    .animation(.smooth(duration: 0.3), value: isExpanded)
+                    .animation(AppTheme.Motion.sheet, value: isExpanded)
                     .opacity(isCollapsed ? 0 : 1)
                     .background(
                         ZStack(alignment: .top) {
-                            BlurView(style: .systemChromeMaterial)
+                            Rectangle()
+                                .fill(.regularMaterial)
                                 .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
                                 .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 .overlay(
@@ -188,7 +189,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                     shouldExpand = translation < -50 || velocity < -500
                                 }
 
-                                withAnimation(.smooth(duration: 0.3)) {
+                                withAnimation(AppTheme.Motion.sheet) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
                                 }

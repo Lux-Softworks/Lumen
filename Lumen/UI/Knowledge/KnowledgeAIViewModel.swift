@@ -17,6 +17,8 @@ final class KnowledgeAIViewModel {
     var isModelLoading: Bool = false
     var sparklePhase: SparklePhase = .idle
 
+    private var activeTask: Task<Void, Never>?
+
     func preloadModel() async {
         guard !isModelLoading else { return }
         isModelLoading = true
@@ -44,16 +46,19 @@ final class KnowledgeAIViewModel {
             scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 4)
         } catch {
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed.", sources: []))
+            messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
             return
         }
 
-        var searchResults = scored.map { $0.page }
+        let minScore = 0.20
+        var searchResults = scored.filter { $0.score >= minScore }.map { $0.page }
         let topScore = scored.first?.score ?? 0
+        var ftsHitCount = 0
 
-        if searchResults.count < 3 {
+        if topScore < 0.30 || searchResults.count < 3 {
             do {
                 let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
+                ftsHitCount = keywordHits.count
                 let existing = Set(searchResults.map { $0.id })
                 for page in keywordHits where !existing.contains(page.id) {
                     searchResults.append(page)
@@ -64,19 +69,38 @@ final class KnowledgeAIViewModel {
             }
         }
 
-        let match = SourceMatch.classify(topScore: topScore)
+        var match = SourceMatch.classify(topScore: topScore)
+        if match == .low && ftsHitCount > 0 {
+            match = .medium
+        }
 
         let priorSources = priorMessages.last { $0.role == .assistant }?.sources ?? []
-        let existingIDs = Set(searchResults.map { $0.id })
-        var merged = searchResults
-        for src in priorSources where !existingIDs.contains(src.id) {
+        var seenIDs = Set<String>()
+        var merged: [PageContent] = []
+        
+        for page in searchResults where seenIDs.insert(page.id).inserted {
+            merged.append(page)
+        }
+        for src in priorSources where seenIDs.insert(src.id).inserted {
             merged.append(src)
         }
+        
         let sources = Array(merged.prefix(4))
 
         guard !sources.isEmpty else {
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "I don't have anything on that from your saved pages.", sources: [], sourceMatch: nil))
+            messages.append(ChatMessage(role: .assistant, text: "I don't have that in your saved pages."))
+            return
+        }
+
+        if match == .low {
+            finishThinking()
+            messages.append(ChatMessage(
+                role: .assistant,
+                text: "I don't have that in your saved pages.",
+                sources: sources,
+                sourceMatch: .low
+            ))
             return
         }
 
@@ -94,15 +118,50 @@ final class KnowledgeAIViewModel {
             }
         }
 
-        do {
-            let answer = try await LocalKnowledgeProvider.shared.answerFromKnowledge(
-                query: trimmed, sources: sources, highlights: highlights, history: history)
+        messages.append(ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: match, isStreaming: true))
+        let streamIndex = messages.count - 1
+
+        activeTask = Task {
+            var raw = ""
+            do {
+                let stream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
+                    query: trimmed, sources: sources, highlights: highlights, history: history)
+                for try await chunk in stream {
+                    if Task.isCancelled { break }
+                    raw += chunk
+                    if streamIndex < messages.count {
+                        messages[streamIndex].text = raw
+                    }
+                }
+            } catch {
+                if Task.isCancelled { return }
+                if streamIndex < messages.count {
+                    messages[streamIndex].text = "Couldn't generate an answer."
+                    messages[streamIndex].isStreaming = false
+                }
+                finishThinking()
+                return
+            }
+
+            let cleaned = await LocalKnowledgeProvider.shared.cleanAnswerText(raw)
+            if streamIndex < messages.count {
+                messages[streamIndex].text = cleaned.isEmpty ? raw : cleaned
+                messages[streamIndex].isStreaming = false
+            }
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: answer, sources: sources, sourceMatch: match))
-        } catch {
-            finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "Couldn't generate an answer.", sources: []))
         }
+    }
+
+    func stopGeneration() {
+        activeTask?.cancel()
+        activeTask = nil
+        if let idx = messages.lastIndex(where: { $0.isStreaming }) {
+            messages[idx].isStreaming = false
+            if messages[idx].text.isEmpty {
+                messages.remove(at: idx)
+            }
+        }
+        finishThinking()
     }
 
     private func ftsQuery(from raw: String) -> String {
@@ -127,9 +186,11 @@ final class KnowledgeAIViewModel {
     private func finishThinking() {
         sparklePhase = .idle
         isThinking = false
+        activeTask = nil
     }
 
     func clearMessages() {
+        stopGeneration()
         messages = []
         inputText = ""
     }

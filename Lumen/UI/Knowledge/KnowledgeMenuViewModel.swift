@@ -81,17 +81,21 @@ final class KnowledgeMenuViewModel {
     func navigateBack() {
         guard !navigationPath.isEmpty else { return }
         let removed = navigationPath.removeLast()
-        switch removed {
-        case .detail:
-            selectedPage = nil
-        case .pages:
-            selectedWebsite = nil
-            websiteViewModel = nil
-        case .websites:
-            selectedTopic = nil
-            websites = []
-        case .topics:
-            break
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(320))
+            guard let self else { return }
+            switch removed {
+            case .detail:
+                self.selectedPage = nil
+            case .pages:
+                self.selectedWebsite = nil
+                self.websiteViewModel = nil
+            case .websites:
+                self.selectedTopic = nil
+                self.websites = []
+            case .topics:
+                break
+            }
         }
     }
 

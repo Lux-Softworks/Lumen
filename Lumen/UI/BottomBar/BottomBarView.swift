@@ -105,7 +105,7 @@ struct BottomBarView: View {
                     state = .search
                 }
 
-                withAnimation(.smooth(duration: 0.3)) {
+                withAnimation(AppTheme.Motion.sheet) {
                     toolbarDragFraction = 1.0
                 }
 
@@ -117,7 +117,7 @@ struct BottomBarView: View {
             },
             onCollapse: {
                 isFocused = false
-                withAnimation(.smooth(duration: 0.3)) {
+                withAnimation(AppTheme.Motion.sheet) {
                     toolbarDragFraction = 0
                 }
             },
@@ -147,6 +147,7 @@ struct BottomBarView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(palette.text)
+                        .frame(width: 18, height: 18)
                         .matchedGeometryEffect(
                             id: "magnifyingGlass_icon", in: animation, isSource: false
                         )
@@ -159,8 +160,8 @@ struct BottomBarView: View {
                         .id(state)
                         .transition(
                             .asymmetric(
-                                insertion: .opacity.animation(.smooth(duration: 0.25).delay(0.15)),
-                                removal: .opacity.animation(.smooth(duration: 0.05))
+                                insertion: .opacity.animation(AppTheme.Motion.fade.delay(0.15)),
+                                removal: .opacity.animation(.easeOut(duration: 0.08))
                             )
                         )
                 } else if state == .browserSettings || state == .siteSettings {
@@ -200,11 +201,11 @@ struct BottomBarView: View {
                 }
             }
         }
-        .animation(.smooth(duration: 0.3), value: state)
+        .animation(AppTheme.Motion.sheet, value: state)
         .ignoresSafeArea(.keyboard)
         .onChange(of: tabCount) { oldCount, newCount in
             guard newCount == 0, oldCount > 0 else { return }
-            withAnimation(.smooth(duration: 0.3)) {
+            withAnimation(AppTheme.Motion.sheet) {
                 state = .search
             }
         }
@@ -325,7 +326,6 @@ struct BottomBarView: View {
                             .foregroundColor(palette.text.opacity(0.8))
                             .frame(width: 18, height: 18)
                             .rotationEffect(.degrees(reloadRotation), anchor: .center)
-                            .drawingGroup()
                             .frame(width: 44, height: 44)
                     }
                     .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
@@ -355,7 +355,7 @@ struct BottomBarView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
                     .frame(width: 32, height: 44)
-                    .animation(.easeInOut(duration: 0.22), value: isIncognitoActive)
+                    .animation(AppTheme.Motion.snappy, value: isIncognitoActive)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(isIncognitoActive ? "Switch to regular tab" : "Open incognito tab")
@@ -376,7 +376,7 @@ struct BottomBarView: View {
                 .matchedGeometryEffect(
                     id: "searchBackground_fill", in: animation, isSource: isExpanded)
         )
-        .padding(.top, 16)
+        .padding(.top, 18)
         .onChange(of: isLoading) { _, loading in
             if loading {
                 if !isSpinning {
@@ -493,7 +493,8 @@ struct BottomBarView: View {
 
     private var frostedBackground: some View {
         ZStack {
-            BlurView(style: .systemChromeMaterial)
+            Rectangle()
+                .fill(.regularMaterial)
                 .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
             palette.uiElement.opacity(palette.isIncognito ? 0.55 : 0.75)
             palette.accent.opacity(0.04)
@@ -529,7 +530,7 @@ struct BottomBarView: View {
             .disabled(tabCount == 0)
             .padding(.leading, 8)
             .opacity(sideOpacity)
-            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
+            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
 
             Spacer()
 
@@ -591,7 +592,7 @@ struct BottomBarView: View {
             }
             .padding(.trailing, 8)
             .opacity(sideOpacity)
-            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
+            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
         }
         .frame(height: 80)
         .overlay(alignment: .topTrailing) {
@@ -601,7 +602,7 @@ struct BottomBarView: View {
             .padding(.trailing, 16)
             .alignmentGuide(.top) { d in d[.bottom] }
             .opacity(isTabOverlayVisible ? 0 : 1)
-            .animation(.smooth(duration: 0.2), value: isTabOverlayVisible)
+            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
         }
     }
 

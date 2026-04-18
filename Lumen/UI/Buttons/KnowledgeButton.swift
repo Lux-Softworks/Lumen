@@ -9,7 +9,8 @@ struct KnowledgeButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                BlurView(style: .systemChromeMaterial)
+                Rectangle()
+                    .fill(.regularMaterial)
                     .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
                     .overlay(
                         Group {

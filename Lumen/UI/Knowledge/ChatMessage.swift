@@ -24,15 +24,23 @@ struct ChatMessage: Identifiable, Equatable, Hashable, Sendable {
     let id: UUID
     enum Role: Equatable, Hashable, Sendable { case user, assistant }
     let role: Role
-    let text: String
-    let sources: [PageContent]
-    let sourceMatch: SourceMatch?
+    var text: String
+    var sources: [PageContent]
+    var sourceMatch: SourceMatch?
+    var isStreaming: Bool
 
-    init(role: Role, text: String, sources: [PageContent] = [], sourceMatch: SourceMatch? = nil) {
+    init(
+        role: Role,
+        text: String,
+        sources: [PageContent] = [],
+        sourceMatch: SourceMatch? = nil,
+        isStreaming: Bool = false
+    ) {
         self.id = UUID()
         self.role = role
         self.text = text
         self.sources = sources
         self.sourceMatch = sourceMatch
+        self.isStreaming = isStreaming
     }
 }

@@ -432,6 +432,7 @@ struct BrowserView: View {
         let cardTopEdgeY = currentY - (currentCardHeight / 2)
 
         let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
+        let headerSlotHeight = lerp(getStatusBarHeight(geometry), headerHeight / targetScale, progress)
         let visualGapHeight = currentHeaderTranslate * currentScale
 
         let titleOpacity: CGFloat = {
@@ -458,7 +459,7 @@ struct BrowserView: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
                     Color.clear
-                        .frame(height: headerHeight / targetScale)
+                        .frame(height: headerSlotHeight)
                         .frame(maxWidth: .infinity)
 
                     headerStripColor(tab: activeTab)
@@ -502,7 +503,7 @@ struct BrowserView: View {
         ZStack(alignment: .bottom) {
             Color.clear
             ZStack {
-                BlurView(style: .systemChromeMaterial)
+                Rectangle().fill(.regularMaterial)
                 Color.black.opacity(overlayOpacity)
             }
             .frame(maxWidth: .infinity)
@@ -522,7 +523,7 @@ struct BrowserView: View {
             if tab.isIncognito {
                 Image(systemName: "eyeglasses")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(IncognitoPalette.accent)
                     .frame(width: 16, height: 16)
             } else if let url, let faviconURL = FaviconService.faviconURL(for: url) {
                 AsyncImage(url: faviconURL) { phaseImage in
@@ -542,9 +543,11 @@ struct BrowserView: View {
                     .frame(width: 16, height: 16)
             }
 
-            Text(tab.title.isEmpty ? "New Tab" : tab.title)
+            Text(tab.isIncognito
+                 ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
+                 : (tab.title.isEmpty ? "New Tab" : tab.title))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
                 .lineLimit(1)
 
             Spacer(minLength: 0)

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct FrontFolderShape: Shape {
     var tabWidth: CGFloat
@@ -132,7 +133,8 @@ struct FolderItemButton: View {
                 .opacity(0.28)
                 .blendMode(colorScheme == .dark ? .plusLighter : .normal)
 
-                BlurView(style: .systemUltraThinMaterial)
+                Rectangle()
+                    .fill(.ultraThinMaterial)
                     .clipShape(
                         FrontFolderShape(
                             tabWidth: frontTabWidth, tabHeight: tabHeight,
@@ -191,6 +193,31 @@ struct WebsitePageButton: View {
 
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(palette.text.opacity(0.06), lineWidth: 0.5)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .center, spacing: 6) {
+                        faviconView
+                            .frame(width: 20, height: 20)
+
+                        Spacer(minLength: 4)
+
+                        Text(website.domain)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(palette.text.opacity(0.45))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Text(statsLine)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(palette.text.opacity(0.35))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(10)
             }
             .aspectRatio(3/4, contentMode: .fit)
 
@@ -199,6 +226,40 @@ struct WebsitePageButton: View {
                 .foregroundColor(palette.text)
                 .lineLimit(1)
         }
+    }
+
+    @ViewBuilder
+    private var faviconView: some View {
+        let url = URL(string: "https://www.google.com/s2/favicons?domain=\(website.domain)&sz=64")
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            default:
+                monogram
+            }
+        }
+    }
+
+    private var monogram: some View {
+        let letter = String(website.displayName.first ?? Character("?")).uppercased()
+        return Text(letter)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(palette.accent)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(palette.accent.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+    }
+
+    private var statsLine: String {
+        let pages = "\(website.pageCount) page\(website.pageCount == 1 ? "" : "s")"
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        let when = formatter.localizedString(for: website.lastVisit, relativeTo: Date())
+        return "\(pages) · \(when)"
     }
 }
 
@@ -247,9 +308,7 @@ struct KnowledgeFolderView: View {
     }
 
     private func opacityFor(index: Int) -> Double {
-        if index == levelIndex { return 1.0 }
-        if abs(index - levelIndex) == 1 { return 0.0 }
-        return 0.0
+        index == levelIndex ? 1.0 : 0.0
     }
 
     private var levelIndex: Int {
