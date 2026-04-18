@@ -69,7 +69,7 @@ struct KnowledgePanelView: View {
                 Button {
                     viewModel.activeTab = .ai
                 } label: {
-                    Text("AI")
+                    Text("Ask")
                         .font(AppTheme.Typography.sansBody(
                             size: 15,
                             weight: viewModel.activeTab == .ai ? .bold : .medium
@@ -88,7 +88,7 @@ struct KnowledgePanelView: View {
                 Button {
                     viewModel.activeTab = .folder
                 } label: {
-                    Text("Folders")
+                    Text("Library")
                         .font(AppTheme.Typography.sansBody(
                             size: 15,
                             weight: viewModel.activeTab == .folder ? .bold : .medium

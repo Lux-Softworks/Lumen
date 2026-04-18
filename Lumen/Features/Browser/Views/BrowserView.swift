@@ -259,17 +259,35 @@ struct BrowserView: View {
 
         ZStack {
             if let tab = activeTab {
-                (tab.themeColor.map { Color(uiColor: $0) } ?? Color.black)
+                let isBlank = (tab.viewModel.currentURL?.absoluteString ?? "").isBlankURL
+
+                (tab.themeColor.map { Color(uiColor: $0) } ?? Color.clear)
                     .ignoresSafeArea()
 
-                let showLive = isFullScreen && webViewReady
+                let showLive = isFullScreen && webViewReady && !isBlank
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.4), value: showLive)
+
+                ZStack {
+                    if isBlank {
+                        HomeHeroView()
+                            .ignoresSafeArea()
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.4), value: isBlank)
             } else if tabManager.tabs.isEmpty && bottomBarState == .submittingSearch {
                 Color.black
                     .ignoresSafeArea()
+            } else if tabManager.tabs.isEmpty {
+                HomeHeroView()
+                    .ignoresSafeArea()
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.4), value: activeTab?.id)
+        .animation(.easeInOut(duration: 0.4), value: tabManager.tabs.isEmpty)
         .opacity(isFullScreen ? 1 : 0)
     }
 
@@ -1095,4 +1113,10 @@ extension View {
 
 #Preview {
     BrowserView()
+}
+
+private extension String {
+    var isBlankURL: Bool {
+        isEmpty || self == "about:blank"
+    }
 }

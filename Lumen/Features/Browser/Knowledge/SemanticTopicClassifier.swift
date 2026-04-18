@@ -1,6 +1,5 @@
 import Foundation
 import NaturalLanguage
-import os
 
 @MainActor
 final class SemanticTopicClassifier {
@@ -236,9 +235,6 @@ final class SemanticTopicClassifier {
 
         let scored = prototypes.map { ($0.name, VectorMath.cosineSimilarity(vector, $0.vector)) }
         let ranked = scored.sorted { $0.1 > $1.1 }
-
-        let top3 = ranked.prefix(3).map { "\($0.0)=\(String(format: "%.3f", $0.1))" }.joined(separator: " ")
-        KnowledgeLogger.capture.info("semantic top3: \(top3, privacy: .public)")
 
         guard let best = ranked.first, best.1 >= Self.minConfidence else { return "" }
         return best.0

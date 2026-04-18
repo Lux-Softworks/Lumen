@@ -18,39 +18,32 @@ class KnowledgeCaptureService: ObservableObject {
     private init() {}
 
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
-        KnowledgeLogger.capture.info("signal received: \(payload.url, privacy: .public) dwell=\(payload.readingTime) scroll=\(payload.scrollDepth, format: .fixed(precision: 2))")
-
-        guard BrowserSettings.shared.collectKnowledge else {
-            KnowledgeLogger.capture.info("skip: collectKnowledge disabled")
-            return
-        }
+        guard BrowserSettings.shared.collectKnowledge else { return }
         guard let webView = webView else { return }
+
         let incognito = objc_getAssociatedObject(
             webView.configuration,
             &_WKWebViewAssociatedKeys.incognitoFlagKey
         ) as? Bool ?? false
-        guard !incognito else {
-            KnowledgeLogger.capture.info("skip: incognito")
-            return
-        }
+
+        guard !incognito else { return }
 
         let html: String?
         do {
             html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
         } catch {
-            KnowledgeLogger.capture.error("skip: outerHTML failed \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.capture.error(
+                "outerHTML failed: \(String(describing: error), privacy: .public)"
+            )
             return
         }
 
-        guard let html = html else {
-            KnowledgeLogger.capture.info("skip: html nil")
-            return
-        }
+        guard let html = html else { return }
+
         let url = webView.url
-
         let extractor = PageContentExtractor()
+
         guard let extractedContent = try? await extractor.extractContent(from: html, baseURL: url) else {
-            KnowledgeLogger.capture.info("skip: extraction failed")
             return
         }
 
@@ -66,15 +59,12 @@ class KnowledgeCaptureService: ObservableObject {
             hasArticleMetadata: extractedContent.title?.isEmpty == false
         )
 
-        KnowledgeLogger.capture.info("quality domain=\(domain, privacy: .public) words=\(wordCount) score=\(quality.score, format: .fixed(precision: 2)) capture=\(quality.shouldCapturePage)")
-
         guard quality.shouldCapturePage else { return }
 
         let topicName = SemanticTopicClassifier.shared.classify(
             title: extractedContent.title,
             content: extractedContent.content
         )
-        KnowledgeLogger.capture.info("topic semantic=\(topicName, privacy: .public)")
 
         var resolvedTopicID: String? = nil
         if !topicName.isEmpty {
@@ -88,7 +78,9 @@ class KnowledgeCaptureService: ObservableObject {
                     )
                 }
             } catch {
-                KnowledgeLogger.capture.error("topic resolve failed: \(String(describing: error), privacy: .public)")
+                KnowledgeLogger.capture.error(
+                    "topic resolve failed: \(String(describing: error), privacy: .public)"
+                )
             }
         }
 
@@ -98,7 +90,8 @@ class KnowledgeCaptureService: ObservableObject {
                 website.pageCount += 1
                 website.totalWords += wordCount
 
-                if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines), !meta.isEmpty {
+                if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !meta.isEmpty {
                     website.displayName = meta
                 } else if website.displayName.isEmpty || website.displayName == domain {
                     website.displayName = DomainNameFormatter.format(host: domain)
@@ -112,7 +105,11 @@ class KnowledgeCaptureService: ObservableObject {
             } else if quality.shouldCreateWebsite {
                 let displayName = Self.resolveSiteName(extracted: extractedContent, domain: domain)
                     ?? DomainNameFormatter.format(host: domain)
-                let websiteSummary = await KnowledgeClassifier.summarizeWebsite(content: extractedContent.content, title: extractedContent.title)
+
+                let websiteSummary = await KnowledgeClassifier.summarizeWebsite(
+                    content: extractedContent.content,
+                    title: extractedContent.title
+                )
 
                 let newWebsite = Website(
                     domain: domain,
@@ -124,10 +121,14 @@ class KnowledgeCaptureService: ObservableObject {
                     firstVisit: Date(),
                     lastVisit: Date()
                 )
+
                 try await KnowledgeStorage.shared.createWebsite(website: newWebsite)
             }
 
-            let pageSummary = await KnowledgeClassifier.summarize(content: extractedContent.content, title: extractedContent.title)
+            let pageSummary = await KnowledgeClassifier.summarize(
+                content: extractedContent.content,
+                title: extractedContent.title
+            )
 
             let pageID = try await KnowledgeStorage.shared.save(
                 url: payload.url,
@@ -141,23 +142,28 @@ class KnowledgeCaptureService: ObservableObject {
             )
 
             Task.detached(priority: .utility) {
-                if let embedding = await EmbeddingService.shared.generateEmbedding(for: extractedContent.content) {
+                if let embedding = await EmbeddingService.shared.generateEmbedding(
+                    for: extractedContent.content
+                ) {
                     try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
                 }
             }
 
             captureToken &+= 1
             NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
-            KnowledgeLogger.capture.info("captured pageID=\(pageID, privacy: .public) token=\(self.captureToken) notified")
         } catch {
-            KnowledgeLogger.capture.error("capture failed: \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.capture.error(
+                "capture failed: \(String(describing: error), privacy: .public)"
+            )
         }
     }
 
     private static func resolveSiteName(extracted: ExtractedContent, domain: String) -> String? {
-        if let meta = extracted.siteName?.trimmingCharacters(in: .whitespacesAndNewlines), !meta.isEmpty {
+        if let meta = extracted.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !meta.isEmpty {
             return meta
         }
+
         let formatted = DomainNameFormatter.format(host: domain)
         return formatted.isEmpty ? nil : formatted
     }
@@ -170,7 +176,9 @@ class KnowledgeCaptureService: ObservableObject {
                 readingTime: payload.readingTime
             )
         } catch {
-            KnowledgeLogger.capture.error("engagement update failed: \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.capture.error(
+                "engagement update failed: \(String(describing: error), privacy: .public)"
+            )
         }
     }
 }

@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/iOS_17+-000?style=flat&logo=apple&logoColor=white" />
-  <img src="https://img.shields.io/badge/Swift_6.2.4-F05138?style=flat&logo=swift&logoColor=white" />
+  <img src="https://img.shields.io/badge/iOS_26+-000?style=flat&logo=apple&logoColor=white" />
+  <img src="https://img.shields.io/badge/Swift_6.2-F05138?style=flat&logo=swift&logoColor=white" />
+  <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
   <img src="https://img.shields.io/badge/AGPL--3.0-blue?style=flat" />
   <img src="https://img.shields.io/badge/v1.0.0-E8E4DC?style=flat" />
@@ -123,7 +124,7 @@ Lumen has no server, meaning there's nothing to send.
 ## Stack
 
 ```
-Swift 6.2.4 · SwiftUI · iOS 17+
+Swift 6.2 · SwiftUI · iOS 26+ · Xcode 26.2+
 │
 ├── 🧠  MLX Swift ──────── on-device Llama 3.2 1B inference
 ├── 🌐  WKWebView ──────── hardened browser engine
@@ -138,16 +139,34 @@ Swift 6.2.4 · SwiftUI · iOS 17+
 
 ## Building
 
+### Requirements
+
+- macOS with **Xcode 26.2** or newer
+- **iOS 26** device or simulator (Apple Silicon Mac required for the simulator — MLX needs an ARM GPU)
+- Apple Developer account for code signing
+- Network access on first launch (the LLM weights are pulled from Hugging Face)
+
+### Steps
+
 ```bash
 # clone
 git clone https://github.com/Lux-Softworks/Lumen.git
 cd Lumen
 
-# open in Xcode 15+
+# open in Xcode
 open Lumen.xcodeproj
-
-# run on physical device (⌘R)
 ```
+
+In Xcode:
+
+1. Select the **Lumen** target → **Signing & Capabilities**.
+2. Replace the bundled team (`XF6K537DNY`) with your own, and change the bundle identifier from `com.luxsoftworks.Lumen` to something unique to you (e.g. `com.yourname.Lumen`). Do the same for the `LumenTests` and `LumenUITests` targets.
+3. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open — wait for it to finish.
+4. Pick a destination (iOS 26 device or iOS 26 simulator on Apple Silicon) and hit **⌘R**.
+
+### First launch
+
+The first time you open the knowledge panel, Lumen downloads the `mlx-community/Llama-3.2-1B-Instruct-4bit` weights (~700 MB) from Hugging Face and caches them on-device. After that, everything runs fully offline.
 
 <br/>
 

@@ -1,5 +1,4 @@
 import SwiftUI
-import os
 
 struct KnowledgeCaptureIndicator: View {
     @State private var isVisible: Bool = false
@@ -38,11 +37,7 @@ struct KnowledgeCaptureIndicator: View {
         .blur(radius: isVisible ? 0 : 4)
         .animation(.smooth(duration: 0.28), value: isVisible)
         .allowsHitTesting(false)
-        .onAppear {
-            KnowledgeLogger.capture.info("indicator mounted")
-        }
         .onReceive(NotificationCenter.default.publisher(for: .knowledgeCaptured)) { _ in
-            KnowledgeLogger.capture.info("indicator received notification")
             showPill()
         }
     }
@@ -50,7 +45,6 @@ struct KnowledgeCaptureIndicator: View {
     private func showPill() {
         hideTask?.cancel()
         isVisible = true
-        KnowledgeLogger.capture.info("indicator showPill isVisible=true")
 
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: visibleDurationMs * 1_000_000)
