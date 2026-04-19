@@ -1,0 +1,70 @@
+included:
+  - Lumen
+  - LumenTests
+  - LumenUITests
+
+excluded:
+  - build
+  - .build
+  - DerivedData
+  - Lumen.xcodeproj
+
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+  - cyclomatic_complexity
+  - identifier_name
+
+opt_in_rules:
+  - array_init
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - explicit_init
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - last_where
+  - modifier_order
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_type_over_type_of_self
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+force_cast: error
+force_try: error
+force_unwrapping:
+  severity: warning
+fatal_error_message:
+  severity: error
+
+custom_rules:
+  no_print:
+    name: "No raw print()"
+    regex: '(?<![a-zA-Z_])print\('
+    match_kinds:
+      - identifier
+    message: "Use os.Logger (KnowledgeLogger or Logger(subsystem:category:)) instead of print()."
+    severity: error
+
+  logger_privacy:
+    name: "Logger interpolation without privacy"
+    regex: 'logger\.(debug|info|notice|warning|error|fault|log)\("[^"]*\\\([^)]*\)[^"]*"\)'
+    message: "Logger string interpolations should use 'privacy:' (public/private/sensitive)."
+    severity: warning
+
+reporter: "xcode"

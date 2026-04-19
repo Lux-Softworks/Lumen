@@ -53,10 +53,7 @@ actor LocalKnowledgeProvider {
         "(?i)^(the (article|page|website|site|content) (is about|covers|discusses|describes|explains))\\s*",
     ])
 
-    private static let citationRegex = try? NSRegularExpression(pattern: "\\[\\d+\\]")
     private static let strayStarRegex = try? NSRegularExpression(pattern: "(?<![*])\\*(?![*])")
-    private static let nonAlphanumRegex = try? NSRegularExpression(pattern: "[^a-z0-9 ]")
-    private static let whitespaceRegex = try? NSRegularExpression(pattern: "\\s+")
 
     private static func stripPrefix(_ text: String, using regex: NSRegularExpression) -> String {
         let ns = text as NSString
@@ -278,7 +275,7 @@ actor LocalKnowledgeProvider {
 
         clearGPUCache()
         touch()
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanSummary(output)
     }
 
     func summarizeWebsiteWithLLM(content: String, title: String?) async throws -> String {
@@ -597,50 +594,8 @@ actor LocalKnowledgeProvider {
         return "Based on **\(title)** [1], this covers topics related to your query."
     }
 
-    func cleanAnswerText(_ raw: String) -> String {
-        cleanOutput(raw)
-    }
-
     private func cleanOutput(_ raw: String) -> String {
         raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func dedupeSentences(_ raw: String) -> String {
-        let sentences = raw.split(whereSeparator: { ".!?".contains($0) }).map { sub -> (String, Character) in
-            let trimmed = sub.trimmingCharacters(in: .whitespacesAndNewlines)
-            return (trimmed, ".")
-        }
-
-        guard sentences.count > 1 else { return raw }
-
-        var seen = Set<String>()
-        var kept: [String] = []
-        var cursor = raw.startIndex
-
-        for (sentence, _) in sentences {
-            guard !sentence.isEmpty else { continue }
-            var key = sentence.lowercased()
-            key = Self.replaceAll(key, using: Self.nonAlphanumRegex, with: "")
-            key = Self.replaceAll(key, using: Self.whitespaceRegex, with: " ")
-            if seen.contains(key) { continue }
-            seen.insert(key)
-
-            if let r = raw.range(of: sentence, range: cursor..<raw.endIndex) {
-                cursor = r.upperBound
-                var end = cursor
-
-                while end < raw.endIndex, ".!?".contains(raw[end]) {
-                    end = raw.index(after: end)
-                }
-
-                kept.append(String(raw[r.lowerBound..<end]))
-                cursor = end
-            } else {
-                kept.append(sentence + ".")
-            }
-        }
-
-        return kept.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func cleanSummary(_ raw: String) -> String {

@@ -123,6 +123,7 @@ struct BrowserView: View {
             )
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
             .onAppear {
+                wireDownloadHandler()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     withAnimation(.smooth(duration: 0.3)) {
                         isReady = true
@@ -660,6 +661,19 @@ struct BrowserView: View {
             onNewIncognitoTab: handleNewIncognitoTab,
             isIncognitoActive: incognitoActive
         )
+    }
+
+    private func wireDownloadHandler() {
+        if #available(iOS 14.5, *) {
+            DownloadHandler.onDownloadComplete = { [weak tabManager] fileURL in
+                guard let tabManager else { return }
+                Task { @MainActor in
+                    let incognito = tabManager.activeTab?.isIncognito ?? false
+                    tabManager.newTab(incognito: incognito)
+                    tabManager.activeTab?.viewModel.loadURL(fileURL)
+                }
+            }
+        }
     }
 
     private func handleNewIncognitoTab() {

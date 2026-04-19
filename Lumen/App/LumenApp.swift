@@ -4,20 +4,16 @@ import os
 @main
 struct LumenApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var bootstrap = AppBootstrap.shared
 
     init() {
-        Task {
-            do {
-                try await KnowledgeStorage.shared.initialize()
-            } catch {
-                KnowledgeLogger.storage.error("KnowledgeStorage init failed: \(String(describing: error), privacy: .public)")
-            }
-        }
+        AppBootstrap.shared.start()
     }
 
     var body: some Scene {
         WindowGroup {
             BrowserView()
+                .environmentObject(bootstrap)
         }
     }
 }

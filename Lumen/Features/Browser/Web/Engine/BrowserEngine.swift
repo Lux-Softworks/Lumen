@@ -160,7 +160,26 @@ enum BrowserEngine {
     static func makeWebView(policy: PrivacyPolicy, isIncognito: Bool = false) -> WKWebView {
         let config = makeConfiguration(policy: policy, isIncognito: isIncognito)
         let webView = LumenWebView(frame: .zero, configuration: config)
+        attachDelegates(to: webView, policy: policy, isIncognito: isIncognito)
+        return webView
+    }
 
+    @MainActor
+    static func makePopupWebView(
+        parentConfig: WKWebViewConfiguration,
+        policy: PrivacyPolicy,
+        isIncognito: Bool
+    ) -> WKWebView {
+        let webView = LumenWebView(frame: .zero, configuration: parentConfig)
+        attachDelegates(to: webView, policy: policy, isIncognito: isIncognito)
+        return webView
+    }
+
+    static let mobileSafariUserAgent: String =
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1"
+
+    @MainActor
+    private static func attachDelegates(to webView: WKWebView, policy: PrivacyPolicy, isIncognito: Bool) {
         if #available(iOS 13.0, *) {
             webView.allowsLinkPreview = false
         }
@@ -173,6 +192,10 @@ enum BrowserEngine {
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
 
+        if webView.customUserAgent?.isEmpty ?? true {
+            webView.customUserAgent = mobileSafariUserAgent
+        }
+
         let detector = ThreatDetector()
         let interceptor = NetworkInterceptor(
             detector: detector, httpsOnly: policy.limitsNavigationToHTTPS)
@@ -181,6 +204,12 @@ enum BrowserEngine {
         }
         webView.navigationDelegate = interceptor
         webView.retainedDelegate = interceptor
+
+        let uiDelegate = BrowserUIDelegate()
+        webView.uiDelegate = uiDelegate
+        objc_setAssociatedObject(
+            webView, &_WKWebViewAssociatedKeys.uiDelegateKey, uiDelegate,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         Task.detached(priority: .utility) {
             let entries = await TrackerDatabase.shared.allEntries()
@@ -192,7 +221,7 @@ enum BrowserEngine {
         }
 
         if let handler = objc_getAssociatedObject(
-            config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler
+            webView.configuration, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler
         {
             handler.interceptor = interceptor
             objc_setAssociatedObject(
@@ -200,7 +229,14 @@ enum BrowserEngine {
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
 
-        return webView
+        if isIncognito {
+            objc_setAssociatedObject(
+                webView,
+                &_WKWebViewAssociatedKeys.incognitoFlagKey,
+                true,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
+        }
     }
 
     static func makeRequest(url: URL) -> URLRequest {
@@ -216,6 +252,7 @@ internal enum _WKWebViewAssociatedKeys {
     static var readingSignalHandlerKey: UInt8 = 2
     static var annotationHandlerKey: UInt8 = 3
     static var incognitoFlagKey: UInt8 = 4
+    static var uiDelegateKey: UInt8 = 5
 }
 
 final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {

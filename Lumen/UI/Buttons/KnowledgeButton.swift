@@ -28,6 +28,7 @@ struct KnowledgeButton: View {
             .frame(width: 85, height: 18)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("bottombar.knowledge")
     }
 }
 

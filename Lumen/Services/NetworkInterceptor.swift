@@ -56,7 +56,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         if blockedFingerprintingScripts.contains(url) {
-            logger.warning("Blocking fingerprinting script: \(url.absoluteString)")
+            logger.warning("Blocking fingerprinting script: \(url.absoluteString, privacy: .private)")
             decisionHandler(.cancel)
             return
         }
@@ -77,7 +77,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         switch action {
         case .upgrade(let httpsURL):
-            logger.info("HTTPS upgrade: \(url.absoluteString) → \(httpsURL.absoluteString)")
+            logger.info("HTTPS upgrade: \(url.absoluteString, privacy: .private) → \(httpsURL.absoluteString, privacy: .private)")
             webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
             return
@@ -89,7 +89,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
             }
-            logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none")")
+            logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none", privacy: .public)")
             decisionHandler(.cancel)
             return
 
@@ -111,7 +111,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             let threats = detector.analyze(request)
 
             if !threats.isEmpty {
-                logger.warning("\(threats.count) threat(s) on \(url.host ?? "unknown")")
+                logger.warning("\(threats.count, privacy: .public) threat(s) on \(url.host ?? "unknown", privacy: .private)")
             }
 
             decisionHandler(.allow)
@@ -129,7 +129,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
             if navigationResponse.isForMainFrame {
                 currentPageURL = url
-                logger.info("Main frame loaded: \(url.host ?? "unknown")")
+                logger.info("Main frame loaded: \(url.host ?? "unknown", privacy: .private)")
             }
 
             if contentType.contains("javascript") || url.pathExtension == "js" {
@@ -150,7 +150,108 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
         }
 
+        if #available(iOS 14.5, *) {
+            let shouldDownload = !navigationResponse.canShowMIMEType
+                || DownloadHandler.shouldDownload(response: navigationResponse.response)
+            if shouldDownload {
+                decisionHandler(.download)
+                return
+            }
+        }
+
         decisionHandler(.allow)
+    }
+
+    @available(iOS 14.5, *)
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        download.delegate = DownloadHandler.shared
+    }
+
+    @available(iOS 14.5, *)
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        download.delegate = DownloadHandler.shared
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        let method = challenge.protectionSpace.authenticationMethod
+
+        if method == NSURLAuthenticationMethodServerTrust {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        if method == NSURLAuthenticationMethodHTTPBasic
+            || method == NSURLAuthenticationMethodHTTPDigest
+            || method == NSURLAuthenticationMethodNTLM
+        {
+            Task { @MainActor in
+                let credential = await Self.promptForCredential(
+                    host: challenge.protectionSpace.host,
+                    realm: challenge.protectionSpace.realm
+                )
+                if let credential {
+                    completionHandler(.useCredential, credential)
+                } else {
+                    completionHandler(.cancelAuthenticationChallenge, nil)
+                }
+            }
+            return
+        }
+
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    @MainActor
+    private static func promptForCredential(host: String, realm: String?) async -> URLCredential? {
+        await withCheckedContinuation { continuation in
+            guard let top = topViewController() else {
+                continuation.resume(returning: nil)
+                return
+            }
+
+            let title = "Sign in to \(host)"
+            let message = realm.flatMap { $0.isEmpty ? nil : "Realm: \($0)" } ?? "Enter your credentials"
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+
+            alert.addTextField { $0.placeholder = "User" }
+            alert.addTextField {
+                $0.placeholder = "Password"
+                $0.isSecureTextEntry = true
+            }
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+                continuation.resume(returning: nil)
+            })
+            alert.addAction(UIAlertAction(title: "Sign In", style: .default) { _ in
+                let fields = alert.textFields ?? []
+                let user = fields.count > 0 ? fields[0].text ?? "" : ""
+                let password = fields.count > 1 ? fields[1].text ?? "" : ""
+                let credential = URLCredential(user: user, password: password, persistence: .forSession)
+                continuation.resume(returning: credential)
+            })
+            top.present(alert, animated: true)
+        }
+    }
+
+    @MainActor
+    private static func topViewController() -> UIViewController? {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first
+        else { return nil }
+
+        guard let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+            ?? scene.windows.first?.rootViewController
+        else { return nil }
+
+        var top = root
+        while let presented = top.presentedViewController { top = presented }
+        return top
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -159,7 +260,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         if let url = webView.url {
-            logger.info("Navigation started: \(url.absoluteString)")
+            logger.info("Navigation started: \(url.absoluteString, privacy: .private)")
         }
     }
 
@@ -169,7 +270,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             let threatCount = detectedThreats.count
             let requestCount = requestLog.count
             logger.info(
-                "Page loaded: \(url.host ?? "unknown") | \(requestCount) requests | \(threatCount) threats detected"
+                "Page loaded: \(url.host ?? "unknown", privacy: .private) | \(requestCount, privacy: .public) requests | \(threatCount, privacy: .public) threats detected"
             )
 
             if !detectedThreats.isEmpty {
@@ -183,7 +284,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        logger.error("Navigation failed: \(error.localizedDescription)")
+        logger.error("Navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
     private func mapResourceType(_ action: WKNavigationAction) -> InterceptedRequest.ResourceType {
@@ -244,11 +345,11 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         for (type, count) in typeCounts.sorted(by: { $0.value > $1.value }) {
-            logger.warning("\(type.rawValue): \(count)")
+            logger.warning("\(type.rawValue, privacy: .public): \(count, privacy: .public)")
         }
 
         for (entity, count) in entityCounts.sorted(by: { $0.value > $1.value }).prefix(10) {
-            logger.warning("\(entity): \(count) event(s)")
+            logger.warning("\(entity, privacy: .private): \(count, privacy: .public) event(s)")
         }
     }
 
@@ -278,7 +379,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             !blockedFingerprintingScripts.contains(scriptUrl)
         {
             blockedFingerprintingScripts.insert(scriptUrl)
-            logger.warning("Blocked fingerprinter: \(scriptUrl.absoluteString)")
+            logger.warning("Blocked fingerprinter: \(scriptUrl.absoluteString, privacy: .private)")
             neutralizeFingerprinting(in: webView)
         }
     }
@@ -321,7 +422,7 @@ extension NetworkInterceptor: ThreatDetectorDelegate {
         case .critical: severityLabel = "CRIT"
         }
 
-        logger.warning(" [\(severityLabel)] \(event.details)")
+        logger.warning(" [\(severityLabel, privacy: .public)] \(event.details, privacy: .private)")
 
         onThreatDetected?(event)
     }

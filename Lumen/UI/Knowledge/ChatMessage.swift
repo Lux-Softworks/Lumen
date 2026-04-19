@@ -1,6 +1,6 @@
 import Foundation
 
-enum SourceMatch: Equatable, Hashable, Sendable {
+nonisolated enum SourceMatch: Equatable, Hashable, Sendable {
     case high
     case medium
     case low

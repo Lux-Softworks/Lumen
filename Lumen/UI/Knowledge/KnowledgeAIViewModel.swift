@@ -134,16 +134,27 @@ final class KnowledgeAIViewModel {
         activeTask = Task {
             var raw = ""
             var streamError: Error? = nil
+            let flushInterval: TimeInterval = 0.08
+            var lastFlush = Date(timeIntervalSince1970: 0)
+
+            @MainActor func flushIfDue(force: Bool = false) {
+                let now = Date()
+                guard force || now.timeIntervalSince(lastFlush) >= flushInterval else { return }
+                lastFlush = now
+                if streamIndex < messages.count, messages[streamIndex].text != raw {
+                    messages[streamIndex].text = raw
+                }
+            }
+
             do {
                 let stream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
                     query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary)
                 for try await chunk in stream {
                     if Task.isCancelled { break }
                     raw += chunk
-                    if streamIndex < messages.count {
-                        messages[streamIndex].text = raw
-                    }
+                    flushIfDue()
                 }
+                flushIfDue(force: true)
             } catch {
                 if Task.isCancelled { return }
                 streamError = error
@@ -159,11 +170,9 @@ final class KnowledgeAIViewModel {
                     for try await chunk in retryStream {
                         if Task.isCancelled { break }
                         raw += chunk
-                        
-                        if streamIndex < messages.count {
-                            messages[streamIndex].text = raw
-                        }
+                        flushIfDue()
                     }
+                    flushIfDue(force: true)
                     modelProducedOutput = !raw.isEmpty
                     streamError = nil
                 } catch {
@@ -182,12 +191,11 @@ final class KnowledgeAIViewModel {
                 return
             }
 
-            let cleaned = await LocalKnowledgeProvider.shared.cleanAnswerText(raw)
-            var finalText: String = cleaned.isEmpty ? raw : cleaned
+            var finalText = raw
             modelProducedOutput = !finalText.isEmpty
 
             if !modelProducedOutput {
-                finalText = "No response generated for that query."
+                finalText = "No response generated for that query. Please try again."
             }
 
             var scoredMatch: SourceMatch? = nil

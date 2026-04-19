@@ -1,5 +1,6 @@
 import UIKit
 import Combine
+import WebKit
 
 @MainActor
 final class Tab: Identifiable, ObservableObject {
@@ -19,6 +20,19 @@ final class Tab: Identifiable, ObservableObject {
         self.url = url
         self.isIncognito = isIncognito
         self.viewModel = BrowserViewModel(url: url, isIncognito: isIncognito)
+        bindPublishers()
+    }
+
+    init(id: UUID = UUID(), preattached webView: WKWebView, isIncognito: Bool) {
+        self.id = id
+        self.url = nil
+        self.isIncognito = isIncognito
+        self.viewModel = BrowserViewModel(url: nil, isIncognito: isIncognito)
+        self.viewModel.attachWebView(webView)
+        bindPublishers()
+    }
+
+    private func bindPublishers() {
         titleCancellable = viewModel.$pageTitle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newTitle in

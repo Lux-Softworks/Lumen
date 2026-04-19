@@ -25,6 +25,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private(set) var webView: WKWebView?
     private var interceptor: NetworkInterceptor?
     private var pendingRequest: URLRequest?
+    private var pendingHistoryRecord: Bool = false
 
     private var observations: [NSKeyValueObservation] = []
     private let logger = Logger(
@@ -40,6 +41,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private var knowledgeProvider: LocalKnowledgeProvider?
     let isIncognito: Bool
+
+    var onRequestPopup: ((WKWebViewConfiguration, WKNavigationAction) -> WKWebView?)?
+    var onWindowClose: (() -> Void)?
 
     func initializeKnowledgeProvider() {}
 
@@ -70,6 +74,15 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 self?.threatEvents.append(event)
                 self?.blockedTrackersCount =
                     self?.threatEvents.filter { $0.type == .tracker }.count ?? 0
+            }
+        }
+
+        if let uiDelegate = webView.uiDelegate as? BrowserUIDelegate {
+            uiDelegate.onRequestNewWebView = { [weak self] config, action in
+                self?.onRequestPopup?(config, action)
+            }
+            uiDelegate.onWebViewDidClose = { [weak self] _ in
+                self?.onWindowClose?()
             }
         }
 
@@ -134,6 +147,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         let url = self.classifyInput(trimmed)
+        pendingHistoryRecord = true
         loadURL(url)
     }
 
@@ -271,11 +285,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         """)
 
                         if let self,
+                            self.pendingHistoryRecord,
                             !self.isIncognito,
                             let url = webView.url?.absoluteString,
                             let title = webView.title, !title.isEmpty
                         {
                             HistoryStore.shared.record(url: url, title: title)
+                            self.pendingHistoryRecord = false
                         }
                     }
                 }

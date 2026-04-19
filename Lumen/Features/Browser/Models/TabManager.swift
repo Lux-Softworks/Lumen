@@ -1,5 +1,6 @@
 import Combine
 import UIKit
+import WebKit
 
 @MainActor
 final class TabManager: ObservableObject {
@@ -18,6 +19,7 @@ final class TabManager: ObservableObject {
             let defaultTab = Tab()
             self.tabs = [defaultTab]
             self.activeTabId = defaultTab.id
+            wirePopupHandler(for: defaultTab)
         } else {
             self.tabs = []
             self.activeTabId = UUID()
@@ -30,9 +32,36 @@ final class TabManager: ObservableObject {
 
     func newTab(incognito: Bool = false) {
         let tab = Tab(isIncognito: incognito)
+        wirePopupHandler(for: tab)
         tabs.append(tab)
         activeTabId = tab.id
         observeActiveViewModel()
+    }
+
+    func adoptPopup(config: WKWebViewConfiguration, parentIsIncognito: Bool) -> WKWebView? {
+        let policy = BrowserSettings.shared.policy(for: nil)
+        let webView = BrowserEngine.makePopupWebView(
+            parentConfig: config,
+            policy: policy,
+            isIncognito: parentIsIncognito
+        )
+        let tab = Tab(preattached: webView, isIncognito: parentIsIncognito)
+        wirePopupHandler(for: tab)
+        tabs.append(tab)
+        activeTabId = tab.id
+        observeActiveViewModel()
+        return webView
+    }
+
+    private func wirePopupHandler(for tab: Tab) {
+        tab.viewModel.onRequestPopup = { [weak self, weak tab] config, _ in
+            guard let self, let tab else { return nil }
+            return self.adoptPopup(config: config, parentIsIncognito: tab.isIncognito)
+        }
+        tab.viewModel.onWindowClose = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.closeTab(id: tab.id)
+        }
     }
 
     func newIncognitoTab() {

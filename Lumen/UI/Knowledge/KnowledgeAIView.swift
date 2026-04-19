@@ -28,15 +28,16 @@ struct KnowledgeAIView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(AppTheme.Motion.standard, value: viewModel.messages.isEmpty)
             .animation(AppTheme.Motion.standard, value: viewModel.isThinking)
-            .overlay(alignment: .bottomLeading) {
+
+            if showThinkingIndicator {
                 HStack(spacing: 8) {
-                    LumenSparkle(size: 22, phase: .spinning)
+                    LumenSparkle(size: 18, phase: .spinning)
                     StatusLabel(text: viewModel.statusMessage)
                 }
-                .padding(.leading, 20)
-                .padding(.top, 5)
-                .opacity(showThinkingIndicator ? 1 : 0)
-                .animation(.easeOut(duration: 0.2), value: showThinkingIndicator)
+                .padding(.leading, 16)
+                .padding(.vertical, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
                 .allowsHitTesting(false)
             }
 
@@ -171,8 +172,8 @@ struct KnowledgeAIView: View {
                 )
         )
         .padding(.horizontal, 16)
-        .padding(.top, isFocused ? 14 : 10)
-        .padding(.bottom, isFocused ? 0 : 10)
+        .padding(.top, isFocused ? 12 : 10)
+        .padding(.bottom, isFocused ? 6 : 10)
         .animation(AppTheme.Motion.snappy, value: isFocused)
     }
 
@@ -336,8 +337,33 @@ private struct StreamingText: View {
         let startIndex: Int
     }
 
+    private enum Block: Identifiable {
+        case prose(id: Int, lines: [Line])
+        case code(id: Int, body: String)
+        var id: Int {
+            switch self {
+            case .prose(let id, _): return id
+            case .code(let id, _): return id
+            }
+        }
+    }
+
     var body: some View {
-        let lines = parseLines(text)
+        let blocks = parseBlocks(text)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(blocks) { block in
+                switch block {
+                case .prose(_, let lines):
+                    proseView(lines: lines)
+                case .code(_, let body):
+                    codeView(body: body)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func proseView(lines: [Line]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(lines) { line in
                 HStack(alignment: .top, spacing: 6) {
@@ -362,25 +388,95 @@ private struct StreamingText: View {
         }
     }
 
-    private func parseLines(_ raw: String) -> [Line] {
-        let rawLines = raw.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+    @ViewBuilder
+    private func codeView(body: String) -> some View {
+        Text(body)
+            .font(.system(size: 13, design: .monospaced))
+            .foregroundColor(palette.text)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(palette.text.opacity(0.06))
+            )
+    }
 
-        var result: [Line] = []
-        var offset = 0
-        for (i, rawLine) in rawLines.enumerated() {
-            var content = rawLine
+    private func parseBlocks(_ raw: String) -> [Block] {
+        var blocks: [Block] = []
+        var blockID = 0
+        var proseAccum: [String] = []
+        var codeAccum: [String] = []
+        var inFence = false
+        var globalOffset = 0
+
+        func flushProse() {
+            guard !proseAccum.isEmpty else { return }
+            let (lines, consumed) = linesFrom(proseAccum, startIndex: globalOffset)
+            if !lines.isEmpty {
+                blocks.append(.prose(id: blockID, lines: lines))
+                blockID += 1
+                globalOffset += consumed
+            }
+            proseAccum.removeAll()
+        }
+
+        func flushCode() {
+            let joined = codeAccum.joined(separator: "\n")
+            let body = joined.trimmingCharacters(in: .newlines)
+            if !body.isEmpty {
+                blocks.append(.code(id: blockID, body: body))
+                blockID += 1
+            }
+            codeAccum.removeAll()
+        }
+
+        for rawLine in raw.components(separatedBy: "\n") {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                if inFence {
+                    flushCode()
+                    inFence = false
+                } else {
+                    flushProse()
+                    inFence = true
+                }
+                continue
+            }
+            if inFence {
+                codeAccum.append(rawLine)
+            } else {
+                proseAccum.append(rawLine)
+            }
+        }
+
+        if inFence {
+            flushCode()
+        } else {
+            flushProse()
+        }
+        return blocks
+    }
+
+    private func linesFrom(_ rawLines: [String], startIndex: Int) -> (lines: [Line], consumed: Int) {
+        var lines: [Line] = []
+        var offset = startIndex
+        var id = 0
+        for rawLine in rawLines {
+            let trimmedLine = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !trimmedLine.isEmpty else { continue }
+            var content = trimmedLine
             var isBullet = false
             if content.hasPrefix("- ") || content.hasPrefix("• ") || content.hasPrefix("* ") {
                 content = String(content.dropFirst(2))
                 isBullet = true
             }
             let tokens = tokenize(content)
-            result.append(Line(id: i, tokens: tokens, isBullet: isBullet, startIndex: offset))
+            lines.append(Line(id: id, tokens: tokens, isBullet: isBullet, startIndex: offset))
             offset += tokens.count
+            id += 1
         }
-        return result
+        return (lines, offset - startIndex)
     }
 
     private func tokenize(_ raw: String) -> [(word: String, bold: Bool)] {
@@ -710,7 +806,7 @@ private struct LumenSparkle: View {
                 .font(.system(size: size, weight: .thin))
                 .foregroundColor(palette.accent)
         }
-        .frame(width: size * 2.4, height: size * 2.4)
+        .frame(width: size * 1.7, height: size * 1.7)
         .onChange(of: phase) { _, newPhase in
             applyPhase(newPhase)
         }

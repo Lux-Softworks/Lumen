@@ -1,7 +1,7 @@
 import Foundation
 
-enum HTTPSUpgradeLogic {
-    enum PolicyAction: Equatable {
+nonisolated enum HTTPSUpgradeLogic {
+    nonisolated enum PolicyAction: Equatable {
         case allow
         case upgrade(URL)
         case cancel
@@ -13,7 +13,7 @@ enum HTTPSUpgradeLogic {
         }
 
         switch scheme {
-        case "https", "about":
+        case "https", "about", "file":
             return .allow
         case "http":
             if httpsOnly {

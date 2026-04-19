@@ -332,6 +332,7 @@ struct BottomBarView: View {
                     .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("bottombar.settings.expanded")
                 .opacity(state == .siteSettings ? 0 : 1)
                 .allowsHitTesting(state != .siteSettings)
             }
@@ -342,6 +343,7 @@ struct BottomBarView: View {
                 state == .browserSettings ? "Browser Settings" : "Search...",
                 text: displayBinding
             )
+            .accessibilityIdentifier("browser.urlField")
             .font(
                 (state == .browserSettings || state == .siteSettings || state == .knowledge)
                     ? AppTheme.Typography.display(size: 17, weight: .bold)
@@ -569,6 +571,7 @@ struct BottomBarView: View {
                         )
                 }
             }
+            .accessibilityIdentifier("bottombar.tabs")
             .disabled(tabCount == 0)
             .padding(.leading, 8)
             .opacity(sideOpacity)
@@ -605,6 +608,7 @@ struct BottomBarView: View {
                 .frame(width: 80, height: 44)
                 .contentShape(Rectangle())
             }
+            .accessibilityIdentifier("bottombar.searchOpen")
 
             Spacer()
 
@@ -620,6 +624,7 @@ struct BottomBarView: View {
                             .stroke(palette.text.opacity(0.15), lineWidth: 1)
                     )
             }
+            .accessibilityIdentifier("bottombar.settings")
             .padding(.trailing, 8)
             .opacity(sideOpacity)
         }
