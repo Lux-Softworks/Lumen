@@ -26,17 +26,19 @@ struct KnowledgeAIView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .bottomLeading) {
-                if !viewModel.messages.isEmpty && viewModel.isThinking && !hasVisibleStreamOutput {
-                    LumenSparkle(size: 22, phase: .spinning)
-                        .padding(.leading, 20)
-                        .padding(.bottom, 2)
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
-                }
-            }
             .animation(AppTheme.Motion.standard, value: viewModel.messages.isEmpty)
             .animation(AppTheme.Motion.standard, value: viewModel.isThinking)
+            .overlay(alignment: .bottomLeading) {
+                HStack(spacing: 8) {
+                    LumenSparkle(size: 22, phase: .spinning)
+                    StatusLabel(text: viewModel.statusMessage)
+                }
+                .padding(.leading, 20)
+                .padding(.top, 5)
+                .opacity(showThinkingIndicator ? 1 : 0)
+                .animation(.easeOut(duration: 0.2), value: showThinkingIndicator)
+                .allowsHitTesting(false)
+            }
 
             inputBar
         }
@@ -159,7 +161,7 @@ struct KnowledgeAIView: View {
             .disabled(!canSend)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 14)
         .background(inputBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -168,10 +170,10 @@ struct KnowledgeAIView: View {
                     lineWidth: 0.75
                 )
         )
-        .animation(AppTheme.Motion.micro, value: isFocused)
         .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 4)
+        .padding(.top, isFocused ? 14 : 10)
+        .padding(.bottom, isFocused ? 0 : 10)
+        .animation(AppTheme.Motion.snappy, value: isFocused)
     }
 
     private var inputBackground: some View {
@@ -186,6 +188,10 @@ struct KnowledgeAIView: View {
     private var hasVisibleStreamOutput: Bool {
         guard let last = viewModel.messages.last, last.isStreaming else { return false }
         return !last.text.isEmpty
+    }
+
+    private var showThinkingIndicator: Bool {
+        !viewModel.messages.isEmpty && viewModel.isThinking && !hasVisibleStreamOutput
     }
 
     private var canSend: Bool {
@@ -237,7 +243,9 @@ private struct ChatBubbleView: View {
             }
 
             if !message.isStreaming, let match = message.sourceMatch {
-                matchBadge(match)
+                StaggeredFade(delay: 0.0) {
+                    matchBadge(match)
+                }
             }
 
             if !message.isStreaming, !message.sources.isEmpty {
@@ -276,25 +284,44 @@ private struct ChatBubbleView: View {
 
     private var sourcesRow: some View {
         VStack(alignment: .leading, spacing: 3) {
-            ForEach(message.sources) { source in
-                HStack(spacing: 5) {
-                    RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(palette.accent.opacity(0.4))
-                        .frame(width: 2, height: 10)
-                    Text(source.domain)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(palette.text.opacity(0.35))
-                        .lineLimit(1)
-                    if let title = source.title, !title.isEmpty {
-                        Text("· \(title)")
-                            .font(.system(size: 10))
-                            .foregroundColor(palette.text.opacity(0.2))
+            ForEach(Array(message.sources.enumerated()), id: \.element.id) { idx, source in
+                StaggeredFade(delay: 0.12 + Double(idx) * 0.07) {
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 1, style: .continuous)
+                            .fill(palette.accent.opacity(0.4))
+                            .frame(width: 2, height: 10)
+                        Text(source.domain)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(palette.text.opacity(0.35))
                             .lineLimit(1)
+                        if let title = source.title, !title.isEmpty {
+                            Text("· \(title)")
+                                .font(.system(size: 10))
+                                .foregroundColor(palette.text.opacity(0.2))
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
                 }
             }
         }
+    }
+}
+
+private struct StaggeredFade<Content: View>: View {
+    let delay: Double
+    @ViewBuilder var content: Content
+    @State private var appeared = false
+
+    var body: some View {
+        content
+            .opacity(appeared ? 1 : 0)
+            .blur(radius: appeared ? 0 : 3)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.32).delay(delay)) {
+                    appeared = true
+                }
+            }
     }
 }
 
@@ -620,6 +647,22 @@ private struct ThreeDotsView: View {
                 phase = (phase + 1) % 3
             }
         }
+    }
+}
+
+private struct StatusLabel: View {
+    let text: String?
+    @Environment(\.palette) private var palette
+
+    private var isHidden: Bool { (text ?? "").isEmpty }
+
+    var body: some View {
+        Text(text ?? "")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(palette.text.opacity(0.5))
+            .opacity(isHidden ? 0 : 1)
+            .blur(radius: isHidden ? 2 : 0)
+            .animation(.easeOut(duration: 0.25), value: text)
     }
 }
 

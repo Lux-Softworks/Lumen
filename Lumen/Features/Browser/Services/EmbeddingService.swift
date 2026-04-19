@@ -1,8 +1,7 @@
 import Foundation
 import NaturalLanguage
 
-@MainActor
-class EmbeddingService {
+final class EmbeddingService: @unchecked Sendable {
     static let shared = EmbeddingService()
 
     private let embeddingModel: NLEmbedding?

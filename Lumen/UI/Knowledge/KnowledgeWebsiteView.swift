@@ -5,6 +5,7 @@ struct KnowledgeWebsiteView: View {
     @State var viewModel: KnowledgeWebsiteViewModel
     var onBack: () -> Void
     var onSelectPage: ((PageContent) -> Void)? = nil
+    var onExportPage: ((PageContent) -> Void)? = nil
     @Environment(\.palette) private var palette
 
     var body: some View {
@@ -175,6 +176,15 @@ struct KnowledgeWebsiteView: View {
             )
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onExportPage {
+                Button {
+                    onExportPage(page)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
     }
 }
 

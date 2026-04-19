@@ -6,6 +6,7 @@ struct HomeHeroView: View {
 
     @State private var currentTagline: String = ""
     @State private var isBreathing: Bool = false
+    @State private var isTranslating: Bool = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -14,12 +15,16 @@ struct HomeHeroView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, 120)
+        .offset(y: isTranslating ? -6 : 6)
+        .animation(
+            reduceMotion
+                ? .none
+                : .easeInOut(duration: 4.5).repeatForever(autoreverses: true),
+            value: isTranslating
+        )
         .allowsHitTesting(false)
         .onAppear {
             currentTagline = Self.pickTagline(at: Date())
-            if !reduceMotion {
-                isBreathing = true
-            }
         }
     }
 

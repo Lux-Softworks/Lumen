@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import WebKit
 import os.log
 
@@ -10,10 +11,14 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     private static let xhrKeywords = ["/api/", "/collect", "/pixel", "/beacon", "/track", "/event"]
     private static let requestLogCap = 500
+    private static let fingerprintBlockThreshold = 3
+    private static let fingerprintBlockWindow: TimeInterval = 10
 
     private(set) var currentPageURL: URL?
     private(set) var requestLog: [InterceptedRequest] = []
     private(set) var detectedThreats: [ThreatEvent] = []
+    private var fingerprintEventsByScript: [URL: [Date]] = [:]
+    private(set) var blockedFingerprintingScripts: Set<URL> = []
 
     private func appendRequest(_ request: InterceptedRequest) {
         requestLog.append(request)
@@ -37,6 +42,8 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         requestLog.removeAll()
         detectedThreats.removeAll()
         currentPageURL = nil
+        fingerprintEventsByScript.removeAll()
+        blockedFingerprintingScripts.removeAll()
     }
 
     func webView(
@@ -44,6 +51,12 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+
+        if blockedFingerprintingScripts.contains(url) {
+            logger.warning("Blocking fingerprinting script: \(url.absoluteString)")
             decisionHandler(.cancel)
             return
         }
@@ -70,6 +83,12 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             return
 
         case .cancel:
+            if navigationAction.navigationType == .linkActivated,
+                let scheme, scheme != "http", scheme != "https",
+                UIApplication.shared.canOpenURL(url)
+            {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
             logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none")")
             decisionHandler(.cancel)
             return
@@ -233,7 +252,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
     }
 
-    func reportFingerprintingEvent(scriptUrl: URL, pageUrl: URL, api: String) {
+    func reportFingerprintingEvent(scriptUrl: URL, pageUrl: URL, api: String, webView: WKWebView?) {
         let isThirdParty = detector.classifyRequest(requestURL: scriptUrl, pageURL: pageUrl)
 
         let request = InterceptedRequest(
@@ -246,6 +265,47 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         )
 
         detector.analyzeHookedFingerprint(request: request, api: api)
+
+        guard isThirdParty else { return }
+
+        let now = Date()
+        var events = fingerprintEventsByScript[scriptUrl, default: []]
+        events = events.filter { now.timeIntervalSince($0) < Self.fingerprintBlockWindow }
+        events.append(now)
+        fingerprintEventsByScript[scriptUrl] = events
+
+        if events.count >= Self.fingerprintBlockThreshold,
+            !blockedFingerprintingScripts.contains(scriptUrl)
+        {
+            blockedFingerprintingScripts.insert(scriptUrl)
+            logger.warning("Blocked fingerprinter: \(scriptUrl.absoluteString)")
+            neutralizeFingerprinting(in: webView)
+        }
+    }
+
+    private func neutralizeFingerprinting(in webView: WKWebView?) {
+        guard let webView else { return }
+        let js = """
+            (function() {
+                try { HTMLCanvasElement.prototype.toDataURL = function() { return 'data:,'; }; } catch(_) {}
+                try {
+                    CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {
+                        var width = (w | 0) || 1;
+                        var height = (h | 0) || 1;
+                        try { return new ImageData(width, height); } catch(_) {
+                            return { data: new Uint8ClampedArray(width * height * 4), width: width, height: height };
+                        }
+                    };
+                } catch(_) {}
+                try { WebGLRenderingContext.prototype.getParameter = function() { return null; }; } catch(_) {}
+                try {
+                    if (window.AudioContext && AudioContext.prototype.createOscillator) {
+                        AudioContext.prototype.createOscillator = function() { throw new Error('blocked'); };
+                    }
+                } catch(_) {}
+            })();
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 }
 

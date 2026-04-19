@@ -235,7 +235,12 @@ final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {
             return
         }
 
-        interceptor?.reportFingerprintingEvent(scriptUrl: scriptUrl, pageUrl: pageUrl, api: api)
+        interceptor?.reportFingerprintingEvent(
+            scriptUrl: scriptUrl,
+            pageUrl: pageUrl,
+            api: api,
+            webView: message.webView
+        )
     }
 }
 
@@ -256,42 +261,3 @@ extension WKWebView {
     }
 }
 
-final class HTTPSOnlyNavigationDelegate: NSObject, WKNavigationDelegate {
-    private let httpsOnly: Bool
-
-    init(enabled: Bool) {
-        self.httpsOnly = enabled
-    }
-
-    func webView(
-        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
-        guard let url = navigationAction.request.url else {
-            decisionHandler(.cancel)
-            return
-        }
-
-        let scheme = url.scheme?.lowercased()
-        let safeSchemes: Set<String> = ["http", "https", "about", "data", "blob", "file"]
-        if let scheme, !safeSchemes.contains(scheme) {
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            }
-            decisionHandler(.cancel)
-            return
-        }
-
-        let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
-
-        switch action {
-        case .allow:
-            decisionHandler(.allow)
-        case .upgrade(let httpsURL):
-            webView.load(BrowserEngine.makeRequest(url: httpsURL))
-            decisionHandler(.cancel)
-        case .cancel:
-            decisionHandler(.cancel)
-        }
-    }
-}

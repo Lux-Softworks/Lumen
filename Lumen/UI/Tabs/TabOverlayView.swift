@@ -7,7 +7,7 @@ struct TabOverlayView: View {
     var shrinkProgress: CGFloat = 1
     var onSelectTab: (UUID) -> Void
 
-    private let scale: CGFloat = 0.65
+    private let scale: CGFloat = 0.69
     private let toolbarHeight: CGFloat = 80
 
     @State private var lastScrolledToId: UUID? = nil

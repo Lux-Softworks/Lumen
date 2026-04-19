@@ -17,6 +17,7 @@ enum SettingsSection: Hashable {
     case displayOptions
     case siteSectionSettings
     case bookmarks
+    case exportKnowledge
 }
 
 struct SettingsPage: View {
@@ -148,6 +149,8 @@ struct SettingsPage: View {
                         siteSectionSettingsList
                     case .bookmarks:
                         BookmarksListView(onNavigate: onNavigate, onDismiss: onDismiss)
+                    case .exportKnowledge:
+                        ExportView(initialScope: .wholeBase, onDismiss: onDismiss)
                 }
             }
             .padding(.top, 12)
@@ -206,6 +209,12 @@ struct SettingsPage: View {
             settingsGroup {
                 settingsRow(icon: "trash", title: "Clear Browsing Data", destructive: true) {
                     showClearDataAlert = true
+                }
+            }
+
+            settingsGroup {
+                settingsRow(icon: "square.and.arrow.up", title: "Export Knowledge", showChevron: true) {
+                    push(.exportKnowledge)
                 }
             }
 
@@ -349,7 +358,6 @@ struct SettingsPage: View {
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(palette.accent)
                 .frame(width: 32, height: 32)
-                .cornerRadius(8)
 
             Text("Page Zoom")
                 .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
@@ -389,7 +397,7 @@ struct SettingsPage: View {
                 .buttonStyle(.plain)
             }
             .background(palette.text.opacity(0.06))
-            .cornerRadius(10)
+            .cornerRadius(16)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -738,6 +746,7 @@ struct SettingsPage: View {
         case .displayOptions: return "Display Options"
         case .siteSectionSettings: return "Site Settings"
         case .bookmarks: return "Bookmarks"
+        case .exportKnowledge: return "Export"
         }
     }
 
@@ -799,7 +808,6 @@ struct SettingsPage: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(destructive ? .red : palette.accent)
                     .frame(width: 32, height: 32)
-                    .cornerRadius(8)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)

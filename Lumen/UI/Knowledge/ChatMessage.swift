@@ -7,15 +7,20 @@ enum SourceMatch: Equatable, Hashable, Sendable {
 
     var label: String {
         switch self {
-        case .high: return "Strong source match"
-        case .medium: return "Partial source match"
-        case .low: return "Weak source match"
+        case .high: return "Well grounded in sources"
+        case .medium: return "Partially grounded"
+        case .low: return "Weakly grounded"
         }
     }
 
-    static func classify(topScore: Double) -> SourceMatch {
-        if topScore >= 0.30 { return .high }
-        if topScore >= 0.12 { return .medium }
+    static func classify(topScore: Double, resultCount: Int = 0, ftsHits: Int = 0) -> SourceMatch {
+        let semantic = min(max(topScore, 0) * 2.5, 1.0)
+        let keyword = min(Double(ftsHits) * 0.25, 0.5)
+        let breadth: Double = resultCount >= 3 ? 0.2 : (resultCount >= 1 ? 0.1 : 0)
+        let confidence = semantic + keyword + breadth
+
+        if confidence >= 0.85 { return .high }
+        if confidence >= 0.35 { return .medium }
         return .low
     }
 }

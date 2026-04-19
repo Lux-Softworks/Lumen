@@ -143,19 +143,21 @@ struct BottomBarView: View {
                     frostedBackground
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(palette.text.opacity(0.15), lineWidth: 1))
-                        .matchedGeometryEffect(id: "searchPill", in: animation)
                         .frame(width: isExpanded ? nil : 80, height: 44)
                         .padding(.top, 18)
                         .frame(maxWidth: .infinity, alignment: .top)
                         .allowsHitTesting(false)
+                        .zIndex(0)
 
                     collapsedContent
                         .opacity(isExpanded ? 0 : 1)
                         .allowsHitTesting(!isExpanded)
+                        .zIndex(1)
 
                     searchBarRow
                         .opacity(isExpanded ? 1 : 0)
                         .allowsHitTesting(isExpanded)
+                        .zIndex(2)
 
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 18, weight: .bold))
@@ -223,18 +225,21 @@ struct BottomBarView: View {
             }
         }
         .onChange(of: state) { _, newState in
-            let isExpandingToSearch = newState == .search || newState == .browserSettings || newState == .siteSettings || newState == .knowledge
+            let isExpandingToSearch =
+                newState == .search || newState == .browserSettings || newState == .siteSettings
+                || newState == .knowledge
 
-            withAnimation(isExpandingToSearch ? AppTheme.Motion.sheet : .easeOut(duration: 0.05)) {
+            withAnimation(AppTheme.Motion.sheet) {
                 searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
             }
 
-            let showsMag = newState == .collapsed || newState == .hidden
+            let showsMag =
+                newState == .collapsed || newState == .hidden
                 || newState == .search || newState == .submittingSearch
             let showsGear = newState == .browserSettings
             let showsFolder = newState == .knowledge
 
-            withAnimation(.easeOut(duration: 0.1)) {
+            withAnimation(AppTheme.Motion.sheet) {
                 magGlassOpacity = showsMag ? 1.0 : 0.0
                 if !showsGear { gearIconOpacity = 0.0 }
                 if !showsFolder { folderIconOpacity = 0.0 }
@@ -284,7 +289,9 @@ struct BottomBarView: View {
                         Button(action: onBack) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(canGoBack ? palette.text : palette.text.opacity(0.2))
+                                .foregroundColor(
+                                    canGoBack ? palette.text : palette.text.opacity(0.2)
+                                )
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoBack)
@@ -292,7 +299,9 @@ struct BottomBarView: View {
                         Button(action: onForward) {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(canGoForward ? palette.text : palette.text.opacity(0.2))
+                                .foregroundColor(
+                                    canGoForward ? palette.text : palette.text.opacity(0.2)
+                                )
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoForward)
@@ -377,7 +386,9 @@ struct BottomBarView: View {
                     .opacity(state == .search && !text.isEmpty ? 1 : 0)
                     .allowsHitTesting(state == .search && !text.isEmpty)
                 }
-                .frame(width: state == .siteSettings || (state == .search && !text.isEmpty) ? 44 : 0, height: 44)
+                .frame(
+                    width: state == .siteSettings || (state == .search && !text.isEmpty) ? 44 : 0,
+                    height: 44)
 
                 Button(action: {
                     onNewIncognitoTab?()
@@ -395,7 +406,9 @@ struct BottomBarView: View {
                     .animation(AppTheme.Motion.snappy, value: isIncognitoActive)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(isIncognitoActive ? "Switch to regular tab" : "Open incognito tab")
+                .accessibilityLabel(
+                    isIncognitoActive ? "Switch to regular tab" : "Open incognito tab"
+                )
                 .opacity(state == .search ? 1 : 0)
                 .allowsHitTesting(state == .search)
                 .frame(width: state == .search ? 32 : 0)
@@ -586,12 +599,11 @@ struct BottomBarView: View {
                         .frame(width: 18, height: 18)
                         .rotationEffect(.degrees(0))
                         .opacity(0)
-                            .matchedGeometryEffect(
-                                id: "reloadButton", in: animation, isSource: !isExpanded)
-                    }
+                        .matchedGeometryEffect(
+                            id: "reloadButton", in: animation, isSource: !isExpanded)
+                }
                 .frame(width: 80, height: 44)
                 .contentShape(Rectangle())
-                .matchedGeometryEffect(id: "searchPill", in: animation, isSource: true)
             }
 
             Spacer()
@@ -610,7 +622,6 @@ struct BottomBarView: View {
             }
             .padding(.trailing, 8)
             .opacity(sideOpacity)
-            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
         }
         .frame(height: 80)
         .overlay(alignment: .topTrailing) {

@@ -33,7 +33,7 @@ struct KnowledgeCaptureIndicator: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
         .opacity(isVisible ? 1 : 0)
-        .scaleEffect(isVisible ? 1 : 0.92, anchor: .topTrailing)
+        .offset(y: isVisible ? 0 : 10)
         .blur(radius: isVisible ? 0 : 4)
         .animation(.smooth(duration: 0.28), value: isVisible)
         .allowsHitTesting(false)

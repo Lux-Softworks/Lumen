@@ -85,6 +85,12 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     let wordCount: Int
     let createdAt: Date
 
+    var displayTitle: String {
+        if let t = title, !t.isEmpty { return t }
+        let path = URL(string: url)?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+        return path.isEmpty ? url : path
+    }
+
     init(
         id: String = .pageID(),
         websiteID: String,
@@ -239,6 +245,27 @@ actor KnowledgeStorage {
         }
 
         try runMigrations()
+
+        applyFileProtectionAndBackupExclusion()
+    }
+
+    private func applyFileProtectionAndBackupExclusion() {
+        let paths = [
+            dbPath,
+            dbPath + "-wal",
+            dbPath + "-shm",
+        ]
+        for path in paths {
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            var url = URL(fileURLWithPath: path)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? url.setResourceValues(values)
+            try? FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: path
+            )
+        }
     }
 
     private func createTables() throws {
@@ -328,6 +355,7 @@ actor KnowledgeStorage {
         CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
             title,
             body,
+            domain,
             content=pages,
             content_rowid=rowid
         );
@@ -335,20 +363,20 @@ actor KnowledgeStorage {
 
         let createFTSTriggers = """
         CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-            INSERT INTO pages_fts(rowid, title, body)
-            VALUES (new.rowid, new.title, new.content);
+            INSERT INTO pages_fts(rowid, title, body, domain)
+            VALUES (new.rowid, new.title, new.content, new.domain);
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-            INSERT INTO pages_fts(pages_fts, rowid, title, body)
-            VALUES ('delete', old.rowid, old.title, old.content);
+            INSERT INTO pages_fts(pages_fts, rowid, title, body, domain)
+            VALUES ('delete', old.rowid, old.title, old.content, old.domain);
         END;
 
         CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-            INSERT INTO pages_fts(pages_fts, rowid, title, body)
-            VALUES ('delete', old.rowid, old.title, old.content);
-            INSERT INTO pages_fts(rowid, title, body)
-            VALUES (new.rowid, new.title, new.content);
+            INSERT INTO pages_fts(pages_fts, rowid, title, body, domain)
+            VALUES ('delete', old.rowid, old.title, old.content, old.domain);
+            INSERT INTO pages_fts(rowid, title, body, domain)
+            VALUES (new.rowid, new.title, new.content, new.domain);
         END;
         """
 
@@ -395,7 +423,9 @@ actor KnowledgeStorage {
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK,
               sqlite3_step(statement) == SQLITE_ROW else { return }
         let createSQL = String(cString: sqlite3_column_text(statement, 0))
-        if createSQL.contains("content=pages") { return }
+        let hasContentTable = createSQL.contains("content=pages")
+        let hasDomain = createSQL.contains("domain")
+        if hasContentTable && hasDomain { return }
 
         try execute("DROP TRIGGER IF EXISTS pages_ai")
         try execute("DROP TRIGGER IF EXISTS pages_ad")
@@ -403,24 +433,24 @@ actor KnowledgeStorage {
         try execute("DROP TABLE IF EXISTS pages_fts")
         try execute("""
             CREATE VIRTUAL TABLE pages_fts USING fts5(
-                title, body, content=pages, content_rowid=rowid
+                title, body, domain, content=pages, content_rowid=rowid
             )
         """)
         try execute("INSERT INTO pages_fts(pages_fts) VALUES ('rebuild')")
         try execute("""
             CREATE TRIGGER pages_ai AFTER INSERT ON pages BEGIN
-                INSERT INTO pages_fts(rowid, title, body) VALUES (new.rowid, new.title, new.content);
+                INSERT INTO pages_fts(rowid, title, body, domain) VALUES (new.rowid, new.title, new.content, new.domain);
             END
         """)
         try execute("""
             CREATE TRIGGER pages_ad AFTER DELETE ON pages BEGIN
-                INSERT INTO pages_fts(pages_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.content);
+                INSERT INTO pages_fts(pages_fts, rowid, title, body, domain) VALUES ('delete', old.rowid, old.title, old.content, old.domain);
             END
         """)
         try execute("""
             CREATE TRIGGER pages_au AFTER UPDATE ON pages BEGIN
-                INSERT INTO pages_fts(pages_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.content);
-                INSERT INTO pages_fts(rowid, title, body) VALUES (new.rowid, new.title, new.content);
+                INSERT INTO pages_fts(pages_fts, rowid, title, body, domain) VALUES ('delete', old.rowid, old.title, old.content, old.domain);
+                INSERT INTO pages_fts(rowid, title, body, domain) VALUES (new.rowid, new.title, new.content, new.domain);
             END
         """)
     }
@@ -763,6 +793,75 @@ actor KnowledgeStorage {
         return try await queryWebsites(sql: sql) { [self] statement in
             sqlite3_bind_text(statement, 1, (topicID as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
         }
+    }
+
+    func fetchWebsite(id: String) async throws -> Website? {
+        try initialize()
+        let sql = "SELECT * FROM websites WHERE id = ? LIMIT 1"
+        let results = try await queryWebsites(sql: sql) { [self] statement in
+            sqlite3_bind_text(statement, 1, id, -1, self.SQLITE_TRANSIENT)
+        }
+
+        return results.first
+    }
+
+    func fetchAllPages() async throws -> [PageContent] {
+        try initialize()
+        let sql = "SELECT * FROM pages ORDER BY timestamp DESC"
+        return try await queryPages(sql: sql)
+    }
+
+    func fetchPagesInDateRange(start: Date, end: Date) async throws -> [PageContent] {
+        try initialize()
+        let sql = "SELECT * FROM pages WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp DESC"
+
+        return try await queryPages(sql: sql) { statement in
+            sqlite3_bind_double(statement, 1, start.timeIntervalSince1970)
+            sqlite3_bind_double(statement, 2, end.timeIntervalSince1970)
+        }
+    }
+
+    func pageCount() async throws -> Int {
+        try initialize()
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM pages", -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return 0 }
+
+        return Int(sqlite3_column_int(statement, 0))
+    }
+
+    func fetchPageEmbeddings(pageIDs: [String]) async throws -> [(pageID: String, vector: [Double])] {
+        try initialize()
+        guard !pageIDs.isEmpty else { return [] }
+
+        let placeholders = Array(repeating: "?", count: pageIDs.count).joined(separator: ",")
+        let sql = "SELECT page_id, vector FROM page_embeddings WHERE page_id IN (\(placeholders))"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+
+        for (index, pid) in pageIDs.enumerated() {
+            sqlite3_bind_text(statement, Int32(index + 1), pid, -1, SQLITE_TRANSIENT)
+        }
+        var results: [(pageID: String, vector: [Double])] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let pid = String(cString: sqlite3_column_text(statement, 0))
+            let blob = sqlite3_column_blob(statement, 1)
+            let size = Int(sqlite3_column_bytes(statement, 1))
+            guard let raw = blob, size > 0 else { continue }
+            let count = size / MemoryLayout<Double>.size
+            let vector = Array(UnsafeBufferPointer(start: raw.assumingMemoryBound(to: Double.self), count: count))
+            results.append((pageID: pid, vector: vector))
+        }
+
+        return results
     }
 
     private func updateWebsiteStats(websiteID: String) throws {
@@ -1292,33 +1391,38 @@ actor KnowledgeStorage {
     }
 
     private func execute(_ sql: String, bindValues: ((OpaquePointer?) -> Void)? = nil) throws {
-        var currentSql = sql
+        try sql.withCString { start in
+            var cursor: UnsafePointer<CChar>? = start
+            var boundOnce = false
 
-        while !currentSql.isEmpty {
-            var statement: OpaquePointer?
-            var tail: UnsafePointer<Int8>?
+            while let head = cursor, head.pointee != 0 {
+                var statement: OpaquePointer?
+                var tail: UnsafePointer<CChar>?
 
-            let result = sqlite3_prepare_v2(db, currentSql, -1, &statement, &tail)
-            guard result == SQLITE_OK else {
-                throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
-            }
-
-            if let statement = statement {
-                defer { sqlite3_finalize(statement) }
-
-                bindValues?(statement)
-
-                let stepResult = sqlite3_step(statement)
-                guard stepResult == SQLITE_DONE || stepResult == SQLITE_ROW else {
-                    throw StorageError.failedToExecute(String(cString: sqlite3_errmsg(db)))
+                let result = sqlite3_prepare_v2(db, head, -1, &statement, &tail)
+                guard result == SQLITE_OK else {
+                    throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
                 }
-            }
 
-            if let tail = tail {
-                let tailStr = String(cString: tail).trimmingCharacters(in: .whitespacesAndNewlines)
-                currentSql = tailStr
-            } else {
-                currentSql = ""
+                if let statement = statement {
+                    defer { sqlite3_finalize(statement) }
+
+                    if !boundOnce {
+                        bindValues?(statement)
+                        boundOnce = true
+                    }
+
+                    let stepResult = sqlite3_step(statement)
+                    guard stepResult == SQLITE_DONE || stepResult == SQLITE_ROW else {
+                        throw StorageError.failedToExecute(String(cString: sqlite3_errmsg(db)))
+                    }
+                }
+
+                cursor = tail
+                while let p = cursor, p.pointee != 0,
+                      p.pointee == 0x20 || p.pointee == 0x09 || p.pointee == 0x0A || p.pointee == 0x0D {
+                    cursor = p.advanced(by: 1)
+                }
             }
         }
     }
@@ -1494,4 +1598,3 @@ enum StorageError: Error, LocalizedError {
         }
     }
 }
-

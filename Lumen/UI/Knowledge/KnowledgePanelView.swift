@@ -5,6 +5,7 @@ struct KnowledgePanelView: View {
 
     @State var viewModel: KnowledgePanelViewModel
     @State private var panelWidth: CGFloat = 375 // default for iphone
+    @State private var safeAreaBottom: CGFloat = 0
     @Environment(\.palette) private var palette
 
     init(viewModel: KnowledgePanelViewModel? = nil) {
@@ -44,6 +45,12 @@ struct KnowledgePanelView: View {
         .task {
             await viewModel.menuViewModel.loadTopics()
             Task { await viewModel.aiViewModel.preloadModel() }
+
+            if let window = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first?.windows.first(where: { $0.isKeyWindow }) {
+                safeAreaBottom = window.safeAreaInsets.bottom
+            }
         }
     }
 
@@ -113,7 +120,7 @@ struct KnowledgePanelView: View {
                 .stroke(palette.text.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 16)
-        .padding(.bottom, (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0) + 8)
+        .padding(.bottom, safeAreaBottom + 8)
         .padding(.top, 8)
     }
 }

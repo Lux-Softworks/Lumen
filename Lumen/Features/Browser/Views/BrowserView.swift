@@ -256,27 +256,16 @@ struct BrowserView: View {
     @ViewBuilder
     private func activeTabLayer(geometry: GeometryProxy) -> some View {
         let isFullScreen = activeTabViewState == .fullScreen
+        let _ = (activeTab?.viewModel.currentURL?.absoluteString ?? "").isEmpty
 
         ZStack {
             if let tab = activeTab {
-                let isBlank = (tab.viewModel.currentURL?.absoluteString ?? "").isBlankURL
-
-                (tab.themeColor.map { Color(uiColor: $0) } ?? Color.clear)
+                (tab.themeColor.map { Color(uiColor: $0) } ?? Color.black)
                     .ignoresSafeArea()
 
-                let showLive = isFullScreen && webViewReady && !isBlank
+                let showLive = isFullScreen && webViewReady
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.4), value: showLive)
-
-                ZStack {
-                    if isBlank {
-                        HomeHeroView()
-                            .ignoresSafeArea()
-                            .transition(.opacity)
-                    }
-                }
-                .animation(.easeInOut(duration: 0.4), value: isBlank)
             } else if tabManager.tabs.isEmpty && bottomBarState == .submittingSearch {
                 Color.black
                     .ignoresSafeArea()
@@ -286,8 +275,6 @@ struct BrowserView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.4), value: activeTab?.id)
-        .animation(.easeInOut(duration: 0.4), value: tabManager.tabs.isEmpty)
         .opacity(isFullScreen ? 1 : 0)
     }
 
@@ -320,7 +307,7 @@ struct BrowserView: View {
             .frame(maxHeight: .infinity, alignment: .bottom)
             .blur(radius: isReady ? 0 : 20)
             .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
-            .animation(.smooth(duration: 0.3), value: bottomBarState)
+            .animation(AppTheme.Motion.sheet, value: bottomBarState)
     }
 
     @ViewBuilder
@@ -440,7 +427,8 @@ struct BrowserView: View {
                     let isBlank = currentURL.isEmpty || currentURL == "about:blank"
 
                     if !isBlank && bottomBarState != .search && bottomBarState != .browserSettings
-                        && bottomBarState != .siteSettings && bottomBarState != .knowledge {
+                        && bottomBarState != .siteSettings && bottomBarState != .knowledge
+                    {
                         bottomBarState = .collapsed
                     }
                 }
@@ -451,7 +439,7 @@ struct BrowserView: View {
     @ViewBuilder
     private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
         let toolbarHeight: CGFloat = 80
-        let targetScale: CGFloat = 0.65
+        let targetScale: CGFloat = 0.69
         let cornerRadius: CGFloat = 16
         let headerHeight: CGFloat = 36
 
@@ -469,7 +457,8 @@ struct BrowserView: View {
         let cardTopEdgeY = currentY - (currentCardHeight / 2)
 
         let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
-        let headerSlotHeight = lerp(getStatusBarHeight(geometry), headerHeight / targetScale, progress)
+        let headerSlotHeight = lerp(
+            getStatusBarHeight(geometry), headerHeight / targetScale, progress)
         let visualGapHeight = currentHeaderTranslate * currentScale
 
         let titleOpacity: CGFloat = {
@@ -486,7 +475,9 @@ struct BrowserView: View {
         ZStack(alignment: .top) {
             if let tab = activeTab {
                 tabCardHeader(tab: tab)
-                    .frame(width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top)
+                    .frame(
+                        width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top
+                    )
                     .clipped()
                     .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
                     .zIndex(1)
@@ -501,10 +492,7 @@ struct BrowserView: View {
 
                     headerStripColor(tab: activeTab)
                         .clipShape(
-                            UnevenRoundedRectangle(
-                                cornerRadii: .init(
-                                    topLeading: lerpCornerRadius, bottomLeading: 0, bottomTrailing: 0,
-                                    topTrailing: lerpCornerRadius))
+                            RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous)
                         )
                         .offset(y: currentHeaderTranslate)
                 }
@@ -519,7 +507,9 @@ struct BrowserView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous))
+                .clipShape(
+                    RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous)
+                )
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .scaleEffect(currentScale, anchor: .center)
@@ -580,10 +570,14 @@ struct BrowserView: View {
                     .frame(width: 16, height: 16)
             }
 
-            Text(tab.title.isEmpty ? "New Tab" : tab.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
+            Text(
+                tab.isIncognito
+                    ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
+                    : (tab.title.isEmpty ? "New Tab" : tab.title)
+            )
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
+            .lineLimit(1)
 
             Spacer(minLength: 0)
         }
@@ -645,7 +639,8 @@ struct BrowserView: View {
                 guard let url = vm?.currentURL else { return }
                 let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
                 if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let root = scene.keyWindow?.rootViewController {
+                    let root = scene.keyWindow?.rootViewController
+                {
                     root.present(vc, animated: true)
                 }
             },
@@ -730,8 +725,9 @@ struct BrowserView: View {
                 if activeTabViewState != .fullScreen {
                     bottomBarState = .browserSettings
                 } else if let url = activeTab?.viewModel.currentURL,
-                          !url.absoluteString.isEmpty,
-                          url.absoluteString != "about:blank" {
+                    !url.absoluteString.isEmpty,
+                    url.absoluteString != "about:blank"
+                {
                     bottomBarState = .siteSettings
                 } else {
                     bottomBarState = .browserSettings
@@ -1113,10 +1109,4 @@ extension View {
 
 #Preview {
     BrowserView()
-}
-
-private extension String {
-    var isBlankURL: Bool {
-        isEmpty || self == "about:blank"
-    }
 }

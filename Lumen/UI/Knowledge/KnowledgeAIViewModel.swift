@@ -16,13 +16,23 @@ final class KnowledgeAIViewModel {
     var isThinking: Bool = false
     var isModelLoading: Bool = false
     var sparklePhase: SparklePhase = .idle
+    var statusMessage: String? = nil
 
     private var activeTask: Task<Void, Never>?
+    private var conversationSummary: String? = nil
+    private var compactedThroughIndex: Int = 0
+    private let autoCompactThreshold = 8
+    private let keepRecentTurns = 3
+
+    private func setStatus(_ message: String?) {
+        statusMessage = message
+    }
 
     func preloadModel() async {
         guard !isModelLoading else { return }
         isModelLoading = true
         sparklePhase = .spinning
+        setStatus("Loading model…")
         do {
             try await LocalKnowledgeProvider.shared.loadModel()
         } catch {
@@ -30,6 +40,7 @@ final class KnowledgeAIViewModel {
         }
         sparklePhase = .idle
         isModelLoading = false
+        setStatus(nil)
     }
 
     func send() async {
@@ -40,6 +51,9 @@ final class KnowledgeAIViewModel {
         messages.append(ChatMessage(role: .user, text: trimmed))
         isThinking = true
         sparklePhase = .spinning
+        setStatus("Searching your library…")
+
+        await maybeCompactHistory(priorMessages: priorMessages)
 
         let scored: [(page: PageContent, score: Double)]
         do {
@@ -50,8 +64,11 @@ final class KnowledgeAIViewModel {
             return
         }
 
-        let minScore = 0.20
+        let minScore = 0.10
         var searchResults = scored.filter { $0.score >= minScore }.map { $0.page }
+        if searchResults.isEmpty, let top = scored.first?.page {
+            searchResults.append(top)
+        }
         let topScore = scored.first?.score ?? 0
         var ftsHitCount = 0
 
@@ -69,38 +86,28 @@ final class KnowledgeAIViewModel {
             }
         }
 
-        var match = SourceMatch.classify(topScore: topScore)
-        if match == .low && ftsHitCount > 0 {
-            match = .medium
-        }
+        let match = SourceMatch.classify(
+            topScore: topScore,
+            resultCount: searchResults.count,
+            ftsHits: ftsHitCount
+        )
 
         let priorSources = priorMessages.last { $0.role == .assistant }?.sources ?? []
         var seenIDs = Set<String>()
         var merged: [PageContent] = []
-        
+
         for page in searchResults where seenIDs.insert(page.id).inserted {
             merged.append(page)
         }
         for src in priorSources where seenIDs.insert(src.id).inserted {
             merged.append(src)
         }
-        
+
         let sources = Array(merged.prefix(4))
 
         guard !sources.isEmpty else {
             finishThinking()
             messages.append(ChatMessage(role: .assistant, text: "I don't have that in your saved pages."))
-            return
-        }
-
-        if match == .low {
-            finishThinking()
-            messages.append(ChatMessage(
-                role: .assistant,
-                text: "I don't have that in your saved pages.",
-                sources: sources,
-                sourceMatch: .low
-            ))
             return
         }
 
@@ -118,14 +125,18 @@ final class KnowledgeAIViewModel {
             }
         }
 
-        messages.append(ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: match, isStreaming: true))
+        _ = match
+        messages.append(ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true))
         let streamIndex = messages.count - 1
+        setStatus("Thinking…")
+        let summary = conversationSummary
 
         activeTask = Task {
             var raw = ""
+            var streamError: Error? = nil
             do {
                 let stream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
-                    query: trimmed, sources: sources, highlights: highlights, history: history)
+                    query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary)
                 for try await chunk in stream {
                     if Task.isCancelled { break }
                     raw += chunk
@@ -135,19 +146,74 @@ final class KnowledgeAIViewModel {
                 }
             } catch {
                 if Task.isCancelled { return }
+                streamError = error
+            }
+
+            var modelProducedOutput = !raw.isEmpty
+
+            if !modelProducedOutput, !Task.isCancelled {
+                KnowledgeLogger.rag.error("empty stream output — retrying stream")
+                do {
+                    let retryStream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
+                        query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary)
+                    for try await chunk in retryStream {
+                        if Task.isCancelled { break }
+                        raw += chunk
+                        
+                        if streamIndex < messages.count {
+                            messages[streamIndex].text = raw
+                        }
+                    }
+                    modelProducedOutput = !raw.isEmpty
+                    streamError = nil
+                } catch {
+                    if Task.isCancelled { return }
+                    streamError = error
+                }
+            }
+
+            if !modelProducedOutput, streamError != nil {
                 if streamIndex < messages.count {
                     messages[streamIndex].text = "Couldn't generate an answer."
                     messages[streamIndex].isStreaming = false
+                    messages[streamIndex].sourceMatch = nil
                 }
                 finishThinking()
                 return
             }
 
             let cleaned = await LocalKnowledgeProvider.shared.cleanAnswerText(raw)
+            var finalText: String = cleaned.isEmpty ? raw : cleaned
+            modelProducedOutput = !finalText.isEmpty
+
+            if !modelProducedOutput {
+                finalText = "No response generated for that query."
+            }
+
+            var scoredMatch: SourceMatch? = nil
+            if modelProducedOutput {
+                do {
+                    let rows = try await KnowledgeStorage.shared.fetchPageEmbeddings(pageIDs: sources.map { $0.id })
+                    let vectors = rows.map { $0.vector }
+                    let validity = AnswerValidityScorer.score(
+                        answer: finalText,
+                        sources: sources,
+                        sourceEmbeddings: vectors
+                    )
+                    scoredMatch = AnswerValidityScorer.match(for: validity)
+                } catch {
+                    KnowledgeLogger.rag.error("validity scoring failed: \(String(describing: error), privacy: .public)")
+                }
+            }
+
             if streamIndex < messages.count {
-                messages[streamIndex].text = cleaned.isEmpty ? raw : cleaned
+                if messages[streamIndex].text != finalText {
+                    messages[streamIndex].text = finalText
+                }
+                messages[streamIndex].sourceMatch = scoredMatch
                 messages[streamIndex].isStreaming = false
             }
+
             finishThinking()
         }
     }
@@ -187,11 +253,41 @@ final class KnowledgeAIViewModel {
         sparklePhase = .idle
         isThinking = false
         activeTask = nil
+        setStatus(nil)
+    }
+
+    private func maybeCompactHistory(priorMessages: [ChatMessage]) async {
+        guard priorMessages.count >= autoCompactThreshold else { return }
+        let keepFrom = max(0, priorMessages.count - keepRecentTurns)
+        guard keepFrom > compactedThroughIndex else { return }
+
+        let slice = Array(priorMessages[compactedThroughIndex..<keepFrom])
+        let turns: [(role: String, text: String)] = slice.map {
+            ($0.role == .user ? "user" : "assistant", $0.text)
+        }
+        guard !turns.isEmpty else { return }
+
+        setStatus("Compacting history...")
+        do {
+            let newSummary = try await LocalKnowledgeProvider.shared.summarizeConversationWithLLM(
+                turns: turns,
+                priorSummary: conversationSummary
+            )
+            if !newSummary.isEmpty {
+                conversationSummary = newSummary
+                compactedThroughIndex = keepFrom
+            }
+        } catch {
+            KnowledgeLogger.rag.error("conversation compaction failed: \(String(describing: error), privacy: .public)")
+        }
+        setStatus("Searching your library…")
     }
 
     func clearMessages() {
         stopGeneration()
         messages = []
         inputText = ""
+        conversationSummary = nil
+        compactedThroughIndex = 0
     }
 }

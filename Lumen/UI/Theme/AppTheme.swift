@@ -52,8 +52,9 @@ public enum AppTheme {
     public enum Motion {
         public static let standard: Animation = .spring(duration: 0.42, bounce: 0.18)
         public static let snappy: Animation = .spring(duration: 0.28, bounce: 0.12)
+        public static let magneticGlide: Animation = .timingCurve(0.25, 1, 0.5, 1, duration: 0.4)
         public static let micro: Animation = .spring(duration: 0.18, bounce: 0)
-        public static let sheet: Animation = .spring(duration: 0.46, bounce: 0.14)
+        public static let sheet: Animation = .timingCurve(0.1, 1, 0.3, 1, duration: 0.55)
         public static let fade: Animation = .easeOut(duration: 0.18)
     }
 }

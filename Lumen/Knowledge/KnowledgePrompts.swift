@@ -81,6 +81,22 @@ enum KnowledgePrompts {
         """
     }
 
+    static func conversationSummary(turns: [(role: String, text: String)], priorSummary: String?) -> String {
+        let transcript = turns.map { t in
+            "\(t.role == "user" ? "User" : "Assistant"): \(t.text)"
+        }.joined(separator: "\n")
+        let priorBlock = priorSummary.map { "Prior summary: \($0)\n\n" } ?? ""
+
+        return """
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        Compress the conversation below into 2-3 short sentences capturing the topics discussed and key facts the user learned. No filler, no meta-commentary. Keep named entities exact.<|eot_id|>\
+        <|start_header_id|>user<|end_header_id|>
+        \(priorBlock)\(transcript)<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
+
+        """
+    }
+
     static func queryRefinement(query: String) -> String {
         """
         Your task is to refine the given query to be more suitable for database search.
@@ -100,17 +116,16 @@ enum KnowledgePrompts {
     ) -> String {
         """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        Answer ONLY from the sources below — pages from the user's reading history.
-        - Use ONLY facts present in the sources. No outside knowledge.
-        - Be as brief as possible. Dense, compressed answers. No filler sentences.
-        - Do NOT describe your process. Do NOT say "I looked", "I searched", "based on the sources", "from the sources", "here is what I found", or any meta-commentary.
-        - Do NOT cite, list, name, or refer to sources, pages, URLs, or titles. Never write citation markers like [1] or (source).
-        - Do NOT repeat the same sentence or phrase. Each sentence must add new information.
-        - If the sources do not answer the question, reply exactly: "I don't have that in your saved pages."
+        You summarize the sources below to answer the user. The sources are pages from the user's reading history, so always draw directly from them.
+        - Synthesize facts from the sources into a complete, substantive answer. Do not refuse.
+        - Write a full response — multiple sentences when the topic warrants it. Do not stop after one line.
+        - Do NOT describe your process. No "I looked", "based on the sources", "here is what I found", or similar meta-commentary.
+        - Do NOT cite or name sources, URLs, or titles. No [1] markers.
+        - Each sentence must add new information. No filler.
         - Bold **key terms** only when it adds clarity.\(highlightsGuideline)
 
         Sources:
-        \(context)\(highlightsBlock)<|eot_id|>\(historyBlock)<|start_header_id|>user<|end_header_id|>
+        \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
         \(query)<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
 

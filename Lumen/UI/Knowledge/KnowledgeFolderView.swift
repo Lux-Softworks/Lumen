@@ -274,10 +274,15 @@ struct WebsitePageButton: View {
 struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
 
-    @State private var pressedTopicID: String? = nil
     @State private var topicToDelete: Topic? = nil
     @State private var showDeleteAlert = false
+    @State private var exportSheet: ExportSheetItem? = nil
     @Environment(\.palette) private var palette
+
+    private struct ExportSheetItem: Identifiable {
+        let id = UUID()
+        let scope: ExportCoordinator.Request.Scope
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -310,6 +315,24 @@ struct KnowledgeFolderView: View {
             .animation(.smooth(duration: 0.3), value: viewModel.navigationPath)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(item: $exportSheet) { item in
+            ExportView(
+                initialScope: initialScope(for: item.scope),
+                fixedCoordinatorScope: item.scope,
+                onDismiss: { exportSheet = nil }
+            )
+            .environment(\.palette, palette)
+        }
+    }
+
+    private func initialScope(for scope: ExportCoordinator.Request.Scope) -> ExportView.Scope {
+        switch scope {
+        case .wholeBase: return .wholeBase
+        case .topic: return .topic
+        case .site: return .site
+        case .page: return .page
+        case .dateRange: return .dateRange
+        }
     }
 
     private func offsetFor(index: Int, width: CGFloat) -> CGFloat {
@@ -384,11 +407,6 @@ struct KnowledgeFolderView: View {
                                 } label: {
                                     VStack(alignment: .center) {
                                         FolderItemButton(topic: topic)
-                                            .scaleEffect(pressedTopicID == topic.id ? 0.88 : 1.0)
-                                            .animation(
-                                                .spring(response: 0.25, dampingFraction: 0.6),
-                                                value: pressedTopicID
-                                            )
 
                                         Text(topic.name)
                                             .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
@@ -398,21 +416,19 @@ struct KnowledgeFolderView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .modifier(StaggerFadeModifier(delay: Double(index) * 0.04))
-                                .highPriorityGesture(
-                                    LongPressGesture(minimumDuration: 0.45)
-                                        .onEnded { _ in
-                                            pressedTopicID = topic.id
-                                            Haptics.impact(.medium)
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                                                Haptics.impact(.light)
-                                            }
-                                            topicToDelete = topic
-                                            showDeleteAlert = true
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                                pressedTopicID = nil
-                                            }
-                                        }
-                                )
+                                .contextMenu {
+                                    Button {
+                                        exportSheet = ExportSheetItem(scope: .topic(id: topic.id))
+                                    } label: {
+                                        Label("Export", systemImage: "square.and.arrow.up")
+                                    }
+                                    Button(role: .destructive) {
+                                        topicToDelete = topic
+                                        showDeleteAlert = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 24)
@@ -475,6 +491,13 @@ struct KnowledgeFolderView: View {
                         }
                         .buttonStyle(.plain)
                         .modifier(StaggerFadeModifier(delay: Double(index) * 0.05))
+                        .contextMenu {
+                            Button {
+                                exportSheet = ExportSheetItem(scope: .site(id: website.id))
+                            } label: {
+                                Label("Export", systemImage: "square.and.arrow.up")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -486,11 +509,14 @@ struct KnowledgeFolderView: View {
     @ViewBuilder
     private var pagesView: some View {
         if let websiteVM = viewModel.websiteViewModel {
-            KnowledgeWebsiteView(viewModel: websiteVM, onBack: {
-                viewModel.navigateBack()
-            }, onSelectPage: { page in
-                viewModel.selectPage(page)
-            })
+            KnowledgeWebsiteView(
+                viewModel: websiteVM,
+                onBack: { viewModel.navigateBack() },
+                onSelectPage: { page in viewModel.selectPage(page) },
+                onExportPage: { page in
+                    exportSheet = ExportSheetItem(scope: .page(id: page.id))
+                }
+            )
         }
     }
 }

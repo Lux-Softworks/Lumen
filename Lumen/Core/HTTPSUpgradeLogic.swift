@@ -13,7 +13,7 @@ enum HTTPSUpgradeLogic {
         }
 
         switch scheme {
-        case "https", "about", "file":
+        case "https", "about":
             return .allow
         case "http":
             if httpsOnly {

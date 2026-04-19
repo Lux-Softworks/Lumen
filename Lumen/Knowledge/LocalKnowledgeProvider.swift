@@ -4,6 +4,7 @@ import MLXLLM
 import MLXLMCommon
 import UIKit
 internal import Tokenizers
+import os
 
 enum KnowledgeIntent {
     case action
@@ -20,6 +21,11 @@ actor LocalKnowledgeProvider {
     private var lastUsed: Date?
     private var isWarmed: Bool = false
     private static let idleUnloadSeconds: UInt64 = 180
+
+    private var shutdownRequested: Bool = false
+    private var inflightCount: Int = 0
+    private var streamTasks: Set<Task<Void, Never>> = []
+    private static let shutdownDrainTimeoutSeconds: Double = 3.0
 
     private static func compile(_ patterns: [String]) -> [NSRegularExpression] {
         patterns.compactMap { try? NSRegularExpression(pattern: $0) }
@@ -82,15 +88,40 @@ actor LocalKnowledgeProvider {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { [weak self] in await self?.unloadModel() }
+            Task { [weak self] in await self?.handleShutdown() }
         }
-        center.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { [weak self] in await self?.unloadModel() }
+    }
+
+    private func beginInference() {
+        inflightCount += 1
+    }
+
+    private func endInference() {
+        inflightCount = max(0, inflightCount - 1)
+    }
+
+    private func registerStreamTask(_ task: Task<Void, Never>) {
+        streamTasks.insert(task)
+    }
+
+    private func unregisterStreamTask(_ task: Task<Void, Never>) {
+        streamTasks.remove(task)
+    }
+
+    private func handleShutdown() async {
+        shutdownRequested = true
+        for task in streamTasks {
+            task.cancel()
         }
+
+        let deadline = Date().addingTimeInterval(Self.shutdownDrainTimeoutSeconds)
+        while inflightCount > 0, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        unloadModel()
+        streamTasks.removeAll()
+        shutdownRequested = false
     }
 
     private func touch() {
@@ -127,9 +158,12 @@ actor LocalKnowledgeProvider {
             return
         }
 
+        try ensureDiskSpaceForModel()
+
         let task = Task<ModelContainer, Error> {
             let config = ModelConfiguration(
-                id: "mlx-community/Llama-3.2-1B-Instruct-4bit"
+                id: "mlx-community/Llama-3.2-1B-Instruct-4bit",
+                revision: "08231374eeacb049a0eade7922910865b8fce912"
             )
             return try await LLMModelFactory.shared.loadContainer(configuration: config)
         }
@@ -139,6 +173,25 @@ actor LocalKnowledgeProvider {
         self.loadingTask = nil
         try? await warmupIfNeeded()
         #endif
+    }
+
+    private static let requiredDiskBytes: Int64 = 1_200_000_000
+
+    private func ensureDiskSpaceForModel() throws {
+        let supportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let values = try? supportURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        let available = values?.volumeAvailableCapacityForImportantUsage ?? 0
+
+        if available < Self.requiredDiskBytes {
+            throw NSError(
+                domain: "LocalKnowledgeProvider",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Not enough free space to download the AI model. Free up at least 1.2 GB and try again."
+                ]
+            )
+        }
     }
 
     private func warmupIfNeeded() async throws {
@@ -172,6 +225,9 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
+        beginInference()
+        defer { endInference() }
+
         let prompt = await KnowledgePrompts.pageSummary(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 50, temperature: 0.1)
@@ -182,12 +238,47 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
         clearGPUCache()
         touch()
         return cleanSummary(output)
+    }
+
+    func summarizeConversationWithLLM(
+        turns: [(role: String, text: String)],
+        priorSummary: String?
+    ) async throws -> String {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(
+                domain: "LocalKnowledgeProvider", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        beginInference()
+        defer { endInference() }
+
+        let prompt = await KnowledgePrompts.conversationSummary(turns: turns, priorSummary: priorSummary)
+        let parameters = GenerateParameters(maxTokens: 140, temperature: 0.2)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
+        let stream = try await container.generate(input: input, parameters: parameters)
+
+        var output = ""
+        for await event in stream {
+            if Task.isCancelled { break }
+            if case .chunk(let text) = event { output += text }
+        }
+
+        clearGPUCache()
+        touch()
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func summarizeWebsiteWithLLM(content: String, title: String?) async throws -> String {
@@ -201,6 +292,9 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
+        beginInference()
+        defer { endInference() }
+
         let prompt = await KnowledgePrompts.websiteSummary(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 25, temperature: 0.1)
@@ -211,6 +305,7 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
@@ -232,6 +327,9 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
+        beginInference()
+        defer { endInference() }
+
         let prompt = await KnowledgePrompts.websiteReadingSynthesis(summaries: summaries)
 
         let parameters = GenerateParameters(maxTokens: 60, temperature: 0.15)
@@ -242,6 +340,7 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
@@ -261,6 +360,9 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
+        beginInference()
+        defer { endInference() }
+
         let prompt = await KnowledgePrompts.topicClassification(content: content, title: title)
 
         let parameters = GenerateParameters(maxTokens: 14, temperature: 0.0)
@@ -271,6 +373,7 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
@@ -317,6 +420,9 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
+        beginInference()
+        defer { endInference() }
+
         let prompt = await KnowledgePrompts.queryRefinement(query: query)
 
         let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
@@ -327,6 +433,7 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
@@ -339,7 +446,8 @@ actor LocalKnowledgeProvider {
         query: String,
         sources: [PageContent],
         highlights: [String] = [],
-        history: [(role: String, text: String)] = []
+        history: [(role: String, text: String)] = [],
+        conversationSummary: String? = nil
     ) async throws -> String {
         guard !sources.isEmpty else { return "" }
 
@@ -357,61 +465,26 @@ actor LocalKnowledgeProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
 
-        let context = sources.prefix(3)
-            .map { p in
-                var parts: [String] = []
-                if let s = p.summary, !s.isEmpty {
-                    parts.append(s)
-                }
-                let bodyLimit = 350
-                let body = String(p.content.prefix(bodyLimit))
-                if !body.isEmpty {
-                    parts.append(body)
-                }
-                let joined = parts.joined(separator: " — ")
-                return "\(p.title ?? p.domain): \(joined)"
-            }
-            .joined(separator: "\n\n")
+        beginInference()
+        defer { endInference() }
 
-        let cleanedHighlights = highlights
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        let highlightsBlock: String
-        let highlightsGuideline: String
-        if cleanedHighlights.isEmpty {
-            highlightsBlock = ""
-            highlightsGuideline = ""
-        } else {
-            let lines = cleanedHighlights.prefix(6)
-                .map { "- \"\(String($0.prefix(240)))\"" }
-                .joined(separator: "\n")
-            highlightsBlock = """
-
-
-                User-highlighted passages (strong signal, prioritize when relevant):
-                \(lines)
-                """
-            highlightsGuideline = "\n- When user-highlighted passages are present, weight them heavily — user explicitly marked them as important."
-        }
-
-        let historyBlock = history.suffix(3)
-            .map { turn -> String in
-                let header = turn.role == "user" ? "user" : "assistant"
-                let body = String(turn.text.prefix(200))
-                return "<|start_header_id|>\(header)<|end_header_id|>\n\(body)<|eot_id|>"
-            }
-            .joined()
+        let blocks = await PromptBudgeter.build(
+            query: query,
+            sources: sources,
+            highlights: highlights,
+            history: history,
+            conversationSummary: conversationSummary
+        )
 
         let prompt = await KnowledgePrompts.ragAnswer(
             query: query,
-            context: context,
-            highlightsBlock: highlightsBlock,
-            highlightsGuideline: highlightsGuideline,
-            historyBlock: historyBlock
+            context: blocks.context,
+            highlightsBlock: blocks.highlightsBlock,
+            highlightsGuideline: blocks.highlightsGuideline,
+            historyBlock: blocks.historyBlock
         )
 
-        let parameters = GenerateParameters(maxTokens: 180, temperature: 0.1)
+        let parameters = GenerateParameters(maxTokens: 320, temperature: 0.2)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
 
@@ -419,6 +492,7 @@ actor LocalKnowledgeProvider {
 
         var output = ""
         for await event in stream {
+            if Task.isCancelled { break }
             if case .chunk(let text) = event { output += text }
         }
 
@@ -432,10 +506,14 @@ actor LocalKnowledgeProvider {
         query: String,
         sources: [PageContent],
         highlights: [String] = [],
-        history: [(role: String, text: String)] = []
+        history: [(role: String, text: String)] = [],
+        conversationSummary: String? = nil
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            let task = Task {
+            let task = Task<Void, Never> {
+                self.beginInference()
+                defer { self.endInference() }
+
                 do {
                     guard !sources.isEmpty else {
                         continuation.finish()
@@ -458,70 +536,42 @@ actor LocalKnowledgeProvider {
                             userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
                     }
 
-                    let context = sources.prefix(3)
-                        .map { p in
-                            var parts: [String] = []
-                            if let s = p.summary, !s.isEmpty { parts.append(s) }
-                            let body = String(p.content.prefix(350))
-                            if !body.isEmpty { parts.append(body) }
-                            return "\(p.title ?? p.domain): \(parts.joined(separator: " — "))"
-                        }
-                        .joined(separator: "\n\n")
-
-                    let cleanedHighlights = highlights
-                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .filter { !$0.isEmpty }
-
-                    let highlightsBlock: String
-                    let highlightsGuideline: String
-                    if cleanedHighlights.isEmpty {
-                        highlightsBlock = ""
-                        highlightsGuideline = ""
-                    } else {
-                        let lines = cleanedHighlights.prefix(6)
-                            .map { "- \"\(String($0.prefix(240)))\"" }
-                            .joined(separator: "\n")
-                        highlightsBlock = """
-
-
-                            User-highlighted passages (strong signal, prioritize when relevant):
-                            \(lines)
-                            """
-                        highlightsGuideline = "\n- When user-highlighted passages are present, weight them heavily — user explicitly marked them as important."
-                    }
-
-                    let historyBlock = history.suffix(3)
-                        .map { turn -> String in
-                            let header = turn.role == "user" ? "user" : "assistant"
-                            let body = String(turn.text.prefix(200))
-                            return "<|start_header_id|>\(header)<|end_header_id|>\n\(body)<|eot_id|>"
-                        }
-                        .joined()
+                    let blocks = await PromptBudgeter.build(
+                        query: query,
+                        sources: sources,
+                        highlights: highlights,
+                        history: history,
+                        conversationSummary: conversationSummary
+                    )
 
                     let prompt = await KnowledgePrompts.ragAnswer(
-                        query: query, context: context,
-                        highlightsBlock: highlightsBlock,
-                        highlightsGuideline: highlightsGuideline,
-                        historyBlock: historyBlock
+                        query: query,
+                        context: blocks.context,
+                        highlightsBlock: blocks.highlightsBlock,
+                        highlightsGuideline: blocks.highlightsGuideline,
+                        historyBlock: blocks.historyBlock
                     )
 
                     let parameters = GenerateParameters(
-                        maxTokens: 220,
-                        temperature: 0.1,
-                        repetitionPenalty: 1.15,
-                        repetitionContextSize: 40
+                        maxTokens: 2048,
+                        temperature: 0.3
                     )
                     let tokens = await container.encode(prompt)
                     let input = LMInput(tokens: MLXArray(tokens))
 
                     let stream = try await container.generate(input: input, parameters: parameters)
 
+                    var chunkCount = 0
+                    var eventCount = 0
                     for await event in stream {
                         if Task.isCancelled { break }
+                        eventCount += 1
                         if case .chunk(let text) = event {
+                            chunkCount += 1
                             continuation.yield(text)
                         }
                     }
+                    await KnowledgeLogger.rag.log("stream done: promptChars=\(prompt.count, privacy: .public) tokens=\(tokens.count, privacy: .public) events=\(eventCount, privacy: .public) chunks=\(chunkCount, privacy: .public)")
 
                     self.clearGPUCache()
                     self.touch()
@@ -532,8 +582,11 @@ actor LocalKnowledgeProvider {
                 }
             }
 
+            Task { self.registerStreamTask(task) }
+
             continuation.onTermination = { _ in
                 task.cancel()
+                Task { await self.unregisterStreamTask(task) }
             }
         }
     }
@@ -549,45 +602,7 @@ actor LocalKnowledgeProvider {
     }
 
     private func cleanOutput(_ raw: String) -> String {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        for regex in Self.outputMetaPatterns {
-            text = Self.stripPrefix(text, using: regex)
-        }
-
-        for regex in Self.outputMetaSentences {
-            var next = Self.stripPrefix(text, using: regex)
-            while next != text {
-                text = next
-                next = Self.stripPrefix(text, using: regex)
-            }
-        }
-
-        text = dedupeSentences(text)
-        text = Self.replaceAll(text, using: Self.citationRegex, with: "")
-        text = Self.replaceAll(text, using: Self.strayStarRegex, with: "")
-
-        let starPairCount = text.components(separatedBy: "**").count - 1
-        if starPairCount % 2 != 0 {
-            text = text.replacingOccurrences(of: "**", with: "")
-        }
-
-        if let lastDot = text.lastIndex(where: { ".!?".contains($0) }) {
-            let after = text[text.index(after: lastDot)...]
-            if after.count > 3 {
-                text = String(text[...lastDot])
-            }
-        }
-
-        while text.contains("  ") {
-            text = text.replacingOccurrences(of: "  ", with: " ")
-        }
-
-        for p in [",", ".", "!", "?", ";", ":"] {
-            text = text.replacingOccurrences(of: " \(p)", with: p)
-        }
-
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func dedupeSentences(_ raw: String) -> String {
@@ -643,13 +658,6 @@ actor LocalKnowledgeProvider {
         let starCount = text.components(separatedBy: "**").count - 1
         if starCount % 2 != 0 {
             text = text.replacingOccurrences(of: "**", with: "")
-        }
-
-        if let lastDot = text.lastIndex(where: { ".!?".contains($0) }) {
-            let after = text[text.index(after: lastDot)...]
-            if after.count > 3 {
-                text = String(text[...lastDot])
-            }
         }
 
         while text.contains("  ") {
