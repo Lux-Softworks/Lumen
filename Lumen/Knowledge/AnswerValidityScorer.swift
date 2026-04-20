@@ -13,8 +13,8 @@ enum AnswerValidityScorer {
         "most", "some", "any", "all", "each", "every", "only", "other"
     ]
 
-    static func score(answer: String, sources: [PageContent], sourceEmbeddings: [[Double]]) -> Double {
-        let cosine = semanticSimilarity(answer: answer, sourceEmbeddings: sourceEmbeddings)
+    static func score(answer: String, sources: [PageContent], sourceEmbeddings: [[Double]]) async -> Double {
+        let cosine = await semanticSimilarity(answer: answer, sourceEmbeddings: sourceEmbeddings)
         let overlap = tokenOverlap(answer: answer, sources: sources)
         return 0.6 * cosine + 0.4 * overlap
     }
@@ -25,8 +25,8 @@ enum AnswerValidityScorer {
         return .low
     }
 
-    private static func semanticSimilarity(answer: String, sourceEmbeddings: [[Double]]) -> Double {
-        guard let answerVec = EmbeddingService.shared.generateEmbedding(for: answer),
+    private static func semanticSimilarity(answer: String, sourceEmbeddings: [[Double]]) async -> Double {
+        guard let answerVec = await EmbeddingService.shared.generateEmbedding(for: answer),
               !answerVec.isEmpty else { return 0 }
         let sims = sourceEmbeddings.map { VectorMath.cosineSimilarity(answerVec, $0) }
         return sims.max() ?? 0

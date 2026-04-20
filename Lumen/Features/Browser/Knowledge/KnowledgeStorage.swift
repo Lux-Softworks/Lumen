@@ -865,12 +865,15 @@ actor KnowledgeStorage {
         )
 
         let limit = min(chunks.count, 12)
-        for (index, text) in chunks.prefix(limit).enumerated() {
-            guard let vector = await EmbeddingService.shared.generateEmbedding(for: text) else {
-                continue
-            }
+        let texts = Array(chunks.prefix(limit))
+        let vectors = await EmbeddingService.shared.generateEmbeddings(for: texts)
+
+        for (index, text) in texts.enumerated() {
+            guard let vector = vectors[index] else { continue }
+
             let chunkID = "\(pageID)_c\(index)"
             let data = vector.withUnsafeBytes { Data($0) }
+
             let sql = """
             INSERT OR REPLACE INTO page_chunks (id, page_id, chunk_index, text, vector)
             VALUES (?, ?, ?, ?, ?)
@@ -980,47 +983,107 @@ actor KnowledgeStorage {
             return []
         }
 
+        let chunkScores = try scoreChunks(queryVector: queryVector)
+        let pageScores = try scorePages(queryVector: queryVector)
+
+        var bestByPage: [String: Double] = [:]
+
+        for (pageID, score) in chunkScores {
+            let chunkBoost = score + 0.02
+            if chunkBoost > (bestByPage[pageID] ?? -1) {
+                bestByPage[pageID] = chunkBoost
+            }
+        }
+
+        for (pageID, score) in pageScores {
+            if score > (bestByPage[pageID] ?? -1) {
+                bestByPage[pageID] = score
+            }
+        }
+
+        let topResults = bestByPage
+            .sorted { $0.value > $1.value }
+            .prefix(limit * 2)
+
+        var results: [(page: PageContent, score: Double)] = []
+
+        for (pageID, score) in topResults {
+            if let page = try await fetchPage(pageID: pageID) {
+                results.append((page: page, score: score))
+            }
+            if results.count >= limit { break }
+        }
+
+        return results
+    }
+
+    private func scoreChunks(queryVector: [Double]) throws -> [(pageID: String, score: Double)] {
+        let sql = """
+            SELECT pc.page_id, pc.vector FROM page_chunks pc
+            JOIN pages p ON pc.page_id = p.id
+            ORDER BY p.timestamp DESC
+            LIMIT 2000
+        """
+
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            return []
+        }
+
+        var bestPerPage: [String: Double] = [:]
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let pageID = String(cString: sqlite3_column_text(statement, 0))
+
+            guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
+            let blobSize = Int(sqlite3_column_bytes(statement, 1))
+            let count = blobSize / MemoryLayout<Double>.size
+            guard count > 0 else { continue }
+
+            let vector = Array(UnsafeBufferPointer(start: rawPtr.assumingMemoryBound(to: Double.self), count: count))
+            let score = VectorMath.cosineSimilarity(queryVector, vector)
+
+            if score > (bestPerPage[pageID] ?? -1) {
+                bestPerPage[pageID] = score
+            }
+        }
+
+        return bestPerPage.map { ($0.key, $0.value) }
+    }
+
+    private func scorePages(queryVector: [Double]) throws -> [(pageID: String, score: Double)] {
         let sql = """
             SELECT pe.page_id, pe.vector FROM page_embeddings pe
             JOIN pages p ON pe.page_id = p.id
             ORDER BY p.timestamp DESC
             LIMIT 500
         """
+
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
 
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+            return []
         }
 
-        var similarities: [(pageID: String, score: Double)] = []
+        var scores: [(String, Double)] = []
 
         while sqlite3_step(statement) == SQLITE_ROW {
             let pageID = String(cString: sqlite3_column_text(statement, 0))
-            let blobData = sqlite3_column_blob(statement, 1)
-            let blobSize = Int(sqlite3_column_bytes(statement, 1))
 
-            guard let rawPtr = blobData, blobSize > 0 else { continue }
+            guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
+            let blobSize = Int(sqlite3_column_bytes(statement, 1))
             let count = blobSize / MemoryLayout<Double>.size
             guard count > 0 else { continue }
+
             let vector = Array(UnsafeBufferPointer(start: rawPtr.assumingMemoryBound(to: Double.self), count: count))
-
             let score = VectorMath.cosineSimilarity(queryVector, vector)
-            similarities.append((pageID: pageID, score: score))
+            scores.append((pageID, score))
         }
 
-        let topResults = similarities
-            .sorted { $0.score > $1.score }
-            .prefix(limit)
-
-        var results: [(page: PageContent, score: Double)] = []
-        for result in topResults {
-            if let page = try await fetchPage(pageID: result.pageID) {
-                results.append((page: page, score: result.score))
-            }
-        }
-
-        return results
+        return scores
     }
 
     func fetchAllWebsites() async throws -> [Website] {

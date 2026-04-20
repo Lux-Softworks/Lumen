@@ -57,29 +57,38 @@ final class KnowledgeAIViewModel {
 
         let scored: [(page: PageContent, score: Double)]
         do {
-            scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 4)
+            scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 6)
         } catch {
             finishThinking()
             messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
             return
         }
 
-        let minScore = 0.10
-        var searchResults = scored.filter { $0.score >= minScore }.map { $0.page }
-        if searchResults.isEmpty, let top = scored.first?.page {
-            searchResults.append(top)
-        }
+        let strongMinScore = 0.40
+        let weakMinScore = 0.30
         let topScore = scored.first?.score ?? 0
+
+        var searchResults = scored.filter { $0.score >= strongMinScore }.map { $0.page }
         var ftsHitCount = 0
 
-        if topScore < 0.30 || searchResults.count < 3 {
+        if searchResults.isEmpty {
             do {
                 let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
                 ftsHitCount = keywordHits.count
-                let existing = Set(searchResults.map { $0.id })
-                for page in keywordHits where !existing.contains(page.id) {
-                    searchResults.append(page)
-                    if searchResults.count >= 4 { break }
+
+                if !keywordHits.isEmpty {
+                    let existing = Set(searchResults.map { $0.id })
+                    for page in keywordHits where !existing.contains(page.id) {
+                        searchResults.append(page)
+                        if searchResults.count >= 3 { break }
+                    }
+
+                    if searchResults.isEmpty {
+                        for page in scored.filter({ $0.score >= weakMinScore }).map({ $0.page }) {
+                            searchResults.append(page)
+                            if searchResults.count >= 2 { break }
+                        }
+                    }
                 }
             } catch {
                 KnowledgeLogger.query.error("FTS fallback failed: \(String(describing: error), privacy: .public)")
