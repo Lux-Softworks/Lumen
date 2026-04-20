@@ -364,34 +364,33 @@ struct KnowledgeFolderView: View {
 
     private var topicSelectionGrid: some View {
         ZStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                if viewModel.topics.isEmpty {
-                    VStack(spacing: 16) {
-                        Text("No Topics Found")
-                            .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
-                            .foregroundColor(palette.text.opacity(0.35))
+            if viewModel.topics.isEmpty {
+                VStack(spacing: 16) {
+                    Text("No Topics Found")
+                        .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
+                        .foregroundColor(palette.text.opacity(0.35))
 
-                        if seedKnowledge {
-                            Button {
-                                Task { await viewModel.seedData() }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "plus.square.fill.on.square.fill")
-                                    Text("Seed Test Data")
-                                }
-                                .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
-                                .foregroundColor(palette.accent)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(palette.accent.opacity(0.1))
-                                .clipShape(Capsule())
+                    if seedKnowledge {
+                        Button {
+                            Task { await viewModel.seedData() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.square.fill.on.square.fill")
+                                Text("Seed Test Data")
                             }
-                            .buttonStyle(.plain)
+                            .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
+                            .foregroundColor(palette.accent)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(palette.accent.opacity(0.1))
+                            .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 180)
-                } else {
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         LazyVGrid(
                             columns: [

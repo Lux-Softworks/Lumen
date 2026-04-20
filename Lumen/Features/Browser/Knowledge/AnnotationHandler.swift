@@ -45,6 +45,17 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                 }
             }
 
+        case "request-delete":
+            guard let id = body["id"] as? String else { return }
+            let x = (body["x"] as? NSNumber)?.doubleValue ?? 0
+            let y = (body["y"] as? NSNumber)?.doubleValue ?? 0
+            let w = (body["w"] as? NSNumber)?.doubleValue ?? 0
+            let h = (body["h"] as? NSNumber)?.doubleValue ?? 0
+            let rect = CGRect(x: x, y: y, width: w, height: h)
+            Task { @MainActor [weak webView] in
+                (webView as? LumenWebView)?.showRemoveHighlightMenu(rect: rect, annotationID: id)
+            }
+
         default:
             break
         }
@@ -61,7 +72,7 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                 annotations = try await KnowledgeStorage.shared.fetchAnnotations(normalizedURL: normalized)
             } catch { return }
 
-            guard !annotations.isEmpty, let wv = webView else { return }
+            guard let wv = webView else { return }
 
             let payload = annotations.map { ann in
                 [

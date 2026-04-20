@@ -44,6 +44,8 @@ class KnowledgeCaptureService: ObservableObject {
 
         guard !incognito else { return }
 
+        await Self.waitForDOMReady(webView: webView)
+
         let html: String?
         do {
             html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
@@ -101,6 +103,8 @@ class KnowledgeCaptureService: ObservableObject {
         }
 
         do {
+            var newlyCreatedWebsiteID: String? = nil
+
             if var website = try await KnowledgeStorage.shared.fetchWebsite(domain: domain) {
                 website.lastVisit = Date()
                 website.pageCount += 1
@@ -122,15 +126,10 @@ class KnowledgeCaptureService: ObservableObject {
                 let displayName = Self.resolveSiteName(extracted: extractedContent, domain: domain)
                     ?? DomainNameFormatter.format(host: domain)
 
-                let websiteSummary = await KnowledgeClassifier.summarizeWebsite(
-                    content: extractedContent.content,
-                    title: extractedContent.title
-                )
-
                 let newWebsite = Website(
                     domain: domain,
                     displayName: displayName,
-                    summary: websiteSummary,
+                    summary: "",
                     topicID: resolvedTopicID,
                     pageCount: 1,
                     totalWords: wordCount,
@@ -139,39 +138,79 @@ class KnowledgeCaptureService: ObservableObject {
                 )
 
                 try await KnowledgeStorage.shared.createWebsite(website: newWebsite)
+                newlyCreatedWebsiteID = newWebsite.id
             }
-
-            let pageSummary = await KnowledgeClassifier.summarize(
-                content: extractedContent.content,
-                title: extractedContent.title
-            )
 
             let pageID = try await KnowledgeStorage.shared.save(
                 url: payload.url,
                 title: extractedContent.title,
                 content: extractedContent.content,
                 author: extractedContent.author,
-                summary: pageSummary,
+                summary: nil,
                 description: extractedContent.description,
                 readingTime: payload.readingTime,
                 scrollDepth: payload.scrollDepth
             )
 
-            Task.detached(priority: .utility) {
+            captureToken &+= 1
+            NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
+
+            Task.detached(priority: .utility) { [extractedContent, newlyCreatedWebsiteID] in
                 if let embedding = await EmbeddingService.shared.generateEmbedding(
                     for: extractedContent.content
                 ) {
                     try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
                 }
-            }
+                try? await KnowledgeStorage.shared.saveEntities(
+                    pageID: pageID,
+                    content: extractedContent.content
+                )
+                await KnowledgeStorage.shared.saveChunkedEmbeddings(
+                    pageID: pageID,
+                    content: extractedContent.content
+                )
 
-            captureToken &+= 1
-            NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
+                let pageSummary = await KnowledgeClassifier.summarize(
+                    content: extractedContent.content,
+                    title: extractedContent.title
+                )
+                if !pageSummary.isEmpty {
+                    try? await KnowledgeStorage.shared.updatePageSummary(pageID: pageID, summary: pageSummary)
+                }
+
+                if let newSiteID = newlyCreatedWebsiteID {
+                    let websiteSummary = await KnowledgeClassifier.summarizeWebsite(
+                        content: extractedContent.content,
+                        title: extractedContent.title
+                    )
+                    if !websiteSummary.isEmpty {
+                        try? await KnowledgeStorage.shared.updateWebsiteSynthesis(
+                            websiteID: newSiteID,
+                            summary: websiteSummary,
+                            pageCount: 1
+                        )
+                    }
+                }
+
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
+                }
+            }
         } catch {
             KnowledgeLogger.capture.error(
                 "capture failed: \(String(describing: error), privacy: .public)"
             )
         }
+    }
+
+    private static func waitForDOMReady(webView: WKWebView) async {
+        let maxAttempts = 6
+        for _ in 0..<maxAttempts {
+            let state = try? await webView.evaluateJavaScript("document.readyState") as? String
+            if state == "complete" { break }
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 200_000_000)
     }
 
     private static func resolveSiteName(extracted: ExtractedContent, domain: String) -> String? {

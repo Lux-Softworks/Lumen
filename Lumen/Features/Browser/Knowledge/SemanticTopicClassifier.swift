@@ -231,6 +231,11 @@ final class SemanticTopicClassifier {
 
         let probe = Self.buildProbe(title: title, content: content)
         guard !probe.isEmpty else { return "" }
+
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(probe)
+        if let lang = recognizer.dominantLanguage, lang != .english { return "" }
+
         guard let vector = embedding.vector(for: probe) else { return "" }
 
         let scored = prototypes.map { ($0.name, VectorMath.cosineSimilarity(vector, $0.vector)) }

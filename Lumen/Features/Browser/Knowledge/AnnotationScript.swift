@@ -59,10 +59,32 @@ enum AnnotationScript {
                     parent.normalize();
                 });
 
+                function requestDelete(mark, id) {
+                    const rect = mark.getBoundingClientRect();
+                    try {
+                        window.webkit.messageHandlers.annotation.postMessage({
+                            action: 'request-delete',
+                            id: id,
+                            url: window.location.href,
+                            x: rect.left,
+                            y: rect.top,
+                            w: rect.width,
+                            h: rect.height
+                        });
+                    } catch (_) {}
+                }
+
                 function wrapRange(range, id) {
                     const mark = document.createElement('mark');
                     mark.setAttribute(MARK_ATTR, id);
-                    mark.style.cssText = 'background:rgba(255,214,102,0.45);color:inherit;padding:0;border-radius:2px;';
+                    mark.style.cssText = 'background:rgba(255,214,102,0.45);color:inherit;padding:0;border-radius:2px;cursor:pointer;';
+                    mark.addEventListener('click', function(e) {
+                        const sel = window.getSelection();
+                        if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        requestDelete(mark, id);
+                    }, true);
                     try { range.surroundContents(mark); return true; }
                     catch (_) {
                         const frag = range.extractContents();

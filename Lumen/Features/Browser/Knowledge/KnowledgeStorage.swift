@@ -1,6 +1,8 @@
 import SQLite3
 import Foundation
 import Accelerate
+import CryptoKit
+import NaturalLanguage
 
 struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
@@ -128,12 +130,38 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 
     nonisolated static func normalizeURL(_ url: String) -> String {
-        var normalized = url.lowercased()
-        normalized = normalized.replacingOccurrences(of: "https://", with: "")
-        normalized = normalized.replacingOccurrences(of: "http://", with: "")
-        normalized = normalized.replacingOccurrences(of: "www.", with: "")
-        if normalized.hasSuffix("/") { normalized.removeLast() }
-        return normalized
+        guard var comps = URLComponents(string: url) else {
+            return url.lowercased()
+        }
+
+        comps.fragment = nil
+        if let items = comps.queryItems {
+            let blocked: Set<String> = [
+                "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+                "utm_id", "utm_name", "utm_brand", "utm_social", "utm_social-type",
+                "fbclid", "gclid", "gbraid", "wbraid", "dclid", "msclkid", "yclid",
+                "mc_cid", "mc_eid", "igshid", "s_cid", "ref", "ref_", "ref_src",
+                "referrer", "source", "src", "campaign", "_hsenc", "_hsmi",
+                "_ga", "_gac", "aff", "affiliate", "trk", "pk_campaign", "pk_kwd",
+                "spm", "share", "shared", "shareid", "share_source"
+            ]
+
+            let filtered = items.filter { !blocked.contains($0.name.lowercased()) }
+            comps.queryItems = filtered.isEmpty ? nil : filtered
+        }
+
+        var host = (comps.host ?? "").lowercased()
+        if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
+        var path = comps.path
+
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        var result = host + path
+
+        if let query = comps.query, !query.isEmpty {
+            result += "?" + query
+        }
+
+        return result.lowercased()
     }
 
     nonisolated static func extractDomain(from url: String) -> String {
@@ -403,6 +431,35 @@ actor KnowledgeStorage {
         if try !columnExists(table: "websites", column: "page_count_at_synthesis") {
             try execute("ALTER TABLE websites ADD COLUMN page_count_at_synthesis INTEGER DEFAULT 0")
         }
+        if try !columnExists(table: "pages", column: "visit_count") {
+            try execute("ALTER TABLE pages ADD COLUMN visit_count INTEGER NOT NULL DEFAULT 1")
+        }
+        if try !columnExists(table: "pages", column: "content_hash") {
+            try execute("ALTER TABLE pages ADD COLUMN content_hash TEXT")
+            try execute("CREATE INDEX IF NOT EXISTS idx_pages_content_hash ON pages(content_hash)")
+        }
+        try execute("""
+            CREATE TABLE IF NOT EXISTS page_entities (
+                page_id TEXT NOT NULL,
+                entity TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                PRIMARY KEY (page_id, entity, kind),
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+            )
+        """)
+        try execute("CREATE INDEX IF NOT EXISTS idx_entities_name ON page_entities(entity)")
+        try execute("CREATE INDEX IF NOT EXISTS idx_entities_kind ON page_entities(kind)")
+        try execute("""
+            CREATE TABLE IF NOT EXISTS page_chunks (
+                id TEXT PRIMARY KEY,
+                page_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                vector BLOB NOT NULL,
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+            )
+        """)
+        try execute("CREATE INDEX IF NOT EXISTS idx_chunks_page ON page_chunks(page_id)")
         try execute("""
             CREATE TABLE IF NOT EXISTS annotations (
                 id TEXT PRIMARY KEY,
@@ -502,6 +559,19 @@ actor KnowledgeStorage {
             websiteID = newWebsite.id
         }
 
+        let hash = Self.contentHash(for: content)
+        if let dupID = try fetchPageIDByContentHash(hash: hash) {
+            try execute(
+                "UPDATE pages SET visit_count = visit_count + 1, timestamp = ? WHERE id = ?",
+                bindValues: { [self] stmt in
+                    sqlite3_bind_int64(stmt, 1, Int64(Date().timeIntervalSince1970))
+                    sqlite3_bind_text(stmt, 2, dupID, -1, SQLITE_TRANSIENT)
+                }
+            )
+            try updateWebsiteStats(websiteID: websiteID)
+            return dupID
+        }
+
         let page = await PageContent(
             websiteID: websiteID,
             url: url,
@@ -514,18 +584,47 @@ actor KnowledgeStorage {
             scrollDepth: scrollDepth
         )
 
-        try savePage(page)
+        let effectiveID = try savePage(page, contentHash: hash)
         try updateWebsiteStats(websiteID: websiteID)
 
-        return page.id
+        return effectiveID
     }
 
-    private func savePage(_ page: PageContent) throws {
+    nonisolated static func contentHash(for content: String) -> String {
+        let snippet = String(content.prefix(4000))
+        let digest = SHA256.hash(data: Data(snippet.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func fetchPageIDByContentHash(hash: String) throws -> String? {
+        let sql = "SELECT id FROM pages WHERE content_hash = ? LIMIT 1"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
+        sqlite3_bind_text(statement, 1, hash, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        return String(cString: sqlite3_column_text(statement, 0))
+    }
+
+    private func savePage(_ page: PageContent, contentHash: String) throws -> String {
         let sql = """
-        INSERT OR REPLACE INTO pages (
+        INSERT INTO pages (
             id, website_id, url, normalized_url, domain, title, content, summary,
-            timestamp, author, description, reading_time, scroll_depth, word_count, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            timestamp, author, description, reading_time, scroll_depth, word_count, created_at,
+            visit_count, content_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(normalized_url) DO UPDATE SET
+            title = excluded.title,
+            content = excluded.content,
+            summary = COALESCE(excluded.summary, pages.summary),
+            timestamp = excluded.timestamp,
+            author = COALESCE(excluded.author, pages.author),
+            description = COALESCE(excluded.description, pages.description),
+            reading_time = MAX(COALESCE(pages.reading_time, 0), COALESCE(excluded.reading_time, 0)),
+            scroll_depth = MAX(COALESCE(pages.scroll_depth, 0.0), COALESCE(excluded.scroll_depth, 0.0)),
+            word_count = excluded.word_count,
+            content_hash = excluded.content_hash,
+            visit_count = pages.visit_count + 1
         """
 
         var statement: OpaquePointer?
@@ -561,18 +660,23 @@ actor KnowledgeStorage {
 
         sqlite3_bind_int(statement, 14, Int32(page.wordCount))
         sqlite3_bind_int64(statement, 15, Int64(page.createdAt.timeIntervalSince1970))
+        sqlite3_bind_text(statement, 16, contentHash, -1, SQLITE_TRANSIENT)
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw StorageError.failedToInsert(String(cString: sqlite3_errmsg(db)))
         }
 
+        let effectiveID = try fetchPageID(normalizedURL: page.normalizedURL) ?? page.id
+
         try execute(
             "UPDATE annotations SET page_id = ? WHERE normalized_url = ? AND page_id IS NULL",
             bindValues: { [self] stmt in
-                sqlite3_bind_text(stmt, 1, page.id, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 1, effectiveID, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 2, page.normalizedURL, -1, SQLITE_TRANSIENT)
             }
         )
+
+        return effectiveID
     }
 
     func createWebsite(website: Website) throws {
@@ -666,6 +770,15 @@ actor KnowledgeStorage {
         })
     }
 
+    func updatePageSummary(pageID: String, summary: String) throws {
+        try initialize()
+        let sql = "UPDATE pages SET summary = ? WHERE id = ?"
+        try execute(sql, bindValues: { [self] statement in
+            sqlite3_bind_text(statement, 1, summary, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, pageID, -1, SQLITE_TRANSIENT)
+        })
+    }
+
     func updatePageEngagement(url: String, scrollDepth: Double, readingTime: Int) throws {
         try initialize()
         let normalizedURL = PageContent.normalizeURL(url)
@@ -732,6 +845,128 @@ actor KnowledgeStorage {
             sqlite3_bind_text(statement, 1, pageID, -1, SQLITE_TRANSIENT)
             sqlite3_bind_blob(statement, 2, (data as NSData).bytes, Int32(data.count), SQLITE_TRANSIENT)
         })
+    }
+
+    func saveChunkedEmbeddings(pageID: String, content: String) async {
+        do {
+            try initialize()
+        } catch {
+            return
+        }
+
+        let chunks = Self.chunkText(content, targetWords: 400, overlapWords: 60)
+        guard !chunks.isEmpty else { return }
+
+        try? execute(
+            "DELETE FROM page_chunks WHERE page_id = ?",
+            bindValues: { [self] stmt in
+                sqlite3_bind_text(stmt, 1, pageID, -1, SQLITE_TRANSIENT)
+            }
+        )
+
+        let limit = min(chunks.count, 12)
+        for (index, text) in chunks.prefix(limit).enumerated() {
+            guard let vector = await EmbeddingService.shared.generateEmbedding(for: text) else {
+                continue
+            }
+            let chunkID = "\(pageID)_c\(index)"
+            let data = vector.withUnsafeBytes { Data($0) }
+            let sql = """
+            INSERT OR REPLACE INTO page_chunks (id, page_id, chunk_index, text, vector)
+            VALUES (?, ?, ?, ?, ?)
+            """
+
+            try? execute(sql, bindValues: { [self] stmt in
+                sqlite3_bind_text(stmt, 1, chunkID, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, pageID, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_int(stmt, 3, Int32(index))
+                sqlite3_bind_text(stmt, 4, text, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_blob(stmt, 5, (data as NSData).bytes, Int32(data.count), SQLITE_TRANSIENT)
+            })
+        }
+    }
+
+    nonisolated static func chunkText(_ content: String, targetWords: Int, overlapWords: Int) -> [String] {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        let words = trimmed.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map(String.init)
+        guard words.count > targetWords else { return [trimmed] }
+
+        var chunks: [String] = []
+        var index = 0
+        let stride = max(1, targetWords - overlapWords)
+
+        while index < words.count {
+            let end = min(words.count, index + targetWords)
+            let slice = words[index..<end]
+            chunks.append(slice.joined(separator: " "))
+            if end == words.count { break }
+            index += stride
+        }
+
+        return chunks
+    }
+
+    func saveEntities(pageID: String, content: String) throws {
+        try initialize()
+
+        let entities = Self.extractEntities(from: content)
+        guard !entities.isEmpty else { return }
+
+        try execute(
+            "DELETE FROM page_entities WHERE page_id = ?",
+            bindValues: { [self] stmt in
+                sqlite3_bind_text(stmt, 1, pageID, -1, SQLITE_TRANSIENT)
+            }
+        )
+
+        let sql = "INSERT OR IGNORE INTO page_entities (page_id, entity, kind) VALUES (?, ?, ?)"
+        for (entity, kind) in entities {
+            try execute(sql, bindValues: { [self] stmt in
+                sqlite3_bind_text(stmt, 1, pageID, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, entity, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, kind, -1, SQLITE_TRANSIENT)
+            })
+        }
+    }
+
+    nonisolated static func extractEntities(from content: String) -> [(name: String, kind: String)] {
+        let snippet = String(content.prefix(8000))
+        guard !snippet.isEmpty else { return [] }
+
+        let tagger = NLTagger(tagSchemes: [.nameType])
+        tagger.string = snippet
+
+        var counts: [String: (kind: String, count: Int)] = [:]
+        let range = snippet.startIndex..<snippet.endIndex
+        let options: NLTagger.Options = [.omitPunctuation, .omitWhitespace, .joinNames]
+
+        tagger.enumerateTags(in: range, unit: .word, scheme: .nameType, options: options) { tag, tokenRange in
+            guard let tag = tag else { return true }
+            let kind: String
+            switch tag {
+            case .personalName: kind = "person"
+            case .placeName: kind = "place"
+            case .organizationName: kind = "organization"
+            default: return true
+            }
+
+            let name = String(snippet[tokenRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard name.count >= 2, name.count <= 64 else { return true }
+            let key = name.lowercased()
+            let existing = counts[key]
+            counts[key] = (existing?.kind ?? kind, (existing?.count ?? 0) + 1)
+
+            return true
+        }
+
+        let ranked = counts
+            .filter { $0.value.count >= 1 }
+            .sorted { $0.value.count > $1.value.count }
+            .prefix(40)
+
+        return ranked.map { (name: $0.key, kind: $0.value.kind) }
     }
 
     func searchSemantic(query: String, limit: Int = 3) async throws -> [PageContent] {
@@ -1132,7 +1367,8 @@ actor KnowledgeStorage {
                     scrollDepth: Double.random(in: 0.6...1.0)
                 )
                 offset += 3600 * 2
-                try savePage(page)
+                let seedHash = Self.contentHash(for: entry.content)
+                _ = try savePage(page, contentHash: seedHash)
                 try updateWebsiteStats(websiteID: entry.website.id)
 
                 if let vector = await EmbeddingService.shared.generateEmbedding(for: entry.content) {

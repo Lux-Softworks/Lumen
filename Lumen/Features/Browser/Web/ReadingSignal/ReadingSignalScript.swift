@@ -37,16 +37,16 @@ enum ReadingSignalScript {
                 var dwell = BASE_DWELL;
                 var scroll = BASE_SCROLL;
                 if (ratio < 1.4) {
-                    scroll = 0.85;
-                    dwell = Math.max(12, BASE_DWELL * 0.5);
+                    scroll = 0.0;
+                    dwell = 5;
                 } else if (ratio < 2.5) {
-                    scroll = 0.55;
-                    dwell = Math.max(18, BASE_DWELL * 0.7);
+                    scroll = 0.35;
+                    dwell = 8;
                 } else if (ratio > 6.0) {
-                    scroll = 0.2;
+                    scroll = 0.15;
                     dwell = BASE_DWELL;
                 } else if (ratio > 3.5) {
-                    scroll = 0.3;
+                    scroll = 0.25;
                     dwell = BASE_DWELL;
                 }
                 return { dwell: dwell, scroll: scroll };
@@ -120,9 +120,27 @@ enum ReadingSignalScript {
 
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState !== 'hidden') { return; }
-                if (!hasFired) { return; }
-
                 updateScrollDepth();
+
+                if (!hasFired && dwellSeconds >= 3) {
+                    hasFired = true;
+                    scrollDepthAtFire = maxScrollDepth;
+                    readingTimeAtFire = dwellSeconds;
+                    clearInterval(interval);
+                    try {
+                        window.webkit.messageHandlers.readingSignal.postMessage({
+                            url: window.location.href,
+                            title: document.title || '',
+                            readingTime: dwellSeconds,
+                            scrollDepth: maxScrollDepth,
+                            triggered: true,
+                            isUpdate: false
+                        });
+                    } catch (e) {}
+                    return;
+                }
+
+                if (!hasFired) { return; }
 
                 var depthGrew = maxScrollDepth - scrollDepthAtFire > 0.10;
                 var timeGrew = dwellSeconds - readingTimeAtFire > 30;
@@ -139,6 +157,22 @@ enum ReadingSignalScript {
                         });
                     } catch (e) {}
                 }
+            });
+
+            window.addEventListener('pagehide', function() {
+                if (hasFired || dwellSeconds < 3) { return; }
+                updateScrollDepth();
+                hasFired = true;
+                try {
+                    window.webkit.messageHandlers.readingSignal.postMessage({
+                        url: window.location.href,
+                        title: document.title || '',
+                        readingTime: dwellSeconds,
+                        scrollDepth: maxScrollDepth,
+                        triggered: true,
+                        isUpdate: false
+                    });
+                } catch (e) {}
             });
         })();
         """

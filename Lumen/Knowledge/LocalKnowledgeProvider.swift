@@ -107,17 +107,16 @@ actor LocalKnowledgeProvider {
 
     private func handleShutdown() async {
         shutdownRequested = true
-        for task in streamTasks {
-            task.cancel()
-        }
 
         let deadline = Date().addingTimeInterval(Self.shutdownDrainTimeoutSeconds)
         while inflightCount > 0, Date() < deadline {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
 
-        unloadModel()
-        streamTasks.removeAll()
+        if inflightCount == 0 {
+            unloadModel()
+            streamTasks.removeAll()
+        }
         shutdownRequested = false
     }
 
@@ -550,7 +549,7 @@ actor LocalKnowledgeProvider {
                     )
 
                     let parameters = GenerateParameters(
-                        maxTokens: 2048,
+                        maxTokens: 8192,
                         temperature: 0.3
                     )
                     let tokens = await container.encode(prompt)
