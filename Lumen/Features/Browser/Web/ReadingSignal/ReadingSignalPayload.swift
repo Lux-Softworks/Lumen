@@ -1,6 +1,6 @@
 import Foundation
 
-struct ReadingSignalPayload: Decodable, Sendable {
+nonisolated struct ReadingSignalPayload: Decodable, Sendable {
     let url: String
     let title: String
     let readingTime: Int

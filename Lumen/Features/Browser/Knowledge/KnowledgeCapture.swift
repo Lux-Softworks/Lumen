@@ -1,5 +1,6 @@
 import Foundation
 import ObjectiveC
+import UIKit
 import WebKit
 import os
 import SwiftUI
@@ -15,7 +16,24 @@ class KnowledgeCaptureService: ObservableObject {
 
     @Published private(set) var captureToken: Int = 0
 
-    private init() {}
+    private var backgroundTasks: Set<Task<Void, Never>> = []
+
+    private init() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.cancelBackgroundTasks()
+            }
+        }
+    }
+
+    func cancelBackgroundTasks() {
+        for task in backgroundTasks { task.cancel() }
+        backgroundTasks.removeAll()
+    }
 
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
         await capture(payload: payload, webView: webView, force: false)
@@ -79,7 +97,7 @@ class KnowledgeCaptureService: ObservableObject {
 
         guard quality.shouldCapturePage else { return }
 
-        let topicName = SemanticTopicClassifier.shared.classify(
+        let topicName = await SemanticTopicClassifier.shared.classify(
             title: extractedContent.title,
             content: extractedContent.content
         )
@@ -155,20 +173,24 @@ class KnowledgeCaptureService: ObservableObject {
             captureToken &+= 1
             NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
 
-            Task.detached(priority: .utility) { [extractedContent, newlyCreatedWebsiteID] in
+            let bgTask = Task.detached(priority: .utility) { [extractedContent, newlyCreatedWebsiteID] in
+                if Task.isCancelled { return }
                 if let embedding = await EmbeddingService.shared.generateEmbedding(
                     for: extractedContent.content
                 ) {
                     try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
                 }
+                if Task.isCancelled { return }
                 try? await KnowledgeStorage.shared.saveEntities(
                     pageID: pageID,
                     content: extractedContent.content
                 )
+                if Task.isCancelled { return }
                 await KnowledgeStorage.shared.saveChunkedEmbeddings(
                     pageID: pageID,
                     content: extractedContent.content
                 )
+                if Task.isCancelled { return }
 
                 let pageSummary = await KnowledgeClassifier.summarize(
                     content: extractedContent.content,
@@ -177,6 +199,8 @@ class KnowledgeCaptureService: ObservableObject {
                 if !pageSummary.isEmpty {
                     try? await KnowledgeStorage.shared.updatePageSummary(pageID: pageID, summary: pageSummary)
                 }
+
+                if Task.isCancelled { return }
 
                 if let newSiteID = newlyCreatedWebsiteID {
                     let websiteSummary = await KnowledgeClassifier.summarizeWebsite(
@@ -195,6 +219,12 @@ class KnowledgeCaptureService: ObservableObject {
                 await MainActor.run {
                     NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
                 }
+            }
+            backgroundTasks.insert(bgTask)
+            let trackedTask = bgTask
+            Task { @MainActor [weak self] in
+                _ = await trackedTask.value
+                self?.backgroundTasks.remove(trackedTask)
             }
         } catch {
             KnowledgeLogger.capture.error(

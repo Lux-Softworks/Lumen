@@ -335,7 +335,7 @@ struct ExportView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isRunning ? Color.red : palette.accent)
+                    .fill(isRunning ? AppTheme.Colors.danger : palette.accent)
             )
             .animation(.easeInOut(duration: 0.15), value: isRunning)
         }

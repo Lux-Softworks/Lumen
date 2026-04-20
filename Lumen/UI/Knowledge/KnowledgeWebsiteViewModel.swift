@@ -21,20 +21,13 @@ struct ReadingSession: Identifiable, Sendable {
         return "\(dateLabel) · \(pageStr)\(timeStr)"
     }
 
-    private static let weekdayFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "EEEE"; return f
-    }()
-    private static let shortDateFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
-    }()
-
     static func formatDate(_ date: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) { return "Today" }
         if calendar.isDateInYesterday(date) { return "Yesterday" }
         let weekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        if date > weekAgo { return weekdayFormatter.string(from: date) }
-        return shortDateFormatter.string(from: date)
+        if date > weekAgo { return DateFormatters.weekday.string(from: date) }
+        return DateFormatters.monthDay.string(from: date)
     }
 }
 

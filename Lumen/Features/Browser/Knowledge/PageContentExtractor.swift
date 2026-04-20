@@ -3,7 +3,7 @@ import PDFKit
 import SwiftSoup
 import Readability
 
-struct ExtractedContent {
+nonisolated struct ExtractedContent: Sendable {
     let url: String
     let title: String?
     let content: String

@@ -1,6 +1,6 @@
 import Foundation
 
-enum ZipArchiver {
+nonisolated enum ZipArchiver {
     enum ArchiverError: Error { case failed, movedFileMissing }
 
     static func zip(sourceDir: URL, filename: String) throws -> URL {

@@ -260,13 +260,13 @@ private struct ChatBubbleView: View {
         let icon: String
         switch match {
         case .high:
-            color = Color.green
+            color = AppTheme.Colors.success
             icon = "checkmark.seal.fill"
         case .medium:
-            color = Color.orange
+            color = AppTheme.Colors.warning
             icon = "exclamationmark.triangle.fill"
         case .low:
-            color = Color.red.opacity(0.8)
+            color = AppTheme.Colors.danger.opacity(0.8)
             icon = "xmark.octagon.fill"
         }
         return HStack(spacing: 5) {

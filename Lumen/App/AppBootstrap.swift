@@ -31,7 +31,9 @@ final class AppBootstrap: ObservableObject {
 
         Task { [weak self] in
             do {
+                async let _: Void = TrackerDatabase.shared.ensureLoaded()
                 try await KnowledgeStorage.shared.initialize()
+                _ = await TrackerDatabase.shared.allEntries()
                 await MainActor.run { self?.knowledgeStorage = .ready }
             } catch {
                 let description = String(describing: error)

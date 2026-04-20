@@ -124,8 +124,11 @@ actor LocalKnowledgeProvider {
         lastUsed = Date()
         idleTask?.cancel()
         idleTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: Self.idleUnloadSeconds * 1_000_000_000)
-            guard !Task.isCancelled else { return }
+            do {
+                try await Task.sleep(nanoseconds: Self.idleUnloadSeconds * 1_000_000_000)
+            } catch {
+                return
+            }
             await self?.unloadIfIdle()
         }
     }

@@ -28,8 +28,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private var pendingHistoryRecord: Bool = false
 
     private var observations: [NSKeyValueObservation] = []
-    private let logger = Logger(
-        subsystem: "com.luxsoftworks.Lumen", category: "BrowserViewModel")
+    private let logger = AppLogger.make("BrowserViewModel")
 
     private var defaultURL: URL {
         BrowserSettings.shared.searchEngine.homePage
@@ -107,7 +106,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
                     return
                 }
 
-                Task {
+                Task { [weak self] in
+                    guard let self else { return }
                     do {
                         async let semanticResults = KnowledgeStorage.shared.searchSemantic(query: query)
                         let local = try await semanticResults
@@ -119,15 +119,16 @@ final class BrowserViewModel: NSObject, ObservableObject {
                             web = try await SearchSuggestionService.shared.fetchSuggestions(for: query)
                         }
 
-                        await MainActor.run {
+                        await MainActor.run { [weak self] in
+                            guard let self else { return }
                             if !self.urlString.isEmpty {
                                 let localSuggestions = local.map { SearchSuggestion(text: $0.url) }
                                 self.searchSuggestions = localSuggestions + web
                             }
                         }
                     } catch {
-                        await MainActor.run {
-                            self.searchSuggestions = []
+                        await MainActor.run { [weak self] in
+                            self?.searchSuggestions = []
                         }
                     }
                 }
@@ -151,7 +152,15 @@ final class BrowserViewModel: NSObject, ObservableObject {
         loadURL(url)
     }
 
+    private static let allowedLoadSchemes: Set<String> = ["http", "https", "about", "file"]
+
     func loadURL(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard Self.allowedLoadSchemes.contains(scheme) else {
+            logger.error("Blocked load with disallowed scheme: \(scheme, privacy: .public)")
+            return
+        }
+
         clearPageState()
         urlString = url.absoluteString
 

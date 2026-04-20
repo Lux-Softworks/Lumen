@@ -124,22 +124,13 @@ enum ExportPayloadBuilder {
     }
 
     private static func aggregatePages(for websites: [Website], storage: KnowledgeStorage) async throws -> [PageContent] {
-        var out: [PageContent] = []
-        for w in websites {
-            let pages = try await storage.fetchPages(websiteID: w.id)
-            out.append(contentsOf: pages)
-        }
-
-        return out
+        guard !websites.isEmpty else { return [] }
+        return try await storage.fetchPages(websiteIDs: websites.map { $0.id })
     }
 
     private static func aggregateAnnotations(for pages: [PageContent], storage: KnowledgeStorage) async throws -> [Annotation] {
-        var out: [Annotation] = []
-        for p in pages {
-            let anns = try await storage.fetchAnnotations(pageID: p.id)
-            out.append(contentsOf: anns)
-        }
-        return out
+        guard !pages.isEmpty else { return [] }
+        return try await storage.fetchAnnotations(pageIDs: pages.map { $0.id })
     }
 
     private static func resolveTopics(for websites: [Website], storage: KnowledgeStorage) async throws -> [Topic] {

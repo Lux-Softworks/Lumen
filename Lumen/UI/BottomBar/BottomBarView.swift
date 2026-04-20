@@ -277,13 +277,17 @@ struct BottomBarView: View {
 
             ZStack(alignment: .leading) {
                 HStack(spacing: 6) {
-                    Button(action: onCopyUrl) {
+                    Button {
+                        Haptics.impact(.light)
+                        onCopyUrl()
+                    } label: {
                         Image(systemName: "link")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(palette.text.opacity(0.8))
                             .frame(width: 28, height: 28)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Copy URL")
 
                     HStack(spacing: 2) {
                         Button(action: onBack) {
@@ -295,6 +299,7 @@ struct BottomBarView: View {
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoBack)
+                        .accessibilityLabel("Back")
 
                         Button(action: onForward) {
                             Image(systemName: "chevron.right")
@@ -305,6 +310,7 @@ struct BottomBarView: View {
                                 .frame(width: 28, height: 28)
                         }
                         .disabled(!canGoForward)
+                        .accessibilityLabel("Forward")
                     }
                     .padding(.horizontal, 2)
                     .clipShape(Capsule())
@@ -313,7 +319,10 @@ struct BottomBarView: View {
                 .opacity(state == .siteSettings ? 1 : 0)
                 .allowsHitTesting(state == .siteSettings)
 
-                Button(action: onSettingsPressed) {
+                Button {
+                    Haptics.impact(.light)
+                    onSettingsPressed()
+                } label: {
                     ZStack {
                         Color.clear
                             .frame(width: 18, height: 18)
@@ -333,6 +342,7 @@ struct BottomBarView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("bottombar.settings.expanded")
+                .accessibilityLabel("Settings")
                 .opacity(state == .siteSettings ? 0 : 1)
                 .allowsHitTesting(state != .siteSettings)
             }
@@ -365,7 +375,10 @@ struct BottomBarView: View {
 
             HStack(spacing: 0) {
                 ZStack {
-                    Button(action: onReload) {
+                    Button {
+                        Haptics.impact(.light)
+                        onReload()
+                    } label: {
                         Image(systemName: "arrow.clockwise")
                             .resizable()
                             .antialiased(true)
@@ -379,6 +392,7 @@ struct BottomBarView: View {
                     .matchedGeometryEffect(id: "reloadButton", in: animation, isSource: isExpanded)
                     .opacity(state == .siteSettings ? 1 : 0)
                     .allowsHitTesting(state == .siteSettings)
+                    .accessibilityLabel("Reload page")
 
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -387,6 +401,7 @@ struct BottomBarView: View {
                     }
                     .opacity(state == .search && !text.isEmpty ? 1 : 0)
                     .allowsHitTesting(state == .search && !text.isEmpty)
+                    .accessibilityLabel("Clear search")
                 }
                 .frame(
                     width: state == .siteSettings || (state == .search && !text.isEmpty) ? 44 : 0,

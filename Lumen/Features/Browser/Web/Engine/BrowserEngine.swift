@@ -202,8 +202,6 @@ enum BrowserEngine {
         interceptor.onDidFinishLoad = { wv in
             AnnotationHandler.applyAll(webView: wv)
         }
-        webView.navigationDelegate = interceptor
-        webView.retainedDelegate = interceptor
 
         let uiDelegate = BrowserUIDelegate()
         webView.uiDelegate = uiDelegate
@@ -211,13 +209,12 @@ enum BrowserEngine {
             webView, &_WKWebViewAssociatedKeys.uiDelegateKey, uiDelegate,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-        Task.detached(priority: .utility) {
+        Task { @MainActor in
+            await TrackerDatabase.shared.ensureLoaded()
             let entries = await TrackerDatabase.shared.allEntries()
-            await MainActor.run {
-                detector.loadTrackerDatabase(entries)
-                webView.navigationDelegate = interceptor
-                webView.retainedDelegate = interceptor
-            }
+            detector.loadTrackerDatabase(entries)
+            webView.navigationDelegate = interceptor
+            webView.retainedDelegate = interceptor
         }
 
         if let handler = objc_getAssociatedObject(

@@ -366,7 +366,7 @@ struct KnowledgeFolderView: View {
         ZStack {
             if viewModel.topics.isEmpty {
                 VStack(spacing: 16) {
-                    Text("No Topics Found")
+                    Text("No topics yet")
                         .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
                         .foregroundColor(palette.text.opacity(0.35))
 
@@ -376,7 +376,7 @@ struct KnowledgeFolderView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.square.fill.on.square.fill")
-                                Text("Seed Test Data")
+                                Text("Seed test data")
                             }
                             .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
                             .foregroundColor(palette.accent)
@@ -400,7 +400,8 @@ struct KnowledgeFolderView: View {
                             ],
                             spacing: 32
                         ) {
-                            ForEach(Array(viewModel.topics.enumerated()), id: \.element.id) { index, topic in
+                            ForEach(viewModel.topics.indices, id: \.self) { index in
+                                let topic = viewModel.topics[index]
                                 Button {
                                     Task { await viewModel.selectTopic(topic) }
                                 } label: {
@@ -484,7 +485,8 @@ struct KnowledgeFolderView: View {
                     GridItem(.flexible(), spacing: 20),
                     GridItem(.flexible(), spacing: 20),
                 ], spacing: 24) {
-                    ForEach(Array(viewModel.websites.enumerated()), id: \.element.id) { index, website in
+                    ForEach(viewModel.websites.indices, id: \.self) { index in
+                        let website = viewModel.websites[index]
                         Button {
                             Task { await viewModel.selectWebsite(website) }
                         } label: {

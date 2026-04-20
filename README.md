@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
   <img src="https://img.shields.io/badge/AGPL--3.0-blue?style=flat" />
-  <img src="https://img.shields.io/badge/v1.0.0-E8E4DC?style=flat" />
+  <img src="https://img.shields.io/badge/v1.1.2-E8E4DC?style=flat" />
 </p>
 
 <p align="center">

@@ -7,7 +7,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     private let detector: ThreatDetector
     private let httpsOnly: Bool
-    private let logger = Logger(subsystem: "com.Lumen.browser", category: "NetworkInterceptor")
+    private let logger = AppLogger.make("NetworkInterceptor")
 
     private static let xhrKeywords = ["/api/", "/collect", "/pixel", "/beacon", "/track", "/event"]
     private static let requestLogCap = 500

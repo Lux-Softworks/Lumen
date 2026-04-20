@@ -68,7 +68,7 @@ struct TabOverlayView: View {
         }
     }
 
-    internal struct LayoutConfig {
+    fileprivate struct LayoutConfig {
         let safeWidth: CGFloat
         let safeHeight: CGFloat
         let cardWidth: CGFloat

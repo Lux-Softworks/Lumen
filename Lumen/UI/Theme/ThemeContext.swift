@@ -6,6 +6,10 @@ struct ActivePalette {
     let accent: Color
     let text: Color
     let secondaryAccent: Color
+    let stroke: Color
+    let success: Color
+    let warning: Color
+    let danger: Color
     let isIncognito: Bool
 
     static let standard = ActivePalette(
@@ -14,6 +18,10 @@ struct ActivePalette {
         accent: AppTheme.Colors.accent,
         text: AppTheme.Colors.text,
         secondaryAccent: AppTheme.Colors.secondaryAccent,
+        stroke: AppTheme.Colors.text.opacity(0.12),
+        success: AppTheme.Colors.success,
+        warning: AppTheme.Colors.warning,
+        danger: AppTheme.Colors.danger,
         isIncognito: false
     )
 
@@ -23,6 +31,10 @@ struct ActivePalette {
         accent: IncognitoPalette.accent,
         text: IncognitoPalette.text,
         secondaryAccent: IncognitoPalette.secondaryAccent,
+        stroke: IncognitoPalette.stroke,
+        success: AppTheme.Colors.success,
+        warning: AppTheme.Colors.warning,
+        danger: AppTheme.Colors.danger,
         isIncognito: true
     )
 }

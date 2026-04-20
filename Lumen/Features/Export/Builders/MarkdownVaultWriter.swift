@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarkdownVaultWriter {
+nonisolated enum MarkdownVaultWriter {
     static func write(
         payload: ExportPayload,
         toggles: ExportCoordinator.Request.Toggles,
@@ -44,9 +44,7 @@ enum MarkdownVaultWriter {
     }
 
     private static func allocateFilename(for page: PageContent, existing: inout Set<String>) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        let date = df.string(from: page.timestamp)
+        let date = DateFormatters.ymd.string(from: page.timestamp)
         let titleSeed = page.displayTitle
         let base = "\(date)-\(slug(titleSeed))"
         var candidate = base
@@ -286,6 +284,6 @@ enum MarkdownVaultWriter {
     }
 
     private static func iso(_ date: Date) -> String {
-        ISO8601DateFormatter().string(from: date)
+        DateFormatters.iso8601.string(from: date)
     }
 }

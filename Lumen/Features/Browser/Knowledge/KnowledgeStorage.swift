@@ -4,7 +4,7 @@ import Accelerate
 import CryptoKit
 import NaturalLanguage
 
-struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let domain: String
     var displayName: String
@@ -48,7 +48,7 @@ struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 }
 
-struct Topic: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct Topic: Identifiable, Codable, Equatable, Hashable, Sendable {
     static let uncategorizedID: String = "topic_uncategorized"
     static let uncategorizedName: String = "Uncategorized"
 
@@ -75,7 +75,7 @@ struct Topic: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 }
 
-struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let websiteID: String
     let url: String
@@ -130,43 +130,11 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 
     nonisolated static func normalizeURL(_ url: String) -> String {
-        guard var comps = URLComponents(string: url) else {
-            return url.lowercased()
-        }
-
-        comps.fragment = nil
-        if let items = comps.queryItems {
-            let blocked: Set<String> = [
-                "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-                "utm_id", "utm_name", "utm_brand", "utm_social", "utm_social-type",
-                "fbclid", "gclid", "gbraid", "wbraid", "dclid", "msclkid", "yclid",
-                "mc_cid", "mc_eid", "igshid", "s_cid", "ref", "ref_", "ref_src",
-                "referrer", "source", "src", "campaign", "_hsenc", "_hsmi",
-                "_ga", "_gac", "aff", "affiliate", "trk", "pk_campaign", "pk_kwd",
-                "spm", "share", "shared", "shareid", "share_source"
-            ]
-
-            let filtered = items.filter { !blocked.contains($0.name.lowercased()) }
-            comps.queryItems = filtered.isEmpty ? nil : filtered
-        }
-
-        var host = (comps.host ?? "").lowercased()
-        if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
-        var path = comps.path
-
-        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        var result = host + path
-
-        if let query = comps.query, !query.isEmpty {
-            result += "?" + query
-        }
-
-        return result.lowercased()
+        URLNormalizer.canonical(url)
     }
 
     nonisolated static func extractDomain(from url: String) -> String {
-        guard let host = URL(string: url)?.host else { return "" }
-        return host.replacingOccurrences(of: "www.", with: "")
+        URLNormalizer.extractDomain(url)
     }
 
     nonisolated static func countWords(in text: String) -> Int {
@@ -175,7 +143,7 @@ struct PageContent: Identifiable, Codable, Equatable, Hashable, Sendable {
     }
 }
 
-struct Annotation: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct Annotation: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let pageID: String?
     let normalizedURL: String
@@ -217,10 +185,10 @@ struct StorageStats: Sendable {
 }
 
 extension String {
-    static func topicID() -> String { return "topic_\(UUID().uuidString)" }
-    static func websiteID() -> String { return "website_\(UUID().uuidString)" }
-    static func pageID() -> String { return "page_\(UUID().uuidString)" }
-    static func annotationID() -> String { return "annotation_\(UUID().uuidString)" }
+    nonisolated static func topicID() -> String { return "topic_\(UUID().uuidString)" }
+    nonisolated static func websiteID() -> String { return "website_\(UUID().uuidString)" }
+    nonisolated static func pageID() -> String { return "page_\(UUID().uuidString)" }
+    nonisolated static func annotationID() -> String { return "annotation_\(UUID().uuidString)" }
 }
 
 enum VectorMath: Sendable {
@@ -279,8 +247,31 @@ actor KnowledgeStorage {
         }
 
         try runMigrations()
+        try migrateEmbeddingVersionIfNeeded()
 
         applyFileProtectionAndBackupExclusion()
+    }
+
+    private func migrateEmbeddingVersionIfNeeded() throws {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &statement, nil) == SQLITE_OK else {
+            return
+        }
+
+        var current: Int32 = 0
+        if sqlite3_step(statement) == SQLITE_ROW {
+            current = sqlite3_column_int(statement, 0)
+        }
+
+        let target = EmbeddingService.embeddingVersion
+        guard current != target else { return }
+
+        try? execute("DELETE FROM page_embeddings")
+        try? execute("DELETE FROM page_chunks")
+
+        try execute("PRAGMA user_version = \(target)")
     }
 
     private func applyFileProtectionAndBackupExclusion() {
@@ -519,6 +510,9 @@ actor KnowledgeStorage {
     }
 
     private func columnExists(table: String, column: String) throws -> Bool {
+        guard table.range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) != nil else {
+            throw StorageError.failedToPrepare("Invalid table identifier")
+        }
         let sql = "PRAGMA table_info(\(table))"
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -554,7 +548,7 @@ actor KnowledgeStorage {
         if let existingWebsite = try await fetchWebsite(domain: domain) {
             websiteID = existingWebsite.id
         } else {
-            let newWebsite = await Website(domain: domain, displayName: domain)
+            let newWebsite = Website(domain: domain, displayName: domain)
             try createWebsite(website: newWebsite)
             websiteID = newWebsite.id
         }
@@ -572,7 +566,7 @@ actor KnowledgeStorage {
             return dupID
         }
 
-        let page = await PageContent(
+        let page = PageContent(
             websiteID: websiteID,
             url: url,
             title: title,
@@ -813,7 +807,7 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try await parseTopic(from: statement)
+        return try parseTopic(from: statement)
     }
 
     func fetchWebsite(domain: String) async throws -> Website? {
@@ -833,7 +827,7 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try await parseWebsite(from: statement)
+        return try parseWebsite(from: statement)
     }
 
     func saveEmbedding(pageID: String, vector: [Double]) throws {
@@ -1247,11 +1241,14 @@ actor KnowledgeStorage {
             return nil
         }
 
-        return try await parsePage(from: statement)
+        return try parsePage(from: statement)
     }
 
     func searchPages(query: String, limit: Int = 50) async throws -> [PageContent] {
         try initialize()
+
+        let safeQuery = Self.sanitizeFTSQuery(query)
+        guard !safeQuery.isEmpty else { return [] }
 
         let sql = """
         SELECT p.* FROM pages p
@@ -1262,9 +1259,24 @@ actor KnowledgeStorage {
         """
 
         return try await queryPages(sql: sql, bindValues: { statement in
-            sqlite3_bind_text(statement, 1, query, -1, self.SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, safeQuery, -1, self.SQLITE_TRANSIENT)
             sqlite3_bind_int(statement, 2, Int32(limit))
         })
+    }
+
+    static func sanitizeFTSQuery(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if trimmed.contains("\"") || trimmed.contains("*") || trimmed.range(of: #"\b(AND|OR|NOT|NEAR)\b"#, options: .regularExpression) != nil {
+            let tokens = trimmed
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+                .prefix(12)
+                .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }
+            return tokens.joined(separator: " OR ")
+        }
+        let escaped = trimmed.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
     }
 
     func deletePage(pageID: String) async throws {
@@ -1283,7 +1295,7 @@ actor KnowledgeStorage {
     func createTopic(name: String, color: String? = nil) async throws -> String {
         try initialize()
 
-        let topic = await Topic(name: name, color: color)
+        let topic = Topic(name: name, color: color)
 
         let sql = """
         INSERT INTO topics (id, name, color, website_count, created_at)
@@ -1358,12 +1370,12 @@ actor KnowledgeStorage {
         let scienceID = try await createTopic(name: "Science",     color: "#7ED321")
         let financeID = try await createTopic(name: "Finance",     color: "#F5A623")
 
-            let apple = await Website(domain: "apple.com", displayName: "Apple", summary: "Official Apple developer and product news.", topicID: techID)
-            let verge = await Website(domain: "theverge.com", displayName: "The Verge", summary: "Tech news, reviews, and culture.", topicID: techID)
-            let github = await Website(domain: "github.com", displayName: "GitHub", summary: "Where the world builds software.", topicID: techID)
-            let nature = await Website(domain: "nature.com", displayName: "Nature", summary: "Peer-reviewed scientific research.", topicID: scienceID)
-            let arxiv  = await Website(domain: "arxiv.org", displayName: "arXiv", summary: "Open-access research preprints.", topicID: scienceID)
-            let wsj    = await Website(domain: "wsj.com", displayName: "Wall St. Journal", summary: "Financial and business news.", topicID: financeID)
+            let apple = Website(domain: "apple.com", displayName: "Apple", summary: "Official Apple developer and product news.", topicID: techID)
+            let verge = Website(domain: "theverge.com", displayName: "The Verge", summary: "Tech news, reviews, and culture.", topicID: techID)
+            let github = Website(domain: "github.com", displayName: "GitHub", summary: "Where the world builds software.", topicID: techID)
+            let nature = Website(domain: "nature.com", displayName: "Nature", summary: "Peer-reviewed scientific research.", topicID: scienceID)
+            let arxiv  = Website(domain: "arxiv.org", displayName: "arXiv", summary: "Open-access research preprints.", topicID: scienceID)
+            let wsj    = Website(domain: "wsj.com", displayName: "Wall St. Journal", summary: "Financial and business news.", topicID: financeID)
 
             for site in [apple, verge, github, nature, arxiv, wsj] {
                 try createWebsite(website: site)
@@ -1419,7 +1431,7 @@ actor KnowledgeStorage {
             var offset: TimeInterval = 0
             for entry in entries {
                 let pageURL = "https://\(entry.website.domain)/\(entry.title.lowercased().replacingOccurrences(of: " ", with: "-").prefix(60))"
-                let page = await PageContent(
+                let page = PageContent(
                     websiteID: entry.website.id,
                     url: pageURL,
                     title: entry.title,
@@ -1471,7 +1483,7 @@ actor KnowledgeStorage {
             return existing
         }
 
-        let annotation = await Annotation(
+        let annotation = Annotation(
             pageID: pageID,
             url: url,
             text: text,
@@ -1534,6 +1546,30 @@ actor KnowledgeStorage {
         }
     }
 
+    func fetchAnnotations(pageIDs: [String]) async throws -> [Annotation] {
+        guard !pageIDs.isEmpty else { return [] }
+        try initialize()
+        let placeholders = Array(repeating: "?", count: pageIDs.count).joined(separator: ",")
+        let sql = "SELECT * FROM annotations WHERE page_id IN (\(placeholders)) ORDER BY created_at ASC"
+        return try await queryAnnotations(sql: sql) { [self] statement in
+            for (index, id) in pageIDs.enumerated() {
+                sqlite3_bind_text(statement, Int32(index + 1), id, -1, SQLITE_TRANSIENT)
+            }
+        }
+    }
+
+    func fetchPages(websiteIDs: [String]) async throws -> [PageContent] {
+        guard !websiteIDs.isEmpty else { return [] }
+        try initialize()
+        let placeholders = Array(repeating: "?", count: websiteIDs.count).joined(separator: ",")
+        let sql = "SELECT * FROM pages WHERE website_id IN (\(placeholders)) ORDER BY timestamp DESC"
+        return try await queryPages(sql: sql, bindValues: { [self] statement in
+            for (index, id) in websiteIDs.enumerated() {
+                sqlite3_bind_text(statement, Int32(index + 1), id, -1, SQLITE_TRANSIENT)
+            }
+        })
+    }
+
     func deleteAnnotation(id: String) async throws {
         try initialize()
         let sql = "DELETE FROM annotations WHERE id = ?"
@@ -1579,7 +1615,7 @@ actor KnowledgeStorage {
             let suffix = String(cString: sqlite3_column_text(statement, 6))
             let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 7)))
 
-            results.append(await Annotation(
+            results.append(Annotation(
                 id: id,
                 pageID: pageID,
                 url: url,
@@ -1679,7 +1715,7 @@ actor KnowledgeStorage {
 
         var results: [PageContent] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            await results.append(try parsePage(from: statement))
+            results.append(try parsePage(from: statement))
         }
 
         return results
@@ -1697,7 +1733,7 @@ actor KnowledgeStorage {
 
         var results: [Website] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            await results.append(try parseWebsite(from: statement))
+            results.append(try parseWebsite(from: statement))
         }
 
         return results
@@ -1715,7 +1751,7 @@ actor KnowledgeStorage {
 
         var results: [Topic] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            await results.append(try parseTopic(from: statement))
+            results.append(try parseTopic(from: statement))
         }
 
         return results
@@ -1758,7 +1794,7 @@ actor KnowledgeStorage {
         }
     }
 
-    private func parsePage(from statement: OpaquePointer?) async throws -> PageContent {
+    private func parsePage(from statement: OpaquePointer?) throws -> PageContent {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let websiteID = String(cString: sqlite3_column_text(statement, 1))
         let url = String(cString: sqlite3_column_text(statement, 2))
@@ -1788,7 +1824,7 @@ actor KnowledgeStorage {
         let _ = Int(sqlite3_column_int(statement, 13))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 14)))
 
-        return await PageContent(
+        return PageContent(
             id: id,
             websiteID: websiteID,
             url: url,
@@ -1804,7 +1840,7 @@ actor KnowledgeStorage {
         )
     }
 
-    private func parseWebsite(from statement: OpaquePointer?) async throws -> Website {
+    private func parseWebsite(from statement: OpaquePointer?) throws -> Website {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let domain = String(cString: sqlite3_column_text(statement, 1))
         let displayName = String(cString: sqlite3_column_text(statement, 2))
@@ -1828,7 +1864,7 @@ actor KnowledgeStorage {
             ? Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 11))) : nil
         let pageCountAtSynthesis = Int(sqlite3_column_int(statement, 12))
 
-        return await Website(
+        return Website(
             id: id,
             domain: domain,
             displayName: displayName,
@@ -1845,7 +1881,7 @@ actor KnowledgeStorage {
         )
     }
 
-    private func parseTopic(from statement: OpaquePointer?) async throws -> Topic {
+    private func parseTopic(from statement: OpaquePointer?) throws -> Topic {
         let id = String(cString: sqlite3_column_text(statement, 0))
         let name = String(cString: sqlite3_column_text(statement, 1))
 
@@ -1855,7 +1891,7 @@ actor KnowledgeStorage {
         let websiteCount = Int(sqlite3_column_int(statement, 3))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 4)))
 
-        return await Topic(
+        return Topic(
             id: id,
             name: name,
             color: color,

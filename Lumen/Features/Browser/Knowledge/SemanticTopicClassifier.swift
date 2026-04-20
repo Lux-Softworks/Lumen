@@ -1,8 +1,7 @@
 import Foundation
 import NaturalLanguage
 
-@MainActor
-final class SemanticTopicClassifier {
+actor SemanticTopicClassifier {
     static let shared = SemanticTopicClassifier()
 
     private struct TopicPrototype {

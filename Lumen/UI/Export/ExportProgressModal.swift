@@ -33,10 +33,10 @@ struct ExportProgressModal: View {
                 Button(action: onCancel) {
                     Text("Cancel")
                         .font(AppTheme.Typography.sansBody(size: 15, weight: .semibold))
-                        .foregroundColor(.red)
+                        .foregroundColor(AppTheme.Colors.danger)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.red.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(AppTheme.Colors.danger.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
             }

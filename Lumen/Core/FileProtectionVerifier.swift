@@ -2,10 +2,7 @@ import Foundation
 import os
 
 enum FileProtectionVerifier {
-    private static let log = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "Lumen",
-        category: "fileprotection"
-    )
+    private static let log = AppLogger.make("fileprotection")
 
     static func assert(
         path: String,

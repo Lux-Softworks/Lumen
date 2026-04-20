@@ -7,11 +7,14 @@ actor TrackerDatabase {
     private var trackers: [String: ThreatDetector.TrackerInfo] = [:]
     private(set) var entityCount: Int = 0
     private(set) var domainCount: Int = 0
+    private(set) var isLoaded: Bool = false
 
-    private init() {
-        Task {
-            await self.loadBundledDatabase()
-        }
+    private init() {}
+
+    func ensureLoaded() {
+        if isLoaded { return }
+        loadBundledDatabase()
+        isLoaded = true
     }
 
     func lookup(domain: String) -> ThreatDetector.TrackerInfo? {
@@ -44,10 +47,9 @@ actor TrackerDatabase {
         trackers.removeAll()
         entityCount = 0
         domainCount = 0
-
-        Task {
-            self.loadBundledDatabase()
-        }
+        isLoaded = false
+        loadBundledDatabase()
+        isLoaded = true
     }
 
     private func loadBundledDatabase() {

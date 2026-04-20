@@ -82,23 +82,7 @@ final class HistoryStore: ObservableObject {
     }
 
     nonisolated static func normalizeURL(_ url: String) -> String {
-        var normalized = url.lowercased().trimmingCharacters(in: .whitespaces)
-        
-        while normalized.hasSuffix("/") {
-            normalized.removeLast()
-        }
-        
-        if normalized.hasPrefix("http://") {
-            normalized = String(normalized.dropFirst(7))
-        } else if normalized.hasPrefix("https://") {
-            normalized = String(normalized.dropFirst(8))
-        }
-        
-        if normalized.hasPrefix("www.") {
-            normalized = String(normalized.dropFirst(4))
-        }
-        
-        return normalized
+        URLNormalizer.displayKey(url)
     }
     
     nonisolated static func stableID(for normalizedURL: String) -> String {

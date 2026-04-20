@@ -1,6 +1,6 @@
 import Foundation
 
-enum JSONBundleWriter {
+nonisolated enum JSONBundleWriter {
     static let schemaVersion = 1
 
     struct Bundle: Encodable {
@@ -161,6 +161,6 @@ enum JSONBundleWriter {
     }
 
     private static func iso(_ date: Date) -> String {
-        ISO8601DateFormatter().string(from: date)
+        DateFormatters.iso8601.string(from: date)
     }
 }

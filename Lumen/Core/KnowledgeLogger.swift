@@ -1,11 +1,17 @@
 import Foundation
 import os
 
-enum KnowledgeLogger {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "Lumen"
+enum AppLogger {
+    static let subsystem = Bundle.main.bundleIdentifier ?? "com.luxsoftworks.Lumen"
 
-    static let storage = Logger(subsystem: subsystem, category: "knowledge.storage")
-    static let capture = Logger(subsystem: subsystem, category: "knowledge.capture")
-    static let query = Logger(subsystem: subsystem, category: "knowledge.query")
-    static let rag = Logger(subsystem: subsystem, category: "knowledge.rag")
+    static func make(_ category: String) -> Logger {
+        Logger(subsystem: subsystem, category: category)
+    }
+}
+
+enum KnowledgeLogger {
+    static let storage = AppLogger.make("knowledge.storage")
+    static let capture = AppLogger.make("knowledge.capture")
+    static let query = AppLogger.make("knowledge.query")
+    static let rag = AppLogger.make("knowledge.rag")
 }

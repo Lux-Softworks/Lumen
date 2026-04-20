@@ -56,28 +56,32 @@ actor ExportCoordinator {
                     let jsonURL = tmpRoot.appendingPathComponent("knowledge.json")
                     try FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
 
-                    try await MarkdownVaultWriter.write(
-                        payload: payload,
-                        toggles: request.toggles,
-                        into: vaultDir,
-                        onProgress: { done, total in
-                            continuation.yield(.writing(current: done, total: total))
-                        },
-                        shouldCancel: { Task.isCancelled }
-                    )
+                    try await Task.detached(priority: .utility) {
+                        try MarkdownVaultWriter.write(
+                            payload: payload,
+                            toggles: request.toggles,
+                            into: vaultDir,
+                            onProgress: { done, total in
+                                continuation.yield(.writing(current: done, total: total))
+                            },
+                            shouldCancel: { Task.isCancelled }
+                        )
+                    }.value
 
-                    try await JSONBundleWriter.write(
-                        payload: payload,
-                        scope: request.scope,
-                        toggles: request.toggles,
-                        to: jsonURL
-                    )
+                    try await Task.detached(priority: .utility) {
+                        try JSONBundleWriter.write(
+                            payload: payload,
+                            scope: request.scope,
+                            toggles: request.toggles,
+                            to: jsonURL
+                        )
+                    }.value
 
                     continuation.yield(.zipping)
-                    let zipURL = try await ZipArchiver.zip(
-                        sourceDir: tmpRoot,
-                        filename: Self.makeZipFilename(for: request)
-                    )
+                    let zipFilename = Self.makeZipFilename(for: request)
+                    let zipURL = try await Task.detached(priority: .utility) {
+                        try ZipArchiver.zip(sourceDir: tmpRoot, filename: zipFilename)
+                    }.value
 
                     continuation.yield(.finished(zipURL))
                 } catch is CancellationError {
@@ -98,9 +102,7 @@ actor ExportCoordinator {
     }
 
     private static func makeZipFilename(for request: Request) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        let date = df.string(from: Date())
+        let date = DateFormatters.ymd.string(from: Date())
         let suffix: String
         switch request.scope {
         case .wholeBase: suffix = "Full"

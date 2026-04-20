@@ -436,9 +436,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Lumen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow websites you visit in Lumen to use the camera when you grant them permission.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Allow websites you visit in Lumen to use your location when you grant them permission.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Allow websites you visit in Lumen to use the microphone when you grant them permission.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allow Lumen to access your photos and files when a website asks you to upload.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Allow websites you visit in Lumen to use your location when you grant them permission.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -448,7 +448,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.Lumen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -475,9 +475,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Lumen;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow websites you visit in Lumen to use the camera when you grant them permission.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Allow websites you visit in Lumen to use your location when you grant them permission.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Allow websites you visit in Lumen to use the microphone when you grant them permission.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allow Lumen to attach photos and files from your library when a website asks you to upload.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Allow websites you visit in Lumen to use your location when you grant them permission.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -487,7 +487,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.Lumen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -509,7 +509,7 @@
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -531,7 +531,7 @@
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -551,7 +551,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -571,7 +571,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XF6K537DNY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.luxsoftworks.LumenUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;

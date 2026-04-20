@@ -212,7 +212,7 @@ final class KnowledgeAIViewModel {
                 do {
                     let rows = try await KnowledgeStorage.shared.fetchPageEmbeddings(pageIDs: sources.map { $0.id })
                     let vectors = rows.map { $0.vector }
-                    let validity = AnswerValidityScorer.score(
+                    let validity = await AnswerValidityScorer.score(
                         answer: finalText,
                         sources: sources,
                         sourceEmbeddings: vectors

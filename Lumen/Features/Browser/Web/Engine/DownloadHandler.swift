@@ -5,7 +5,7 @@ import os.log
 @available(iOS 14.5, *)
 final class DownloadHandler: NSObject, WKDownloadDelegate {
 
-    private let logger = Logger(subsystem: "com.Lumen.browser", category: "Download")
+    private let logger = AppLogger.make("Download")
     private var destinationsByDownload: [ObjectIdentifier: URL] = [:]
 
     static let shared = DownloadHandler()

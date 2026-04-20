@@ -1,6 +1,13 @@
 import UIKit
 
 enum FaviconService {
+    private static let cache: NSCache<NSURL, UIImage> = {
+        let c = NSCache<NSURL, UIImage>()
+        c.countLimit = 256
+        c.totalCostLimit = 16 * 1024 * 1024
+        return c
+    }()
+
     static func faviconURL(for pageURL: URL) -> URL? {
         guard let host = pageURL.host, !host.isEmpty else { return nil }
 
@@ -18,8 +25,12 @@ enum FaviconService {
 
     static func fetchFavicon(for pageURL: URL) async -> UIImage? {
         guard let url = faviconURL(for: pageURL) else { return nil }
+        let key = url as NSURL
+        if let cached = cache.object(forKey: key) { return cached }
         guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
-
-        return UIImage(data: data)
+        guard let image = UIImage(data: data) else { return nil }
+        let cost = data.count
+        cache.setObject(image, forKey: key, cost: cost)
+        return image
     }
 }

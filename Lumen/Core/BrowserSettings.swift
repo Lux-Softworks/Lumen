@@ -9,6 +9,7 @@ enum NativeAppsPolicy: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+@MainActor
 class BrowserSettings: ObservableObject {
     static let shared = BrowserSettings()
 
