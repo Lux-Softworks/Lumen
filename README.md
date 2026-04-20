@@ -170,6 +170,8 @@ The first time you open the knowledge panel, Lumen downloads the `mlx-community/
 
 <br/>
 
-## License
+## License and Contributing
 
 [AGPL-3.0](LICENSE) — if you build on this, share it back.
+
+If you would like to contribute to the browser, please make a branch and follow all rulesets + conventions. Thanks for helping improve our community and software!
