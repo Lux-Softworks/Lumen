@@ -18,6 +18,22 @@ class KnowledgeCaptureService: ObservableObject {
     private init() {}
 
     func handleSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
+        await capture(payload: payload, webView: webView, force: false)
+    }
+
+    func captureForHighlight(url: String, webView: WKWebView?) async {
+        let payload = ReadingSignalPayload(
+            url: url,
+            title: "",
+            readingTime: 5,
+            scrollDepth: 0.05,
+            triggered: true,
+            isUpdate: false
+        )
+        await capture(payload: payload, webView: webView, force: true)
+    }
+
+    private func capture(payload: ReadingSignalPayload, webView: WKWebView?, force: Bool) async {
         guard BrowserSettings.shared.collectKnowledge else { return }
         guard let webView = webView else { return }
 
@@ -102,7 +118,7 @@ class KnowledgeCaptureService: ObservableObject {
                 }
 
                 try await KnowledgeStorage.shared.updateWebsite(website)
-            } else if quality.shouldCreateWebsite {
+            } else if quality.shouldCreateWebsite || force {
                 let displayName = Self.resolveSiteName(extracted: extractedContent, domain: domain)
                     ?? DomainNameFormatter.format(host: domain)
 

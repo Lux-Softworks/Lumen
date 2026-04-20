@@ -39,6 +39,12 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                 }
             }
 
+            Task { [weak webView] in
+                if let wv = webView {
+                    await KnowledgeCaptureService.shared.captureForHighlight(url: url, webView: wv)
+                }
+            }
+
         default:
             break
         }

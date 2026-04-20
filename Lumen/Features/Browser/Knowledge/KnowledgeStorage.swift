@@ -47,11 +47,16 @@ struct Website: Identifiable, Codable, Equatable, Hashable, Sendable {
 }
 
 struct Topic: Identifiable, Codable, Equatable, Hashable, Sendable {
+    static let uncategorizedID: String = "topic_uncategorized"
+    static let uncategorizedName: String = "Uncategorized"
+
     let id: String
     let name: String
     let color: String?
     let websiteCount: Int
     let createdAt: Date
+
+    var isUncategorized: Bool { id == Self.uncategorizedID }
 
     init(
         id: String = .topicID(),
@@ -234,6 +239,7 @@ actor KnowledgeStorage {
 
         try execute("PRAGMA journal_mode=WAL")
         try execute("PRAGMA synchronous=NORMAL")
+        try execute("PRAGMA foreign_keys=ON")
 
         try execute("BEGIN TRANSACTION")
         do {
@@ -559,6 +565,14 @@ actor KnowledgeStorage {
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw StorageError.failedToInsert(String(cString: sqlite3_errmsg(db)))
         }
+
+        try execute(
+            "UPDATE annotations SET page_id = ? WHERE normalized_url = ? AND page_id IS NULL",
+            bindValues: { [self] stmt in
+                sqlite3_bind_text(stmt, 1, page.id, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, page.normalizedURL, -1, SQLITE_TRANSIENT)
+            }
+        )
     }
 
     func createWebsite(website: Website) throws {
@@ -793,6 +807,24 @@ actor KnowledgeStorage {
         return try await queryWebsites(sql: sql) { [self] statement in
             sqlite3_bind_text(statement, 1, (topicID as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
         }
+    }
+
+    func fetchUncategorizedWebsites() async throws -> [Website] {
+        try initialize()
+        let sql = "SELECT * FROM websites WHERE topic_id IS NULL ORDER BY last_visit DESC"
+        return try await queryWebsites(sql: sql)
+    }
+
+    func uncategorizedWebsiteCount() async throws -> Int {
+        try initialize()
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM websites WHERE topic_id IS NULL", -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(statement, 0))
     }
 
     func fetchWebsite(id: String) async throws -> Website? {

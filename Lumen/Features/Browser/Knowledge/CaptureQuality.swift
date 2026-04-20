@@ -9,14 +9,36 @@ struct CaptureQuality {
         "/search", "/results", "/find",
         "/login", "/signin", "/sign-in", "/signup", "/sign-up", "/register",
         "/logout", "/account", "/settings", "/preferences", "/checkout",
-        "/cart", "/oauth", "/auth"
+        "/cart", "/oauth", "/auth", "/password", "/reset", "/verify",
+        "/billing", "/payment", "/pay", "/subscription", "/wallet",
+        "/admin", "/dashboard", "/inbox", "/messages", "/chat",
+        "/dm", "/compose", "/profile/edit", "/security"
     ]
 
     private static let blockedDomainSubstrings: [String] = [
-        "google.", "bing.com", "duckduckgo.com", "yahoo.com", "baidu.com",
-        "ecosia.org", "startpage.com", "kagi.com", "brave.com/search",
-        "chat.openai.com", "claude.ai", "gemini.google.com",
-        "accounts.", "login.", "auth."
+        "google.com/search", "bing.com/search", "duckduckgo.com", "yahoo.com/search",
+        "baidu.com", "ecosia.org", "startpage.com", "kagi.com", "brave.com/search",
+        "search.yahoo", "search.brave", "you.com",
+
+        "chat.openai.com", "chatgpt.com", "claude.ai", "gemini.google.com",
+        "copilot.microsoft.com", "bard.google.com", "poe.com", "perplexity.ai",
+
+        "accounts.", "login.", "auth.", "signin.", "oauth.", "sso.",
+        "myaccount.", "id.", "identity.",
+
+        "mail.google.com", "outlook.live.com", "outlook.office.com", "mail.yahoo",
+        "mail.proton", "protonmail.com", "fastmail.com", "icloud.com/mail",
+
+        "bank", "chase.com", "wellsfargo.com", "citibank.com", "bankofamerica.com",
+        "capitalone.com", "paypal.com", "venmo.com", "cashapp.com", "stripe.com/dashboard",
+        "coinbase.com/account", "binance.com/my",
+
+        "healthcare", "mychart.", "patient.", "kaiserpermanente.org",
+
+        "web.whatsapp.com", "messenger.com", "telegram.org", "discord.com/channels",
+        "slack.com/client", "teams.microsoft.com",
+
+        "admin.", "portal.", "dashboard."
     ]
 
     static func evaluate(
@@ -48,45 +70,6 @@ struct CaptureQuality {
             }
         }
 
-        var score: Double = 0
-
-        if wordCount >= 120 { score += 1 }
-        if wordCount >= 400 { score += 1 }
-        if wordCount >= 1000 { score += 1 }
-
-        if readingTime >= 15 { score += 1 }
-        if readingTime >= 45 { score += 1 }
-        if readingTime >= 120 { score += 1 }
-
-        let scrollTarget = expectedScrollTarget(wordCount: wordCount)
-        if scrollDepth >= scrollTarget * 0.6 { score += 0.5 }
-        if scrollDepth >= scrollTarget { score += 0.5 }
-
-        if hasArticleMetadata { score += 1 }
-
-        let expectedReadSeconds = max(10, Double(wordCount) / 250.0 * 60.0)
-        let readProgress = Double(readingTime) / expectedReadSeconds
-        if readProgress >= 0.15 { score += 0.5 }
-        if readProgress >= 0.4 { score += 0.5 }
-
-        let engagementFloor = readingTime >= 10 && scrollDepth >= 0.15
-        let contentFloor = wordCount >= 100
-
-        let shouldCapturePage = engagementFloor && contentFloor && score >= 2.0
-
-        return CaptureQuality(
-            score: score,
-            shouldCapturePage: shouldCapturePage,
-            shouldCreateWebsite: shouldCapturePage
-        )
-    }
-
-    private static func expectedScrollTarget(wordCount: Int) -> Double {
-        switch wordCount {
-        case 0..<300: return 0.75
-        case 300..<800: return 0.55
-        case 800..<2500: return 0.35
-        default: return 0.22
-        }
+        return CaptureQuality(score: 1, shouldCapturePage: true, shouldCreateWebsite: true)
     }
 }

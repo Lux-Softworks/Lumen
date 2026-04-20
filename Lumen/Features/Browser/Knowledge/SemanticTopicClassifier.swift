@@ -13,7 +13,7 @@ final class SemanticTopicClassifier {
     private let embedding: NLEmbedding?
     private let prototypes: [TopicPrototype]
 
-    private static let minConfidence: Double = 0.18
+    private static let minConfidence: Double = 0.15
 
     private static let topicSeeds: [(String, [String])] = [
         ("AI", [

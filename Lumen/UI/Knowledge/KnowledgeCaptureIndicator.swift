@@ -5,7 +5,7 @@ struct KnowledgeCaptureIndicator: View {
     @State private var hideTask: Task<Void, Never>?
 
     private let label = "Knowledge initiated"
-    private let visibleDurationMs: UInt64 = 1400
+    private let visibleDurationMs: UInt64 = 3200
 
     var body: some View {
         HStack(spacing: 6) {

@@ -34,7 +34,20 @@ final class KnowledgeMenuViewModel {
         if wasEmpty { isLoading = true }
         defer { if wasEmpty { isLoading = false } }
         do {
-            topics = try await KnowledgeStorage.shared.fetchAllTopics()
+            var loaded = try await KnowledgeStorage.shared.fetchAllTopics()
+            let uncategorizedCount = try await KnowledgeStorage.shared.uncategorizedWebsiteCount()
+
+            if uncategorizedCount > 0 {
+                loaded.append(
+                    Topic(
+                        id: Topic.uncategorizedID,
+                        name: Topic.uncategorizedName,
+                        color: nil,
+                        websiteCount: uncategorizedCount
+                    )
+                )
+            }
+            topics = loaded
         } catch {
             self.error = error
         }
@@ -48,7 +61,11 @@ final class KnowledgeMenuViewModel {
         defer { isLoading = false }
         do {
             if let topic = topic {
-                websites = try await KnowledgeStorage.shared.fetchWebsites(for: topic.id)
+                if topic.isUncategorized {
+                    websites = try await KnowledgeStorage.shared.fetchUncategorizedWebsites()
+                } else {
+                    websites = try await KnowledgeStorage.shared.fetchWebsites(for: topic.id)
+                }
             } else {
                 websites = try await KnowledgeStorage.shared.fetchAllWebsites()
             }

@@ -417,16 +417,18 @@ struct KnowledgeFolderView: View {
                                 .buttonStyle(.plain)
                                 .modifier(StaggerFadeModifier(delay: Double(index) * 0.04))
                                 .contextMenu {
-                                    Button {
-                                        exportSheet = ExportSheetItem(scope: .topic(id: topic.id))
-                                    } label: {
-                                        Label("Export", systemImage: "square.and.arrow.up")
-                                    }
-                                    Button(role: .destructive) {
-                                        topicToDelete = topic
-                                        showDeleteAlert = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
+                                    if !topic.isUncategorized {
+                                        Button {
+                                            exportSheet = ExportSheetItem(scope: .topic(id: topic.id))
+                                        } label: {
+                                            Label("Export", systemImage: "square.and.arrow.up")
+                                        }
+                                        Button(role: .destructive) {
+                                            topicToDelete = topic
+                                            showDeleteAlert = true
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
@@ -669,13 +671,13 @@ private struct PageDetailView: View {
     }
 
     private func loadAnnotations() async {
-        let loaded = (try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)) ?? []
+        let loaded = (try? await KnowledgeStorage.shared.fetchAnnotations(normalizedURL: page.normalizedURL)) ?? []
         await MainActor.run { annotations = loaded }
     }
 
     private func delete(_ annotation: Annotation) async {
         try? await KnowledgeStorage.shared.deleteAnnotation(id: annotation.id)
-        let refreshed = (try? await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)) ?? []
+        let refreshed = (try? await KnowledgeStorage.shared.fetchAnnotations(normalizedURL: page.normalizedURL)) ?? []
         await MainActor.run {
             withAnimation(.smooth(duration: 0.25)) { annotations = refreshed }
         }

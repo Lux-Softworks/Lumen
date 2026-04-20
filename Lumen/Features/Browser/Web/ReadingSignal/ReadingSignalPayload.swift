@@ -21,4 +21,13 @@ struct ReadingSignalPayload: Decodable, Sendable {
         triggered = try container.decode(Bool.self, forKey: .triggered)
         isUpdate = (try? container.decode(Bool.self, forKey: .isUpdate)) ?? false
     }
+
+    init(url: String, title: String, readingTime: Int, scrollDepth: Double, triggered: Bool, isUpdate: Bool) {
+        self.url = url
+        self.title = title
+        self.readingTime = readingTime
+        self.scrollDepth = scrollDepth
+        self.triggered = triggered
+        self.isUpdate = isUpdate
+    }
 }
