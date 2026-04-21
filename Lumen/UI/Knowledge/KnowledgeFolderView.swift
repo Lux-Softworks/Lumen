@@ -57,7 +57,7 @@ struct BackFolderShape: Shape {
         path.addLine(to: CGPoint(x: width - tabWidth, y: tabHeight))
         path.addQuadCurve(
             to: CGPoint(x: width - tabWidth + tabFilletRadius, y: tabHeight - tabFilletRadius),
-            control: CGPoint(x: width - tabWidth, y: tabHeight))
+            control: CGPoint(x: width - tabWidth + tabFilletRadius, y: tabHeight))
         path.addLine(to: CGPoint(x: width - tabWidth + tabFilletRadius, y: tabCornerRadius))
         path.addQuadCurve(
             to: CGPoint(x: width - tabWidth + tabFilletRadius + tabCornerRadius, y: 0),
@@ -400,8 +400,7 @@ struct KnowledgeFolderView: View {
                             ],
                             spacing: 32
                         ) {
-                            ForEach(viewModel.topics.indices, id: \.self) { index in
-                                let topic = viewModel.topics[index]
+                            ForEach(Array(viewModel.topics.enumerated()), id: \.element.id) { index, topic in
                                 Button {
                                     Task { await viewModel.selectTopic(topic) }
                                 } label: {
@@ -532,6 +531,7 @@ private struct StaggerFadeModifier: ViewModifier {
         content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 8)
+            .blur(radius: appeared ? 0 : 2)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.35).delay(delay)) {
                     appeared = true

@@ -53,22 +53,13 @@ nonisolated final class EmbeddingService: @unchecked Sendable {
     }
 
     func generateEmbeddings(for texts: [String]) async -> [[Double]?] {
-        return await withTaskGroup(of: (Int, [Double]?).self, returning: [[Double]?].self) { group in
-            for (index, text) in texts.enumerated() {
-                group.addTask(priority: .userInitiated) { [weak self] in
-                    guard !text.isEmpty, let self else { return (index, nil) }
-                    return (index, self.embedSync(text))
-                }
+        await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return Array(repeating: nil, count: texts.count) }
+            return texts.map { text -> [Double]? in
+                guard !text.isEmpty else { return nil }
+                return self.embedSync(text)
             }
-
-            var results: [(Int, [Double]?)] = []
-            for await result in group {
-                results.append(result)
-            }
-
-            results.sort { $0.0 < $1.0 }
-            return results.map { $0.1 }
-        }
+        }.value
     }
 
     private func embedSync(_ text: String) -> [Double]? {

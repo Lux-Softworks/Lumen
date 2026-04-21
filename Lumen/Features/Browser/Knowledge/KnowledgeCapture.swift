@@ -173,7 +173,8 @@ class KnowledgeCaptureService: ObservableObject {
             captureToken &+= 1
             NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
 
-            let bgTask = Task.detached(priority: .utility) { [extractedContent, newlyCreatedWebsiteID] in
+            let bgTask = Task.detached(priority: .background) { [extractedContent, newlyCreatedWebsiteID] in
+                try? await Task.sleep(nanoseconds: 800_000_000)
                 if Task.isCancelled { return }
                 if let embedding = await EmbeddingService.shared.generateEmbedding(
                     for: extractedContent.content
@@ -181,16 +182,19 @@ class KnowledgeCaptureService: ObservableObject {
                     try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
                 }
                 if Task.isCancelled { return }
+                await Task.yield()
                 try? await KnowledgeStorage.shared.saveEntities(
                     pageID: pageID,
                     content: extractedContent.content
                 )
                 if Task.isCancelled { return }
+                await Task.yield()
                 await KnowledgeStorage.shared.saveChunkedEmbeddings(
                     pageID: pageID,
                     content: extractedContent.content
                 )
                 if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
 
                 let pageSummary = await KnowledgeClassifier.summarize(
                     content: extractedContent.content,
@@ -201,6 +205,7 @@ class KnowledgeCaptureService: ObservableObject {
                 }
 
                 if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
 
                 if let newSiteID = newlyCreatedWebsiteID {
                     let websiteSummary = await KnowledgeClassifier.summarizeWebsite(

@@ -254,7 +254,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private func observeWebView(_ webView: WKWebView) {
         observations.append(
             webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.currentURL = webView.url
 
                     if let url = webView.url {
@@ -267,7 +267,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.title, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.pageTitle = webView.title ?? ""
                 }
             }
@@ -275,7 +275,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.isLoading = webView.isLoading
 
                     if !webView.isLoading {
@@ -306,7 +306,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoBack, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.canGoBack = webView.canGoBack
                 }
             }
@@ -314,7 +314,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoForward, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.canGoForward = webView.canGoForward
                 }
             }
@@ -322,7 +322,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     self?.estimatedProgress = webView.estimatedProgress
                 }
             }
@@ -331,7 +331,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         if #available(iOS 15.0, *) {
             observations.append(
                 webView.observe(\.themeColor, options: [.new]) { [weak self] webView, _ in
-                    MainActor.assumeIsolated {
+                    DispatchQueue.main.async {
                         if let newColor = webView.themeColor {
                             self?.themeColor = newColor
                         } else {
@@ -383,7 +383,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         webView.evaluateJavaScript(script) { [weak self] result, _ in
             guard let colorString = result as? String else { return }
-            MainActor.assumeIsolated {
+            DispatchQueue.main.async {
                 guard let self = self else { return }
                 let color = UIColor.fromAnyString(colorString)
                 self.themeColor = color
