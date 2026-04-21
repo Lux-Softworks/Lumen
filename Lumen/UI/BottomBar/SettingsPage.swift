@@ -34,8 +34,9 @@ struct SettingsPage: View {
     var onReloadPage: (() -> Void)? = nil
     var onNavigate: ((String) -> Void)? = nil
 
-    @StateObject private var settings = BrowserSettings.shared
+    @ObservedObject private var settings = BrowserSettings.shared
     @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     @Namespace private var engineNamespace
     @Namespace private var nativeAppsNamespace
     @State private var navigationPath: [SettingsSection] = []
@@ -276,7 +277,18 @@ struct SettingsPage: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(palette.uiElement)
+                .fill(.regularMaterial)
+                .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            palette.isIncognito
+                                ? palette.background.opacity(0.45)
+                                : (colorScheme == .dark
+                                    ? Color.white.opacity(0.04)
+                                    : Color.white.opacity(0.25))
+                        )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -288,7 +300,6 @@ struct SettingsPage: View {
         let trackers = trackerCount
         let ads = 0
 
-        var attributed = AttributedString("Lumen scrubbed ")
         var trackersNumber = AttributedString("\(trackers) ")
         trackersNumber.font = .system(size: 16, weight: .bold)
         trackersNumber.foregroundColor = palette.accent
@@ -309,7 +320,7 @@ struct SettingsPage: View {
         base.font = .system(size: 16, weight: .regular)
         base.foregroundColor = palette.text
 
-        attributed = base + trackersNumber + trackersLabel + adsNumber + adsLabel
+        let attributed = base + trackersNumber + trackersLabel + adsNumber + adsLabel
 
         return Text(attributed)
             .frame(maxWidth: .infinity, alignment: .leading)

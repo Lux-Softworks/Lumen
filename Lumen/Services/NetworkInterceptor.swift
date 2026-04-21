@@ -316,18 +316,15 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             break
         }
 
-        let path = url.path
-        for keyword in Self.xhrKeywords {
-            if path.range(of: keyword, options: .caseInsensitive) != nil {
-                return .xhr
-            }
+        var haystack = url.path.lowercased()
+        if let query = url.query {
+            haystack.append("?")
+            haystack.append(query.lowercased())
         }
 
-        if let query = url.query {
-            for keyword in Self.xhrKeywords {
-                if query.range(of: keyword, options: .caseInsensitive) != nil {
-                    return .xhr
-                }
+        for keyword in Self.xhrKeywords {
+            if haystack.contains(keyword) {
+                return .xhr
             }
         }
 

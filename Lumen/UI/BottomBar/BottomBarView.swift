@@ -228,11 +228,6 @@ struct BottomBarView: View {
             let isExpandingToSearch =
                 newState == .search || newState == .browserSettings || newState == .siteSettings
                 || newState == .knowledge
-
-            withAnimation(AppTheme.Motion.sheet) {
-                searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
-            }
-
             let showsMag =
                 newState == .collapsed || newState == .hidden
                 || newState == .search || newState == .submittingSearch
@@ -240,13 +235,16 @@ struct BottomBarView: View {
             let showsFolder = newState == .knowledge
 
             withAnimation(AppTheme.Motion.sheet) {
+                searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
                 magGlassOpacity = showsMag ? 1.0 : 0.0
                 if !showsGear { gearIconOpacity = 0.0 }
                 if !showsFolder { folderIconOpacity = 0.0 }
             }
-            withAnimation(.easeIn(duration: 0.22).delay(0.12)) {
-                if showsGear { gearIconOpacity = 1.0 }
-                if showsFolder { folderIconOpacity = 1.0 }
+            if showsGear || showsFolder {
+                withAnimation(.easeIn(duration: 0.22).delay(0.12)) {
+                    if showsGear { gearIconOpacity = 1.0 }
+                    if showsFolder { folderIconOpacity = 1.0 }
+                }
             }
 
             if newState != .search {
@@ -364,7 +362,10 @@ struct BottomBarView: View {
             .tint(palette.accent)
             .focused($isFocused)
             .submitLabel(.go)
-            .onSubmit(onSubmit)
+            .onSubmit {
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                onSubmit()
+            }
             .frame(height: 44)
             .disabled(state == .siteSettings || state == .browserSettings || state == .knowledge)
             .truncationMode(
@@ -450,59 +451,12 @@ struct BottomBarView: View {
         ScrollView(.vertical, showsIndicators: false) {
             if !searchSuggestions.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) {
-                        index, suggestion in
-                        Button {
-                            onSuggestionTap(suggestion.text)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(palette.text.opacity(0.6))
-                                    .frame(width: 24)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    let attributedText: AttributedString = {
-                                        var attributedText = AttributedString(
-                                            suggestion.text)
-
-                                        if !text.isEmpty {
-                                            var searchRange =
-                                                suggestion.text
-                                                .startIndex..<suggestion.text.endIndex
-                                            while let range = suggestion.text.range(
-                                                of: text, options: .caseInsensitive,
-                                                range: searchRange)
-                                            {
-                                                if let attrRange = Range(
-                                                    range, in: attributedText)
-                                                {
-                                                    attributedText[attrRange].font =
-                                                        .system(
-                                                            size: 16, weight: .heavy)
-                                                }
-                                                searchRange =
-                                                    range
-                                                    .upperBound..<suggestion.text.endIndex
-                                            }
-                                        }
-
-                                        return attributedText
-                                    }()
-
-                                    Text(attributedText)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(palette.text)
-                                        .lineLimit(1)
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                    ForEach(searchSuggestions, id: \.id) { suggestion in
+                        SearchSuggestionRow(
+                            suggestion: suggestion,
+                            query: text,
+                            onTap: { onSuggestionTap(suggestion.text) }
+                        )
                     }
                 }
                 .frame(minHeight: 10)
@@ -553,8 +507,7 @@ struct BottomBarView: View {
             Rectangle()
                 .fill(.regularMaterial)
                 .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
-            palette.uiElement.opacity(palette.isIncognito ? 0.55 : 0.75)
-            palette.accent.opacity(0.04)
+            palette.uiElement.opacity(palette.isIncognito ? 0.45 : 0.65)
         }
     }
 
@@ -587,10 +540,10 @@ struct BottomBarView: View {
                 }
             }
             .accessibilityIdentifier("bottombar.tabs")
-            .disabled(tabCount == 0)
+            .disabled(tabCount == 0 || isTabOverlayVisible)
             .padding(.leading, 8)
             .opacity(sideOpacity)
-            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
+            .allowsHitTesting(!isTabOverlayVisible)
 
             Spacer()
 
@@ -642,6 +595,7 @@ struct BottomBarView: View {
             .accessibilityIdentifier("bottombar.settings")
             .padding(.trailing, 8)
             .opacity(sideOpacity)
+            .allowsHitTesting(!isTabOverlayVisible)
         }
         .frame(height: 80)
         .overlay(alignment: .topTrailing) {
@@ -651,9 +605,8 @@ struct BottomBarView: View {
             .padding(.trailing, 16)
             .alignmentGuide(.top) { d in d[.bottom] }
             .opacity(isTabOverlayVisible ? 0 : 1)
-            .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
+            .allowsHitTesting(!isTabOverlayVisible)
         }
-        .opacity(sideOpacity)
         .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
     }
 
@@ -695,6 +648,51 @@ struct BottomBarView: View {
             cleanHost.removeFirst(4)
         }
         return cleanHost
+    }
+}
+
+private struct SearchSuggestionRow: View {
+    let suggestion: SearchSuggestion
+    let query: String
+    let onTap: () -> Void
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(palette.text.opacity(0.6))
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attributedText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(palette.text)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var attributedText: AttributedString {
+        var result = AttributedString(suggestion.text)
+        if !query.isEmpty {
+            var searchRange = suggestion.text.startIndex..<suggestion.text.endIndex
+            while let range = suggestion.text.range(of: query, options: .caseInsensitive, range: searchRange) {
+                if let attrRange = Range(range, in: result) {
+                    result[attrRange].font = .system(size: 16, weight: .heavy)
+                }
+                searchRange = range.upperBound..<suggestion.text.endIndex
+            }
+        }
+        return result
     }
 }
 

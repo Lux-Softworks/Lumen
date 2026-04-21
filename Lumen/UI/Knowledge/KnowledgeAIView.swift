@@ -5,6 +5,7 @@ struct KnowledgeAIView: View {
     @Bindable var viewModel: KnowledgeAIViewModel
     @FocusState private var isFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    @State private var scrollWorkItem: DispatchWorkItem?
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
 
@@ -111,9 +112,14 @@ struct KnowledgeAIView: View {
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation(AppTheme.Motion.standard) {
-            proxy.scrollTo("bottom", anchor: .bottom)
+        scrollWorkItem?.cancel()
+        let work = DispatchWorkItem {
+            withAnimation(AppTheme.Motion.standard) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
         }
+        scrollWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
     }
 
     private var inputBar: some View {
@@ -317,7 +323,6 @@ private struct StaggeredFade<Content: View>: View {
     var body: some View {
         content
             .opacity(appeared ? 1 : 0)
-            .blur(radius: appeared ? 0 : 3)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.32).delay(delay)) {
                     appeared = true
@@ -504,7 +509,6 @@ private struct FadingWord: View {
             .font(.system(size: 15, weight: bold ? .bold : .regular))
             .foregroundColor(palette.text)
             .opacity(appeared ? 1 : 0)
-            .blur(radius: appeared ? 0 : 2)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.25)) {
                     appeared = true
@@ -703,7 +707,6 @@ private struct WordView: View {
             .font(.system(size: 15, weight: bold ? .bold : .regular))
             .foregroundColor(palette.text)
             .opacity(appeared ? 1 : 0)
-            .blur(radius: appeared ? 0 : 2)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.25).delay(delay)) {
                     appeared = true

@@ -110,7 +110,6 @@ final class TabManager: ObservableObject {
     private func observeActiveViewModel() {
         guard let activeTab else { return }
         activeViewModelCancellable = activeTab.viewModel.objectWillChange
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }

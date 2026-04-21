@@ -4,7 +4,7 @@ import WebKit
 
 struct HardenedWebView: UIViewControllerRepresentable {
     @ObservedObject var viewModel: BrowserViewModel
-    @StateObject private var settings = BrowserSettings.shared
+    @ObservedObject private var settings = BrowserSettings.shared
     var bottomInset: CGFloat = 0
     var safeAreaTop: CGFloat = 0
 
@@ -219,7 +219,6 @@ final class WebViewHostController: UIViewController {
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         let windowTop = view.window?.safeAreaInsets.top
-        let _ = view.safeAreaInsets.top
         let top = windowTop ?? 44
 
         topConstraint?.constant = top

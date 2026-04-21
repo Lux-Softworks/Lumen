@@ -17,9 +17,9 @@ struct KnowledgeButton: View {
                             if palette.isIncognito {
                                 palette.background.opacity(0.85)
                             } else if colorScheme == .dark {
-                                Color.black.opacity(0.35)
+                                Color.black.opacity(0.28)
                             } else {
-                                Color.gray.opacity(0.1)
+                                Color.white.opacity(0.22)
                             }
                         }
                     )

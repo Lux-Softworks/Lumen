@@ -54,9 +54,12 @@ struct ResizableSheetContainer<Content: View>: View {
 
     var body: some View {
         GeometryReader { outerGeometry in
+            let screenHeight = outerGeometry.size.height
+            let sheetHeight = currentHeight(screenHeight: screenHeight)
+            let cornerR = animatedCornerRadius(screenHeight: screenHeight)
+
             ZStack(alignment: .bottom) {
-                Color.black.opacity(0.3)
-                    .background(.ultraThinMaterial)
+                Color.black.opacity(0.35)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -72,11 +75,7 @@ struct ResizableSheetContainer<Content: View>: View {
                 content()
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16)
-                    .frame(
-                        height: currentHeight(screenHeight: outerGeometry.size.height),
-                        alignment: .top
-                    )
-                    .animation(AppTheme.Motion.sheet, value: isExpanded)
+                    .frame(height: sheetHeight, alignment: .top)
                     .opacity(isCollapsed ? 0 : 1)
                     .background(
                         ZStack(alignment: .top) {
@@ -89,33 +88,25 @@ struct ResizableSheetContainer<Content: View>: View {
                                         if palette.isIncognito {
                                             palette.background.opacity(0.85)
                                         } else if colorScheme == .dark {
-                                            Color.black.opacity(0.4)
+                                            Color.black.opacity(0.28)
                                         } else {
-                                            Color.gray.opacity(0.1)
+                                            Color.white.opacity(0.22)
                                         }
                                     }
                                     .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
                                 )
-                                .cornerRadius(
-                                    animatedCornerRadius(screenHeight: outerGeometry.size.height),
-                                    corners: [.topLeft, .topRight]
-                                )
+                                .cornerRadius(cornerR, corners: [.topLeft, .topRight])
                                 .overlay(
-                                    RoundedCorner(
-                                        radius: animatedCornerRadius(
-                                            screenHeight: outerGeometry.size.height),
-                                        corners: [.topLeft, .topRight]
-                                    )
-                                    .stroke(palette.text.opacity(0.15), lineWidth: 0.5)
+                                    RoundedCorner(radius: cornerR, corners: [.topLeft, .topRight])
+                                        .stroke(palette.text.opacity(0.15), lineWidth: 0.5)
                                 )
-                                .shadow(color: Color.black.opacity(0.15), radius: 15, y: -2)
+                                .shadow(color: Color.black.opacity(0.18), radius: 6, y: -1)
 
                             ProgressView(
                                 progress: progress,
                                 isLoading: isLoading,
                                 width: outerGeometry.size.width,
-                                cornerRadius: animatedCornerRadius(
-                                    screenHeight: outerGeometry.size.height),
+                                cornerRadius: cornerR,
                             )
                         }
                     )

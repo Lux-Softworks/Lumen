@@ -532,7 +532,6 @@ private struct StaggerFadeModifier: ViewModifier {
         content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 8)
-            .blur(radius: appeared ? 0 : 2)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.35).delay(delay)) {
                     appeared = true

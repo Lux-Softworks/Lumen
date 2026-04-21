@@ -141,25 +141,26 @@ final class ThreatDetector {
     }
 
     func analyze(_ request: InterceptedRequest) -> [ThreatEvent] {
+        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
         var events: [ThreatEvent] = []
 
-        if let trackerEvent = detectTracker(request) {
+        if let trackerEvent = detectTracker(request, domain: domain) {
             events.append(trackerEvent)
         }
 
-        if let fingerprintEvent = detectFingerprinting(request) {
+        if let fingerprintEvent = detectFingerprinting(request, domain: domain) {
             events.append(fingerprintEvent)
         }
 
-        if let exfilEvent = detectDataExfiltration(request) {
+        if let exfilEvent = detectDataExfiltration(request, domain: domain) {
             events.append(exfilEvent)
         }
 
-        if let cookieEvent = detectCookieAbuse(request) {
+        if let cookieEvent = detectCookieAbuse(request, domain: domain) {
             events.append(cookieEvent)
         }
 
-        if let minerEvent = detectCryptominer(request) {
+        if let minerEvent = detectCryptominer(request, domain: domain) {
             events.append(minerEvent)
         }
 
@@ -212,11 +213,8 @@ final class ThreatDetector {
         return parts.suffix(2).joined(separator: ".")
     }
 
-    private func detectTracker(_ request: InterceptedRequest) -> ThreatEvent? {
+    private func detectTracker(_ request: InterceptedRequest, domain: String) -> ThreatEvent? {
         guard request.isThirdParty else { return nil }
-
-        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
-
         guard let tracker = lookupTracker(domain: domain) else { return nil }
 
         let severity: ThreatSeverity
@@ -263,7 +261,7 @@ final class ThreatDetector {
         )
     }
 
-    private func detectFingerprinting(_ request: InterceptedRequest) -> ThreatEvent? {
+    private func detectFingerprinting(_ request: InterceptedRequest, domain: String) -> ThreatEvent? {
         guard request.resourceType == .script else { return nil }
 
         let urlString = request.url.absoluteString.lowercased()
@@ -273,8 +271,6 @@ final class ThreatDetector {
         }
 
         guard isKnownFingerprintScript else { return nil }
-
-        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
 
         return ThreatEvent(
             id: UUID(),
@@ -329,7 +325,7 @@ final class ThreatDetector {
         delegate?.threatDetector(self, didDetect: event)
     }
 
-    private func detectDataExfiltration(_ request: InterceptedRequest) -> ThreatEvent? {
+    private func detectDataExfiltration(_ request: InterceptedRequest, domain: String) -> ThreatEvent? {
         guard request.isThirdParty else { return nil }
 
         guard let components = URLComponents(url: request.url, resolvingAgainstBaseURL: false),
@@ -348,8 +344,6 @@ final class ThreatDetector {
         }
 
         guard !suspiciousParams.isEmpty else { return nil }
-
-        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
 
         let dataRisk: [DataCategory] = suspiciousParams.compactMap { param in
             let lower = param.lowercased()
@@ -379,7 +373,7 @@ final class ThreatDetector {
         )
     }
 
-    private func detectCookieAbuse(_ request: InterceptedRequest) -> ThreatEvent? {
+    private func detectCookieAbuse(_ request: InterceptedRequest, domain: String) -> ThreatEvent? {
         guard request.isThirdParty else { return nil }
 
         let hasCookieSyncIndicators: Bool = {
@@ -399,8 +393,6 @@ final class ThreatDetector {
 
         guard hasCookieSyncIndicators else { return nil }
 
-        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
-
         return ThreatEvent(
             id: UUID(),
             timestamp: request.timestamp,
@@ -415,11 +407,8 @@ final class ThreatDetector {
         )
     }
 
-    private func detectCryptominer(_ request: InterceptedRequest) -> ThreatEvent? {
+    private func detectCryptominer(_ request: InterceptedRequest, domain: String) -> ThreatEvent? {
         guard request.resourceType == .script else { return nil }
-
-        let domain = extractRegistrableDomain(from: request.url.host?.lowercased() ?? "")
-
         guard cryptominerDomains.contains(domain) else { return nil }
 
         return ThreatEvent(

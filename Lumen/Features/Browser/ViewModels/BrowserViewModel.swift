@@ -38,13 +38,10 @@ final class BrowserViewModel: NSObject, ObservableObject {
         BrowserSettings.shared.searchEngine.templateURL
     }
 
-    private var knowledgeProvider: LocalKnowledgeProvider?
     let isIncognito: Bool
 
     var onRequestPopup: ((WKWebViewConfiguration, WKNavigationAction) -> WKWebView?)?
     var onWindowClose: (() -> Void)?
-
-    func initializeKnowledgeProvider() {}
 
     func processUserInput(_ input: String) async {
         await MainActor.run {
@@ -257,7 +254,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private func observeWebView(_ webView: WKWebView) {
         observations.append(
             webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.currentURL = webView.url
 
                     if let url = webView.url {
@@ -270,7 +267,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.title, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.pageTitle = webView.title ?? ""
                 }
             }
@@ -278,20 +275,20 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.isLoading = webView.isLoading
 
                     if !webView.isLoading {
                         self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
 
-                        _ = try? await webView.evaluateJavaScript("""
+                        webView.evaluateJavaScript("""
                             requestAnimationFrame(() => {
                                 requestAnimationFrame(() => {
                                     window.webkit.messageHandlers.firstPaint.postMessage({});
                                 });
                             });
-                        """)
+                        """, completionHandler: nil)
 
                         if let self,
                             self.pendingHistoryRecord,
@@ -309,7 +306,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoBack, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.canGoBack = webView.canGoBack
                 }
             }
@@ -317,7 +314,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.canGoForward, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.canGoForward = webView.canGoForward
                 }
             }
@@ -325,7 +322,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         observations.append(
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
-                Task { @MainActor [weak self] in
+                MainActor.assumeIsolated {
                     self?.estimatedProgress = webView.estimatedProgress
                 }
             }
@@ -334,7 +331,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         if #available(iOS 15.0, *) {
             observations.append(
                 webView.observe(\.themeColor, options: [.new]) { [weak self] webView, _ in
-                    Task { @MainActor [weak self] in
+                    MainActor.assumeIsolated {
                         if let newColor = webView.themeColor {
                             self?.themeColor = newColor
                         } else {
@@ -384,10 +381,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 })();
             """
 
-        webView.evaluateJavaScript(script) { [weak self] result, error in
+        webView.evaluateJavaScript(script) { [weak self] result, _ in
             guard let colorString = result as? String else { return }
-
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 guard let self = self else { return }
                 let color = UIColor.fromAnyString(colorString)
                 self.themeColor = color
@@ -402,12 +398,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
     private func startScrollObservation(_ webView: WKWebView) {
         observations.append(
             webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self, weak webView] _, change in
-                guard let self = self,
-                      let newY = change.newValue?.y,
+                guard let newY = change.newValue?.y,
                       let oldY = change.oldValue?.y else { return }
 
                 DispatchQueue.main.async {
-                    guard let webView = webView else { return }
+                    guard let self = self, let webView = webView else { return }
                     let delta = newY - oldY
                     self.onScrollUpdate?(newY, delta, webView.scrollView.contentSize.height, webView.scrollView.bounds.height)
                 }

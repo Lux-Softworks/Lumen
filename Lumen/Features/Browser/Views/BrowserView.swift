@@ -31,6 +31,7 @@ struct BrowserView: View {
     private func syncIncognitoToActiveTab() {
         let next = activeTab?.isIncognito ?? false
         guard next != incognitoActive else { return }
+
         withAnimation(.easeInOut(duration: 0.22)) {
             incognitoActive = next
         }
@@ -124,8 +125,8 @@ struct BrowserView: View {
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
             .onAppear {
                 wireDownloadHandler()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.smooth(duration: 0.3)) {
+                DispatchQueue.main.async {
+                    withAnimation(.smooth(duration: 0.2)) {
                         isReady = true
                     }
                     withAnimation(AppTheme.Motion.sheet) {
@@ -209,12 +210,8 @@ struct BrowserView: View {
                     .environment(\.colorScheme, .dark)
                     .opacity(0.55)
             } else {
-                LinearGradient(
-                    colors: [AppTheme.Colors.background, AppTheme.Colors.background],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
+                AppTheme.Colors.background
                 backgroundDecorations(geometry: geometry)
-                Color.black.opacity(0.3)
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .environment(\.colorScheme, .dark)
@@ -257,7 +254,6 @@ struct BrowserView: View {
     @ViewBuilder
     private func activeTabLayer(geometry: GeometryProxy) -> some View {
         let isFullScreen = activeTabViewState == .fullScreen
-        let _ = (activeTab?.viewModel.currentURL?.absoluteString ?? "").isEmpty
 
         ZStack {
             if let tab = activeTab {
@@ -306,9 +302,7 @@ struct BrowserView: View {
     private func bottomBarLayer(geometry: GeometryProxy) -> some View {
         bottomBar()
             .frame(maxHeight: .infinity, alignment: .bottom)
-            .blur(radius: isReady ? 0 : 20)
             .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
-            .animation(AppTheme.Motion.sheet, value: bottomBarState)
     }
 
     @ViewBuilder
@@ -349,7 +343,6 @@ struct BrowserView: View {
         .id(tab.id)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all)
-        .blur(radius: isReady ? 0 : 20)
         .allowsHitTesting(activeTabViewState == .fullScreen && webViewReady)
         .disabled(activeTabViewState != .fullScreen || !webViewReady)
         .onAppear {

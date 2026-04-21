@@ -23,11 +23,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        URLCache.shared = URLCache(
-            memoryCapacity: 32 * 1024 * 1024,
-            diskCapacity: 256 * 1024 * 1024
-        )
-        _ = TrackerDatabase.shared
+        DispatchQueue.global(qos: .utility).async {
+            URLCache.shared = URLCache(
+                memoryCapacity: 32 * 1024 * 1024,
+                diskCapacity: 256 * 1024 * 1024
+            )
+        }
         return true
     }
 

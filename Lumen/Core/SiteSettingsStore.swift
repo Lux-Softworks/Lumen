@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 class SiteSettingsStore: ObservableObject {
     static let shared = SiteSettingsStore()
     

@@ -25,6 +25,8 @@ struct HomeHeroView: View {
         .allowsHitTesting(false)
         .onAppear {
             currentTagline = Self.pickTagline(at: Date())
+            guard !reduceMotion else { return }
+            isBreathing = true
         }
     }
 

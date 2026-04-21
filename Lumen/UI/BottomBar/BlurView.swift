@@ -10,6 +10,9 @@ struct BlurView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
-        uiView.effect = UIBlurEffect(style: style)
+        let currentStyle = (uiView.effect as? UIBlurEffect)?.value(forKey: "style") as? Int
+        if currentStyle != style.rawValue {
+            uiView.effect = UIBlurEffect(style: style)
+        }
     }
 }
