@@ -246,8 +246,8 @@ actor SemanticTopicClassifier {
 
     private static func buildProbe(title: String?, content: String) -> String {
         var parts: [String] = []
-        if let t = title?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty {
-            parts.append(t)
+        if let trimmedTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedTitle.isEmpty {
+            parts.append(trimmedTitle)
         }
         let snippet = content.trimmingCharacters(in: .whitespacesAndNewlines)
         let bodyLimit = 1200
@@ -262,14 +262,14 @@ actor SemanticTopicClassifier {
     private static func average(_ vectors: [[Double]]) -> [Double] {
         guard let first = vectors.first else { return [] }
         var result = [Double](repeating: 0, count: first.count)
-        for v in vectors {
-            for i in 0..<min(result.count, v.count) {
-                result[i] += v[i]
+        for vector in vectors {
+            for i in 0..<min(result.count, vector.count) {
+                result[i] += vector[i]
             }
         }
-        let n = Double(vectors.count)
+        let count = Double(vectors.count)
         for i in 0..<result.count {
-            result[i] /= n
+            result[i] /= count
         }
         return result
     }

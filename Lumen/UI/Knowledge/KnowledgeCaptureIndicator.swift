@@ -3,8 +3,8 @@ import SwiftUI
 struct KnowledgeCaptureIndicator: View {
     @State private var isVisible: Bool = false
     @State private var hideTask: Task<Void, Never>?
+    @State private var label: String = "Knowledge initiated"
 
-    private let label = "Knowledge initiated"
     private let visibleDurationMs: UInt64 = 3200
 
     var body: some View {
@@ -37,7 +37,11 @@ struct KnowledgeCaptureIndicator: View {
         .blur(radius: isVisible ? 0 : 4)
         .animation(.smooth(duration: 0.28), value: isVisible)
         .allowsHitTesting(false)
-        .onReceive(NotificationCenter.default.publisher(for: .knowledgeCaptured)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .knowledgeCaptured)) { note in
+            let userInfo = note.userInfo ?? [:]
+            if (userInfo["stage"] as? String) == "enrichment" { return }
+            let isUpdate = (userInfo["isUpdate"] as? Bool) ?? false
+            label = isUpdate ? "Knowledge updated" : "Knowledge initiated"
             showPill()
         }
     }

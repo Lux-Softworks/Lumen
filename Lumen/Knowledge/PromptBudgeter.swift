@@ -77,12 +77,12 @@ enum PromptBudgeter {
         let headerCost = header.count
         let lineBudget = max(0, budget - headerCost)
 
-        for h in cleaned.prefix(6) {
+        for highlight in cleaned.prefix(6) {
             let available = lineBudget - used
             if available < 30 { break }
-            let take = min(h.count, min(available - 6, 240))
+            let take = min(highlight.count, min(available - 6, 240))
             if take <= 0 { break }
-            let line = "- \"\(String(h.prefix(take)))\""
+            let line = "- \"\(String(highlight.prefix(take)))\""
             lines.append(line)
             used += line.count + 1
         }

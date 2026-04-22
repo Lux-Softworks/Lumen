@@ -93,7 +93,7 @@ nonisolated struct PageContent: Identifiable, Codable, Equatable, Hashable, Send
     let createdAt: Date
 
     var displayTitle: String {
-        if let t = title, !t.isEmpty { return t }
+        if let title, !title.isEmpty { return title }
         let path = URL(string: url)?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
         return path.isEmpty ? url : path
     }
@@ -531,6 +531,11 @@ actor KnowledgeStorage {
         return false
     }
 
+    struct SaveResult: Sendable {
+        let pageID: String
+        let isNew: Bool
+    }
+
     func save(
         url: String,
         title: String?,
@@ -540,7 +545,7 @@ actor KnowledgeStorage {
         description: String? = nil,
         readingTime: Int? = nil,
         scrollDepth: Double? = nil
-    ) async throws -> String {
+    ) async throws -> SaveResult {
         try initialize()
 
         let domain = PageContent.extractDomain(from: url)
@@ -563,8 +568,11 @@ actor KnowledgeStorage {
                 }
             )
             try updateWebsiteStats(websiteID: websiteID)
-            return dupID
+            return SaveResult(pageID: dupID, isNew: false)
         }
+
+        let normalizedURL = PageContent.normalizeURL(url)
+        let existedBefore = try pageExists(normalizedURL: normalizedURL)
 
         let page = PageContent(
             websiteID: websiteID,
@@ -581,7 +589,16 @@ actor KnowledgeStorage {
         let effectiveID = try savePage(page, contentHash: hash)
         try updateWebsiteStats(websiteID: websiteID)
 
-        return effectiveID
+        return SaveResult(pageID: effectiveID, isNew: !existedBefore)
+    }
+
+    private func pageExists(normalizedURL: String) throws -> Bool {
+        let id: String? = try queryOne(
+            "SELECT id FROM pages WHERE normalized_url = ? LIMIT 1",
+            bind: { sqlite3_bind_text($0, 1, normalizedURL, -1, self.SQLITE_TRANSIENT) },
+            row: { String(cString: sqlite3_column_text($0, 0)) }
+        )
+        return id != nil
     }
 
     nonisolated static func contentHash(for content: String) -> String {
@@ -591,13 +608,11 @@ actor KnowledgeStorage {
     }
 
     private func fetchPageIDByContentHash(hash: String) throws -> String? {
-        let sql = "SELECT id FROM pages WHERE content_hash = ? LIMIT 1"
-        var statement: OpaquePointer?
-        defer { sqlite3_finalize(statement) }
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
-        sqlite3_bind_text(statement, 1, hash, -1, SQLITE_TRANSIENT)
-        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
-        return String(cString: sqlite3_column_text(statement, 0))
+        try queryOne(
+            "SELECT id FROM pages WHERE content_hash = ? LIMIT 1",
+            bind: { sqlite3_bind_text($0, 1, hash, -1, self.SQLITE_TRANSIENT) },
+            row: { String(cString: sqlite3_column_text($0, 0)) }
+        )
     }
 
     private func savePage(_ page: PageContent, contentHash: String) throws -> String {
@@ -792,42 +807,20 @@ actor KnowledgeStorage {
 
     func fetchTopic(name: String) async throws -> Topic? {
         try initialize()
-
-        let sql = "SELECT * FROM topics WHERE LOWER(name) = LOWER(?) LIMIT 1"
-        var statement: OpaquePointer?
-        defer { sqlite3_finalize(statement) }
-
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
-        }
-
-        sqlite3_bind_text(statement, 1, name, -1, SQLITE_TRANSIENT)
-
-        guard sqlite3_step(statement) == SQLITE_ROW else {
-            return nil
-        }
-
-        return try parseTopic(from: statement)
+        return try queryOne(
+            "SELECT * FROM topics WHERE LOWER(name) = LOWER(?) LIMIT 1",
+            bind: { sqlite3_bind_text($0, 1, name, -1, self.SQLITE_TRANSIENT) },
+            row: { try self.parseTopic(from: $0) }
+        )
     }
 
     func fetchWebsite(domain: String) async throws -> Website? {
         try initialize()
-
-        let sql = "SELECT * FROM websites WHERE domain = ?"
-        var statement: OpaquePointer?
-        defer { sqlite3_finalize(statement) }
-
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
-        }
-
-        sqlite3_bind_text(statement, 1, domain, -1, SQLITE_TRANSIENT)
-
-        guard sqlite3_step(statement) == SQLITE_ROW else {
-            return nil
-        }
-
-        return try parseWebsite(from: statement)
+        return try queryOne(
+            "SELECT * FROM websites WHERE domain = ?",
+            bind: { sqlite3_bind_text($0, 1, domain, -1, self.SQLITE_TRANSIENT) },
+            row: { try self.parseWebsite(from: $0) }
+        )
     }
 
     func saveEmbedding(pageID: String, vector: [Double]) throws {
@@ -841,14 +834,18 @@ actor KnowledgeStorage {
         })
     }
 
-    func saveChunkedEmbeddings(pageID: String, content: String) async {
+    func saveChunkedEmbeddings(pageID: String, content: String, annotations: [Annotation] = []) async {
         do {
             try initialize()
         } catch {
             return
         }
 
-        let chunks = Self.chunkText(content, targetWords: 400, overlapWords: 60)
+        let cappedContent = String(content.prefix(300_000))
+        let wordCount = PageContent.countWords(in: cappedContent)
+        let budget = Self.chunkBudget(wordCount: wordCount, hasHighlights: !annotations.isEmpty)
+        let maxChunks = max(budget * 4, 32)
+        let chunks = Self.chunkText(cappedContent, targetWords: 400, overlapWords: 60, maxChunks: maxChunks)
         guard !chunks.isEmpty else { return }
 
         try? execute(
@@ -857,15 +854,16 @@ actor KnowledgeStorage {
                 sqlite3_bind_text(stmt, 1, pageID, -1, SQLITE_TRANSIENT)
             }
         )
+        let selected = Self.selectChunks(chunks: chunks, annotations: annotations, budget: budget)
+        guard !selected.isEmpty else { return }
 
-        let limit = min(chunks.count, 12)
-        let texts = Array(chunks.prefix(limit))
+        let texts = selected.map { $0.text }
         let vectors = await EmbeddingService.shared.generateEmbeddings(for: texts)
 
-        for (index, text) in texts.enumerated() {
-            guard let vector = vectors[index] else { continue }
+        for (slot, pair) in selected.enumerated() {
+            guard let vector = vectors[slot] else { continue }
 
-            let chunkID = "\(pageID)_c\(index)"
+            let chunkID = "\(pageID)_c\(pair.index)"
             let data = vector.withUnsafeBytes { Data($0) }
 
             let sql = """
@@ -876,25 +874,98 @@ actor KnowledgeStorage {
             try? execute(sql, bindValues: { [self] stmt in
                 sqlite3_bind_text(stmt, 1, chunkID, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 2, pageID, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_int(stmt, 3, Int32(index))
-                sqlite3_bind_text(stmt, 4, text, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_int(stmt, 3, Int32(pair.index))
+                sqlite3_bind_text(stmt, 4, pair.text, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_blob(stmt, 5, (data as NSData).bytes, Int32(data.count), SQLITE_TRANSIENT)
             })
         }
     }
 
-    nonisolated static func chunkText(_ content: String, targetWords: Int, overlapWords: Int) -> [String] {
+    nonisolated static func chunkBudget(wordCount: Int, hasHighlights: Bool) -> Int {
+        switch wordCount {
+        case ..<500:   return 1
+        case ..<1500:  return 3
+        case ..<3500:  return 6
+        case ..<8000:  return hasHighlights ? 10 : 8
+        default:       return hasHighlights ? 14 : 12
+        }
+    }
+
+    nonisolated static func selectChunks(
+        chunks: [String],
+        annotations: [Annotation],
+        budget: Int
+    ) -> [(index: Int, text: String)] {
+        guard !chunks.isEmpty, budget > 0 else { return [] }
+        if chunks.count <= budget {
+            return chunks.enumerated().map { ($0.offset, $0.element) }
+        }
+
+        if !annotations.isEmpty {
+            let needles: [(String, Double)] = annotations.flatMap { ann -> [(String, Double)] in
+                var pairs: [(String, Double)] = []
+                let text = ann.text.lowercased()
+                if text.count >= 4 { pairs.append((text, 3.0)) }
+                let prefix = ann.prefix.lowercased()
+                if prefix.count >= 4 { pairs.append((prefix, 1.0)) }
+                let suffix = ann.suffix.lowercased()
+                if suffix.count >= 4 { pairs.append((suffix, 1.0)) }
+
+                return pairs
+            }
+
+            let scored: [(index: Int, score: Double)] = chunks.enumerated().map { idx, chunk in
+                let lower = chunk.lowercased()
+                var score = 0.0
+                for (needle, weight) in needles where lower.contains(needle) {
+                    score += weight
+                }
+                if idx == 0 || idx == chunks.count - 1 { score += 0.5 }
+
+                return (idx, score)
+            }
+
+            let ranked = scored
+                .sorted { $0.score > $1.score }
+                .prefix(budget)
+                .map { $0.index }
+                .sorted()
+
+            return ranked.map { ($0, chunks[$0]) }
+        }
+
+        var picked: Set<Int> = [0, chunks.count - 1]
+        let interior = budget - picked.count
+
+        if interior > 0 {
+            let step = Double(chunks.count - 1) / Double(interior + 1)
+
+            for i in 1...interior {
+                let idx = Int((Double(i) * step).rounded())
+                picked.insert(min(max(idx, 0), chunks.count - 1))
+            }
+        }
+
+        return picked.sorted().map { ($0, chunks[$0]) }
+    }
+
+    nonisolated static func chunkText(
+        _ content: String,
+        targetWords: Int,
+        overlapWords: Int,
+        maxChunks: Int = Int.max
+    ) -> [String] {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
 
-        let words = trimmed.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map(String.init)
+        let words = trimmed.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
         guard words.count > targetWords else { return [trimmed] }
 
         var chunks: [String] = []
         var index = 0
         let stride = max(1, targetWords - overlapWords)
 
-        while index < words.count {
+        while index < words.count && chunks.count < maxChunks {
             let end = min(words.count, index + targetWords)
             let slice = words[index..<end]
             chunks.append(slice.joined(separator: " "))
@@ -1786,12 +1857,47 @@ actor KnowledgeStorage {
                 }
 
                 cursor = tail
-                while let p = cursor, p.pointee != 0,
-                      p.pointee == 0x20 || p.pointee == 0x09 || p.pointee == 0x0A || p.pointee == 0x0D {
-                    cursor = p.advanced(by: 1)
+                while let ptr = cursor, ptr.pointee != 0,
+                      ptr.pointee == 0x20 || ptr.pointee == 0x09 || ptr.pointee == 0x0A || ptr.pointee == 0x0D {
+                    cursor = ptr.advanced(by: 1)
                 }
             }
         }
+    }
+
+    private func query<T>(
+        _ sql: String,
+        bind: (OpaquePointer?) -> Void = { _ in },
+        row: (OpaquePointer?) throws -> T
+    ) throws -> [T] {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        bind(statement)
+        var results: [T] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            results.append(try row(statement))
+        }
+
+        return results
+    }
+
+    private func queryOne<T>(
+        _ sql: String,
+        bind: (OpaquePointer?) -> Void = { _ in },
+        row: (OpaquePointer?) throws -> T
+    ) throws -> T? {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        bind(statement)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+
+        return try row(statement)
     }
 
     private func parsePage(from statement: OpaquePointer?) throws -> PageContent {

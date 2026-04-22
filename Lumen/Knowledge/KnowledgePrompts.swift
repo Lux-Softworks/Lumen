@@ -82,8 +82,8 @@ enum KnowledgePrompts {
     }
 
     static func conversationSummary(turns: [(role: String, text: String)], priorSummary: String?) -> String {
-        let transcript = turns.map { t in
-            "\(t.role == "user" ? "User" : "Assistant"): \(t.text)"
+        let transcript = turns.map { turn in
+            "\(turn.role == "user" ? "User" : "Assistant"): \(turn.text)"
         }.joined(separator: "\n")
         let priorBlock = priorSummary.map { "Prior summary: \($0)\n\n" } ?? ""
 

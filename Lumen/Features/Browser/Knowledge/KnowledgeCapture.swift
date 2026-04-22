@@ -159,7 +159,7 @@ class KnowledgeCaptureService: ObservableObject {
                 newlyCreatedWebsiteID = newWebsite.id
             }
 
-            let pageID = try await KnowledgeStorage.shared.save(
+            let saveResult = try await KnowledgeStorage.shared.save(
                 url: payload.url,
                 title: extractedContent.title,
                 content: extractedContent.content,
@@ -169,61 +169,21 @@ class KnowledgeCaptureService: ObservableObject {
                 readingTime: payload.readingTime,
                 scrollDepth: payload.scrollDepth
             )
+            let pageID = saveResult.pageID
 
             captureToken &+= 1
-            NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
+            NotificationCenter.default.post(
+                name: .knowledgeCaptured,
+                object: nil,
+                userInfo: ["isUpdate": !saveResult.isNew]
+            )
 
             let bgTask = Task.detached(priority: .background) { [extractedContent, newlyCreatedWebsiteID] in
-                try? await Task.sleep(nanoseconds: 800_000_000)
-                if Task.isCancelled { return }
-                if let embedding = await EmbeddingService.shared.generateEmbedding(
-                    for: extractedContent.content
-                ) {
-                    try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
-                }
-                if Task.isCancelled { return }
-                await Task.yield()
-                try? await KnowledgeStorage.shared.saveEntities(
+                await Self.runEnrichment(
                     pageID: pageID,
-                    content: extractedContent.content
+                    extracted: extractedContent,
+                    newlyCreatedWebsiteID: newlyCreatedWebsiteID
                 )
-                if Task.isCancelled { return }
-                await Task.yield()
-                await KnowledgeStorage.shared.saveChunkedEmbeddings(
-                    pageID: pageID,
-                    content: extractedContent.content
-                )
-                if Task.isCancelled { return }
-                try? await Task.sleep(nanoseconds: 300_000_000)
-
-                let pageSummary = await KnowledgeClassifier.summarize(
-                    content: extractedContent.content,
-                    title: extractedContent.title
-                )
-                if !pageSummary.isEmpty {
-                    try? await KnowledgeStorage.shared.updatePageSummary(pageID: pageID, summary: pageSummary)
-                }
-
-                if Task.isCancelled { return }
-                try? await Task.sleep(nanoseconds: 300_000_000)
-
-                if let newSiteID = newlyCreatedWebsiteID {
-                    let websiteSummary = await KnowledgeClassifier.summarizeWebsite(
-                        content: extractedContent.content,
-                        title: extractedContent.title
-                    )
-                    if !websiteSummary.isEmpty {
-                        try? await KnowledgeStorage.shared.updateWebsiteSynthesis(
-                            websiteID: newSiteID,
-                            summary: websiteSummary,
-                            pageCount: 1
-                        )
-                    }
-                }
-
-                await MainActor.run {
-                    NotificationCenter.default.post(name: .knowledgeCaptured, object: nil)
-                }
             }
             backgroundTasks.insert(bgTask)
             let trackedTask = bgTask
@@ -236,6 +196,90 @@ class KnowledgeCaptureService: ObservableObject {
                 "capture failed: \(String(describing: error), privacy: .public)"
             )
         }
+    }
+
+    private static func runEnrichment(
+        pageID: String,
+        extracted: ExtractedContent,
+        newlyCreatedWebsiteID: String?
+    ) async {
+        await yieldIfActive()
+        await savePageEmbedding(pageID: pageID, content: extracted.content)
+
+        await yieldIfActive()
+        await saveEntities(pageID: pageID, content: extracted.content)
+
+        await yieldIfActive()
+        await saveChunks(pageID: pageID, content: extracted.content)
+
+        await yieldIfActive()
+        await summarizePage(pageID: pageID, extracted: extracted)
+
+        await yieldIfActive()
+        if let siteID = newlyCreatedWebsiteID {
+            await summarizeWebsite(siteID: siteID, extracted: extracted)
+        }
+
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .knowledgeCaptured,
+                object: nil,
+                userInfo: ["stage": "enrichment"]
+            )
+        }
+    }
+
+    private static func yieldIfActive() async {
+        if Task.isCancelled { return }
+        await Task.yield()
+    }
+
+    private static func savePageEmbedding(pageID: String, content: String) async {
+        if Task.isCancelled { return }
+        guard let embedding = await EmbeddingService.shared.generateEmbedding(for: content) else { return }
+        try? await KnowledgeStorage.shared.saveEmbedding(pageID: pageID, vector: embedding)
+    }
+
+    private static func saveEntities(pageID: String, content: String) async {
+        if Task.isCancelled { return }
+        try? await KnowledgeStorage.shared.saveEntities(pageID: pageID, content: content)
+    }
+
+    private static func saveChunks(pageID: String, content: String) async {
+        if Task.isCancelled { return }
+        let annotations = (try? await KnowledgeStorage.shared.fetchAnnotations(pageID: pageID)) ?? []
+
+        await KnowledgeStorage.shared.saveChunkedEmbeddings(
+            pageID: pageID,
+            content: content,
+            annotations: annotations
+        )
+    }
+
+    private static func summarizePage(pageID: String, extracted: ExtractedContent) async {
+        if Task.isCancelled { return }
+        let summary = await KnowledgeClassifier.summarize(
+            content: extracted.content,
+            title: extracted.title
+        )
+        guard !summary.isEmpty else { return }
+
+        try? await KnowledgeStorage.shared.updatePageSummary(pageID: pageID, summary: summary)
+    }
+
+    private static func summarizeWebsite(siteID: String, extracted: ExtractedContent) async {
+        if Task.isCancelled { return }
+        let summary = await KnowledgeClassifier.summarizeWebsite(
+            content: extracted.content,
+            title: extracted.title
+        )
+        guard !summary.isEmpty else { return }
+
+        try? await KnowledgeStorage.shared.updateWebsiteSynthesis(
+            websiteID: siteID,
+            summary: summary,
+            pageCount: 1
+        )
     }
 
     private static func waitForDOMReady(webView: WKWebView) async {

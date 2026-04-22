@@ -2,10 +2,10 @@ import UIKit
 
 enum FaviconService {
     private static let cache: NSCache<NSURL, UIImage> = {
-        let c = NSCache<NSURL, UIImage>()
-        c.countLimit = 256
-        c.totalCostLimit = 16 * 1024 * 1024
-        return c
+        let cache = NSCache<NSURL, UIImage>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
     }()
 
     static func faviconURL(for pageURL: URL) -> URL? {

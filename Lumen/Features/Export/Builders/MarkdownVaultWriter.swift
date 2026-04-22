@@ -262,10 +262,8 @@ nonisolated enum MarkdownVaultWriter {
 
     private static func slug(_ raw: String) -> String {
         var cleaned = String(raw.unicodeScalars.map { scalar -> Character in
-            let c = Character(scalar)
-
-            if illegal.contains(c) { return "-" }
-            return c
+            let char = Character(scalar)
+            return illegal.contains(char) ? "-" : char
         })
         cleaned = cleaned
             .replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)

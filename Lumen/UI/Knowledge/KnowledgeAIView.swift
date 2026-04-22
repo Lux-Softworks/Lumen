@@ -48,16 +48,16 @@ struct KnowledgeAIView: View {
         .padding(.bottom, keyboardHeight)
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
-        ) { n in
-            guard let frame = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-            let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        ) { notification in
+            guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            let dur = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
             let height = max(0, frame.height - safeAreaBottom)
             withAnimation(.spring(duration: dur * 0.85, bounce: 0)) { keyboardHeight = height }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
-        ) { n in
-            let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        ) { notification in
+            let dur = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
             withAnimation(.easeOut(duration: dur * 0.9)) { keyboardHeight = 0 }
         }
     }
@@ -733,11 +733,11 @@ private struct ThreeDotsView: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(0..<3, id: \.self) { i in
+            ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(palette.text.opacity(phase == i ? 0.4 : 0.12))
+                    .fill(palette.text.opacity(phase == index ? 0.4 : 0.12))
                     .frame(width: 5, height: 5)
-                    .animation(.easeInOut(duration: 0.3).delay(Double(i) * 0.1), value: phase)
+                    .animation(.easeInOut(duration: 0.3).delay(Double(index) * 0.1), value: phase)
             }
         }
         .task {
@@ -784,13 +784,13 @@ private struct LumenSparkle: View {
                 TimelineView(.animation) { timeline in
                     let angle = timeline.date.timeIntervalSinceReferenceDate * 120
                     ZStack {
-                        ForEach(0..<tickCount, id: \.self) { i in
+                        ForEach(0..<tickCount, id: \.self) { index in
                             Capsule()
                                 .fill(palette.accent)
                                 .frame(width: 1.5, height: size * 0.2)
                                 .offset(y: -(size * 0.75 * tickSpread))
                                 .rotationEffect(
-                                    .degrees(Double(i) * (360.0 / Double(tickCount)) + angle)
+                                    .degrees(Double(index) * (360.0 / Double(tickCount)) + angle)
                                 )
                                 .opacity(tickOpacity)
                         }

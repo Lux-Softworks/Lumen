@@ -188,9 +188,9 @@ struct WebsitePageButton: View {
     @Environment(\.palette) private var palette
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
-        return f
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
     }()
 
     var body: some View {

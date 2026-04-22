@@ -21,15 +21,15 @@ struct HistoryStoreTests {
     }
 
     @Test func stableIDDeterministicForSameURL() {
-        let a = HistoryStore.stableID(for: "example.com/x")
-        let b = HistoryStore.stableID(for: "example.com/x")
-        #expect(a == b)
+        let first = HistoryStore.stableID(for: "example.com/x")
+        let second = HistoryStore.stableID(for: "example.com/x")
+        #expect(first == second)
     }
 
     @Test func stableIDDiffersForDifferentURLs() {
-        let a = HistoryStore.stableID(for: "example.com/x")
-        let b = HistoryStore.stableID(for: "example.com/y")
-        #expect(a != b)
+        let first = HistoryStore.stableID(for: "example.com/x")
+        let second = HistoryStore.stableID(for: "example.com/y")
+        #expect(first != second)
     }
 
     @Test func stableIDLength() {

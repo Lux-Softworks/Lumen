@@ -57,11 +57,15 @@ struct PageContentExtractor {
         let pageCount = pdf.pageCount
         if pageCount > 0 {
             for index in 0..<pageCount {
+                if extractedText.count >= Self.maxContentChars { break }
                 if let page = pdf.page(at: index) {
                     extractedText += page.string ?? ""
-                    if index < pageCount - 1 { extractedText += "\n" }
+                    if index < pageCount - 1 { extractedText += "\n\n" }
                 }
             }
+        }
+        if extractedText.count > Self.maxContentChars {
+            extractedText = String(extractedText.prefix(Self.maxContentChars))
         }
 
         var extractedTitle: String? = nil
@@ -102,19 +106,40 @@ private extension PageContentExtractor {
         return nil
     }
 
+    static let maxContentChars = 150_000
+    static let blockSelectors = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"
+
     func cleanHTML(_ html: String) throws -> String {
         let doc = try SwiftSoup.parse(html)
 
-        try doc.select("script, style").remove()
+        try doc.select("script, style, noscript, nav, header, footer, aside, form, iframe").remove()
+        try doc.select("[aria-hidden=true], [hidden]").remove()
 
-        let text = try doc.text()
+        let blocks = try doc.select(Self.blockSelectors)
+        var paragraphs: [String] = []
+        var totalChars = 0
 
-        let cleaned = text
-            .components(separatedBy: .whitespacesAndNewlines)
+        for block in blocks {
+            guard let text = try? block.text() else { continue }
+            let normalized = normalizeWhitespace(text)
+            guard normalized.count >= 20 else { continue }
+            if totalChars + normalized.count > Self.maxContentChars { break }
+            paragraphs.append(normalized)
+            totalChars += normalized.count + 2
+        }
+
+        if paragraphs.isEmpty {
+            let fallback = normalizeWhitespace((try? doc.text()) ?? "")
+            return String(fallback.prefix(Self.maxContentChars))
+        }
+
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    private func normalizeWhitespace(_ text: String) -> String {
+        text.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-
-        return cleaned
     }
 
     func extractSiteName(from html: String) throws -> String? {

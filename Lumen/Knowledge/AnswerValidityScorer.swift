@@ -38,8 +38,8 @@ enum AnswerValidityScorer {
 
         let joinedSources = sources.map { page -> String in
             var parts: [String] = []
-            if let t = page.title, !t.isEmpty { parts.append(t) }
-            if let s = page.summary, !s.isEmpty { parts.append(s) }
+            if let title = page.title, !title.isEmpty { parts.append(title) }
+            if let summary = page.summary, !summary.isEmpty { parts.append(summary) }
             parts.append(String(page.content.prefix(2000)))
             return parts.joined(separator: " ")
         }.joined(separator: " ")

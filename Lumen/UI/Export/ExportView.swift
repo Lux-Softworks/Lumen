@@ -81,8 +81,8 @@ struct ExportView: View {
     }
 
     private var isRunning: Bool {
-        guard let p = exportProgress else { return false }
-        switch p {
+        guard let progress = exportProgress else { return false }
+        switch progress {
         case .fetching, .writing, .zipping: return true
         default: return false
         }
@@ -91,8 +91,8 @@ struct ExportView: View {
     private static let progressGateDelay: UInt64 = 400_000_000
 
     private var isProgressVisible: Bool {
-        guard progressGateVisible, let p = exportProgress else { return false }
-        switch p {
+        guard progressGateVisible, let progress = exportProgress else { return false }
+        switch progress {
         case .fetching, .writing, .zipping, .finished: return true
         case .cancelled, .failed: return false
         }
@@ -262,8 +262,8 @@ struct ExportView: View {
 
     private var footerArea: some View {
         VStack(spacing: 12) {
-            if isProgressVisible, let p = exportProgress {
-                inlineProgressCard(progress: p)
+            if isProgressVisible, let progress = exportProgress {
+                inlineProgressCard(progress: progress)
                     .transition(.blurFade)
             }
             actionButton

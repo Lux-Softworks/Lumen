@@ -621,8 +621,8 @@ actor LocalKnowledgeProvider {
             text = text.replacingOccurrences(of: "  ", with: " ")
         }
 
-        for p in [",", ".", "!", "?", ";", ":"] {
-            text = text.replacingOccurrences(of: " \(p)", with: p)
+        for punct in [",", ".", "!", "?", ";", ":"] {
+            text = text.replacingOccurrences(of: " \(punct)", with: punct)
         }
 
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
