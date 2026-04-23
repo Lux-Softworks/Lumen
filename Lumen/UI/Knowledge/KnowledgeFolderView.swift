@@ -275,7 +275,6 @@ struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
 
     @State private var topicToDelete: Topic? = nil
-    @State private var showDeleteAlert = false
     @State private var exportSheet: ExportSheetItem? = nil
     @Environment(\.palette) private var palette
 
@@ -322,6 +321,21 @@ struct KnowledgeFolderView: View {
                 onDismiss: { exportSheet = nil }
             )
             .environment(\.palette, palette)
+        }
+        .alert(
+            "Delete \"\(topicToDelete?.name ?? "Folder")\"?",
+            isPresented: Binding(
+                get: { topicToDelete != nil },
+                set: { if !$0 { topicToDelete = nil } }
+            ),
+            presenting: topicToDelete
+        ) { topic in
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deleteTopic(topic) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("All websites and saved pages inside this folder will be permanently deleted.")
         }
     }
 
@@ -424,7 +438,6 @@ struct KnowledgeFolderView: View {
                                         }
                                         Button(role: .destructive) {
                                             topicToDelete = topic
-                                            showDeleteAlert = true
                                         } label: {
                                             Label("Delete", systemImage: "trash")
                                         }
@@ -434,21 +447,6 @@ struct KnowledgeFolderView: View {
                         }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
-                        .alert(
-                            "Delete \"\(topicToDelete?.name ?? "Folder")\"?",
-                            isPresented: $showDeleteAlert,
-                            presenting: topicToDelete
-                        ) { topic in
-                            Button("Delete", role: .destructive) {
-                                Task { await viewModel.deleteTopic(topic) }
-                                topicToDelete = nil
-                            }
-                            Button("Cancel", role: .cancel) {
-                                topicToDelete = nil
-                            }
-                        } message: { _ in
-                            Text("All websites and saved pages inside this folder will be permanently deleted.")
-                        }
                     }
                 }
             }
