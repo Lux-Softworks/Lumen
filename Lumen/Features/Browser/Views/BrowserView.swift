@@ -123,6 +123,9 @@ struct BrowserView: View {
                 isAddressBarFocused: $isAddressBarFocused
             )
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
+            .onOpenURL { url in
+                tabManager.openExternalURL(url)
+            }
             .onAppear {
                 wireDownloadHandler()
                 DispatchQueue.main.async {

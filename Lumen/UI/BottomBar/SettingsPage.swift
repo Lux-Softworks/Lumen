@@ -629,7 +629,10 @@ struct SettingsPage: View {
             }
 
             Button {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
+                if #available(iOS 18.3, *),
+                   let url = URL(string: UIApplication.openDefaultApplicationsSettingsURLString) {
+                    UIApplication.shared.open(url)
+                } else if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             } label: {

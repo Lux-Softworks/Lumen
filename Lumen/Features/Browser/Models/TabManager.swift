@@ -68,6 +68,23 @@ final class TabManager: ObservableObject {
         newTab(incognito: true)
     }
 
+    func openExternalURL(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard scheme == "http" || scheme == "https" else { return }
+
+        if let active = activeTab, !active.isIncognito {
+            active.viewModel.loadURL(url)
+            return
+        }
+
+        let tab = Tab(url: url)
+        wirePopupHandler(for: tab)
+        tabs.append(tab)
+        activeTabId = tab.id
+        observeActiveViewModel()
+        tab.viewModel.loadURL(url)
+    }
+
     func switchTab(id: UUID) {
         guard tabs.contains(where: { $0.id == id }) else { return }
         activeTabId = id

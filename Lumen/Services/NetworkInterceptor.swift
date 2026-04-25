@@ -63,6 +63,22 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         let scheme = url.scheme?.lowercased()
 
+        if scheme == "marketplace-kit" {
+            let isUserInitiated = navigationAction.navigationType == .linkActivated
+                || navigationAction.navigationType == .formSubmitted
+            let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? false
+
+            if isUserInitiated && isMainFrame {
+                logger.info("Forwarding marketplace-kit handoff to WebKit/MarketplaceKit")
+                decisionHandler(.allow)
+            } else {
+                logger.warning("Ignoring non-user-initiated marketplace-kit invocation")
+                decisionHandler(.cancel)
+            }
+
+            return
+        }
+
         if navigationAction.navigationType == .linkActivated
             || navigationAction.navigationType == .formSubmitted
             || navigationAction.navigationType == .other
