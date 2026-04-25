@@ -55,43 +55,76 @@ final class KnowledgeAIViewModel {
 
         await maybeCompactHistory(priorMessages: priorMessages)
 
-        let scored: [(page: PageContent, score: Double)]
-        do {
-            scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 6)
-        } catch {
-            finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
-            return
-        }
-
-        let strongMinScore = 0.40
-        let weakMinScore = 0.30
-        let topScore = scored.first?.score ?? 0
-
-        var searchResults = scored.filter { $0.score >= strongMinScore }.map { $0.page }
+        let parsedDate = DateQueryParser.parse(trimmed)
+        var searchResults: [PageContent] = []
         var ftsHitCount = 0
+        var topScore: Double = 0
 
-        if searchResults.isEmpty {
+        if let parsedDate {
+            setStatus("Searching pages from \(parsedDate.phrase)…")
+            let residual = parsedDate.cleanedQuery
+
             do {
-                let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
-                ftsHitCount = keywordHits.count
+                let scoped = try await KnowledgeStorage.shared.searchSemanticScoredInDateRange(
+                    query: residual, range: parsedDate.range, limit: 6
+                )
 
-                if !keywordHits.isEmpty {
-                    let existing = Set(searchResults.map { $0.id })
-                    for page in keywordHits where !existing.contains(page.id) {
-                        searchResults.append(page)
-                        if searchResults.count >= 3 { break }
-                    }
+                topScore = scoped.first?.score ?? 0
+                searchResults = scoped.map { $0.page }
+            } catch {
+                finishThinking()
+                messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
 
-                    if searchResults.isEmpty {
-                        for page in scored.filter({ $0.score >= weakMinScore }).map({ $0.page }) {
+                return
+            }
+
+            if searchResults.isEmpty {
+                finishThinking()
+                messages.append(ChatMessage(
+                    role: .assistant,
+                    text: "Nothing in your saved pages from \(parsedDate.phrase)."
+                ))
+
+                return
+            }
+        } else {
+            let scored: [(page: PageContent, score: Double)]
+            do {
+                scored = try await KnowledgeStorage.shared.searchSemanticScored(query: trimmed, limit: 6)
+            } catch {
+                finishThinking()
+                messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
+
+                return
+            }
+
+            let strongMinScore = 0.40
+            let weakMinScore = 0.30
+            topScore = scored.first?.score ?? 0
+            searchResults = scored.filter { $0.score >= strongMinScore }.map { $0.page }
+
+            if searchResults.isEmpty {
+                do {
+                    let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
+                    ftsHitCount = keywordHits.count
+
+                    if !keywordHits.isEmpty {
+                        let existing = Set(searchResults.map { $0.id })
+                        for page in keywordHits where !existing.contains(page.id) {
                             searchResults.append(page)
-                            if searchResults.count >= 2 { break }
+                            if searchResults.count >= 3 { break }
+                        }
+
+                        if searchResults.isEmpty {
+                            for page in scored.filter({ $0.score >= weakMinScore }).map({ $0.page }) {
+                                searchResults.append(page)
+                                if searchResults.count >= 2 { break }
+                            }
                         }
                     }
+                } catch {
+                    KnowledgeLogger.query.error("FTS fallback failed: \(String(describing: error), privacy: .public)")
                 }
-            } catch {
-                KnowledgeLogger.query.error("FTS fallback failed: \(String(describing: error), privacy: .public)")
             }
         }
 
@@ -139,6 +172,7 @@ final class KnowledgeAIViewModel {
         let streamIndex = messages.count - 1
         setStatus("Thinking…")
         let summary = conversationSummary
+        let dateScopePhrase = parsedDate?.phrase
 
         activeTask = Task {
             var raw = ""
@@ -157,7 +191,7 @@ final class KnowledgeAIViewModel {
 
             do {
                 let stream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
-                    query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary)
+                    query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary, dateScopePhrase: dateScopePhrase)
                 for try await chunk in stream {
                     if Task.isCancelled { break }
                     raw += chunk
@@ -175,7 +209,7 @@ final class KnowledgeAIViewModel {
                 KnowledgeLogger.rag.error("empty stream output — retrying stream")
                 do {
                     let retryStream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
-                        query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary)
+                        query: trimmed, sources: sources, highlights: highlights, history: history, conversationSummary: summary, dateScopePhrase: dateScopePhrase)
                     for try await chunk in retryStream {
                         if Task.isCancelled { break }
                         raw += chunk

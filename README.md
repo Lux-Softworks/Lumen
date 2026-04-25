@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
   <img src="https://img.shields.io/badge/AGPL--3.0-blue?style=flat" />
-  <img src="https://img.shields.io/badge/v1.1.4-E8E4DC?style=flat" />
+  <img src="https://img.shields.io/badge/v1.1.5-E8E4DC?style=flat" />
 </p>
 
 <p align="center">
@@ -124,7 +124,7 @@ Lumen has no server, meaning there's nothing to send.
 ## Stack
 
 ```
-Swift 6.2 · SwiftUI · iOS 26+ · Xcode 26.2+
+Swift 6.2 · SwiftUI · iOS 18+ · Xcode 26.2+
 │
 ├── 🧠  MLX Swift ──────── on-device Llama 3.2 1B inference
 ├── 🌐  WKWebView ──────── hardened browser engine
@@ -142,7 +142,7 @@ Swift 6.2 · SwiftUI · iOS 26+ · Xcode 26.2+
 ### Requirements
 
 - macOS with **Xcode 26.2** or newer
-- **iOS 26** device or simulator (Apple Silicon Mac required for the simulator — MLX needs an ARM GPU)
+- **iOS 18** or newer device or simulator (Apple Silicon Mac required for the simulator — MLX needs an ARM GPU)
 - Apple Developer account for code signing
 - Network access on first launch (the LLM weights are pulled from Hugging Face)
 
@@ -162,7 +162,7 @@ In Xcode:
 1. Select the **Lumen** target → **Signing & Capabilities**.
 2. Replace the bundled team (`XF6K537DNY`) with your own, and change the bundle identifier from `com.luxsoftworks.Lumen` to something unique to you (e.g. `com.yourname.Lumen`). Do the same for the `LumenTests` and `LumenUITests` targets.
 3. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open — wait for it to finish.
-4. Pick a destination (iOS 26 device or iOS 26 simulator on Apple Silicon) and hit **⌘R**.
+4. Pick a destination (iOS 18+ device or iOS 18+ simulator on Apple Silicon) and hit **⌘R**.
 
 ### First launch
 

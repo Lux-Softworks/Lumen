@@ -1048,8 +1048,74 @@ actor KnowledgeStorage {
             return []
         }
 
-        let chunkScores = try scoreChunks(queryVector: queryVector)
-        let pageScores = try scorePages(queryVector: queryVector)
+        return try await rankPagesByVector(queryVector, limit: limit, pageIDFilter: nil)
+    }
+
+    func searchSemanticScoredInDateRange(
+        query: String,
+        range: DateInterval,
+        limit: Int = 6
+    ) async throws -> [(page: PageContent, score: Double)] {
+        try initialize()
+
+        let pageIDs = try fetchPageIDsCreated(in: range)
+        guard !pageIDs.isEmpty else { return [] }
+
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let queryVector = trimmedQuery.isEmpty
+            ? nil
+            : await EmbeddingService.shared.generateEmbedding(for: trimmedQuery) {
+            let ranked = try await rankPagesByVector(
+                queryVector,
+                limit: limit,
+                pageIDFilter: Set(pageIDs)
+            )
+
+            if !ranked.isEmpty { return ranked }
+        }
+
+        let recent = try await fetchPagesCreated(in: range, limit: limit)
+
+        return recent.map { (page: $0, score: 0.0) }
+    }
+
+    func fetchPagesCreated(in range: DateInterval, limit: Int = 100) async throws -> [PageContent] {
+        try initialize()
+        let sql = "SELECT * FROM pages WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC LIMIT ?"
+
+        return try await queryPages(sql: sql) { statement in
+            sqlite3_bind_double(statement, 1, range.start.timeIntervalSince1970)
+            sqlite3_bind_double(statement, 2, range.end.timeIntervalSince1970)
+            sqlite3_bind_int(statement, 3, Int32(limit))
+        }
+    }
+
+    private func fetchPageIDsCreated(in range: DateInterval) throws -> [String] {
+        let sql = "SELECT id FROM pages WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_double(statement, 1, range.start.timeIntervalSince1970)
+        sqlite3_bind_double(statement, 2, range.end.timeIntervalSince1970)
+
+        var ids: [String] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            ids.append(String(cString: sqlite3_column_text(statement, 0)))
+        }
+
+        return ids
+    }
+
+    private func rankPagesByVector(
+        _ queryVector: [Double],
+        limit: Int,
+        pageIDFilter: Set<String>?
+    ) async throws -> [(page: PageContent, score: Double)] {
+        let chunkScores = try scoreChunks(queryVector: queryVector, pageIDFilter: pageIDFilter)
+        let pageScores = try scorePages(queryVector: queryVector, pageIDFilter: pageIDFilter)
 
         var bestByPage: [String: Double] = [:]
 
@@ -1082,7 +1148,7 @@ actor KnowledgeStorage {
         return results
     }
 
-    private func scoreChunks(queryVector: [Double]) throws -> [(pageID: String, score: Double)] {
+    private func scoreChunks(queryVector: [Double], pageIDFilter: Set<String>? = nil) throws -> [(pageID: String, score: Double)] {
         let sql = """
             SELECT pc.page_id, pc.vector FROM page_chunks pc
             JOIN pages p ON pc.page_id = p.id
@@ -1101,6 +1167,7 @@ actor KnowledgeStorage {
 
         while sqlite3_step(statement) == SQLITE_ROW {
             let pageID = String(cString: sqlite3_column_text(statement, 0))
+            if let filter = pageIDFilter, !filter.contains(pageID) { continue }
 
             guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
             let blobSize = Int(sqlite3_column_bytes(statement, 1))
@@ -1118,7 +1185,7 @@ actor KnowledgeStorage {
         return bestPerPage.map { ($0.key, $0.value) }
     }
 
-    private func scorePages(queryVector: [Double]) throws -> [(pageID: String, score: Double)] {
+    private func scorePages(queryVector: [Double], pageIDFilter: Set<String>? = nil) throws -> [(pageID: String, score: Double)] {
         let sql = """
             SELECT pe.page_id, pe.vector FROM page_embeddings pe
             JOIN pages p ON pe.page_id = p.id
@@ -1137,6 +1204,7 @@ actor KnowledgeStorage {
 
         while sqlite3_step(statement) == SQLITE_ROW {
             let pageID = String(cString: sqlite3_column_text(statement, 0))
+            if let filter = pageIDFilter, !filter.contains(pageID) { continue }
 
             guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
             let blobSize = Int(sqlite3_column_bytes(statement, 1))
@@ -1431,6 +1499,19 @@ actor KnowledgeStorage {
         try execute("DELETE FROM pages")
         try execute("DELETE FROM websites")
         try execute("DELETE FROM topics")
+    }
+
+    func deleteAllKnowledge() throws {
+        try initialize()
+        try? execute("DELETE FROM annotations")
+        try? execute("DELETE FROM page_entities")
+        try? execute("DELETE FROM page_chunks")
+        try? execute("DELETE FROM page_embeddings")
+        try execute("DELETE FROM pages")
+        try? execute("DELETE FROM pages_fts")
+        try execute("DELETE FROM websites")
+        try execute("DELETE FROM topics")
+        try? execute("VACUUM")
     }
 
     func seedTestData() async throws {

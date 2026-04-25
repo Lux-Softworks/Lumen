@@ -19,11 +19,11 @@ enum KnowledgePrompts {
     static func websiteSummary(content: String, title: String?) -> String {
         """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        Describe a website's purpose in under 8 words.<|eot_id|>\
+        Describe a website's purpose in one short, complete sentence ending in a period. Maximum 20 words. Never trail off.<|eot_id|>\
         <|start_header_id|>user<|end_header_id|>
         developer.apple.com: Documentation for iOS, macOS, watchOS APIs and frameworks.<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
-        Apple developer documentation and API reference.<|eot_id|>\
+        Apple's developer documentation and API reference for its platforms.<|eot_id|>\
         <|start_header_id|>user<|end_header_id|>
         \(title ?? ""): \(content.prefix(800))<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
@@ -35,7 +35,7 @@ enum KnowledgePrompts {
         let joined = summaries.prefix(8).joined(separator: ". ")
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        Describe what these pages have in common in one sentence.<|eot_id|>\
+        Describe what these pages have in common in one or two complete sentences ending in a period. Maximum 40 words. Never trail off.<|eot_id|>\
         <|start_header_id|>user<|end_header_id|>
         \(joined)<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
@@ -129,6 +129,32 @@ enum KnowledgePrompts {
         \(query)<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
 
+        """
+    }
+
+    static func ragAnswerDateScoped(
+        query: String,
+        context: String,
+        highlightsBlock: String,
+        highlightsGuideline: String,
+        historyBlock: String,
+        scopePhrase: String
+    ) -> String {
+        """
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        Answer using the sources below. Each source is a page from the user's reading history, labeled with its title and the date the user read it (e.g. "Page Title (read Apr 17, 2026)").
+        The user is asking specifically about: \(scopePhrase).
+        - If the user asks what they read, list each source by **title** and read date. Group related items.
+        - Otherwise, synthesize facts from the sources and reference read dates when temporally relevant ("you read about X on Apr 18").
+        - Do not refuse. Do not describe your process.
+        - Do NOT cite URLs or use [1] markers. Titles and read dates are allowed when the user asks about reading history.
+        - Each sentence must add new information.
+        - Bold **key terms** only when it adds clarity.\(highlightsGuideline)
+
+        Sources:
+        \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
+        \(query)<|eot_id|>\
+        <|start_header_id|>assistant<|end_header_id|>
         """
     }
 }

@@ -17,14 +17,15 @@ enum PromptBudgeter {
         sources: [PageContent],
         highlights: [String],
         history: [(role: String, text: String)],
-        conversationSummary: String? = nil
+        conversationSummary: String? = nil,
+        includeReadDates: Bool = false
     ) -> Blocks {
         let available = max(0, maxInputChars - templateOverhead - query.count)
         let sourcesBudget = Int(Double(available) * 0.60)
         let highlightsBudget = Int(Double(available) * 0.20)
         let historyBudget = available - sourcesBudget - highlightsBudget
 
-        let context = buildContext(sources: sources, budget: sourcesBudget)
+        let context = buildContext(sources: sources, budget: sourcesBudget, includeReadDates: includeReadDates)
         let (highlightsBlock, highlightsGuideline) = buildHighlights(highlights: highlights, budget: highlightsBudget)
         let historyBlock = buildHistory(history: history, budget: historyBudget, summary: conversationSummary)
 
@@ -36,14 +37,24 @@ enum PromptBudgeter {
         )
     }
 
-    private static func buildContext(sources: [PageContent], budget: Int) -> String {
-        let top = Array(sources.prefix(3))
+    private static let readDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
+    private static func buildContext(sources: [PageContent], budget: Int, includeReadDates: Bool) -> String {
+        let top = Array(sources.prefix(includeReadDates ? 5 : 3))
         guard !top.isEmpty, budget > 0 else { return "" }
 
         let perSource = max(minSourceChars, budget / top.count)
 
         return top.map { page -> String in
-            let label = page.title ?? page.domain
+            let baseLabel = page.title ?? page.domain
+            let label: String = includeReadDates
+                ? "\(baseLabel) (read \(readDateFormatter.string(from: page.createdAt)))"
+                : baseLabel
             let summary = page.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let body = page.content.trimmingCharacters(in: .whitespacesAndNewlines)
 

@@ -41,6 +41,7 @@ struct SettingsPage: View {
     @Namespace private var nativeAppsNamespace
     @State private var navigationPath: [SettingsSection] = []
     @State private var showClearDataAlert = false
+    @State private var showDeleteKnowledgeAlert = false
 
     @State private var pageZoom: Int = 100
     @State private var requestDesktopSite: Bool = false
@@ -73,6 +74,12 @@ struct SettingsPage: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will clear your history and all website data.")
+        }
+        .alert("Delete All Knowledge?", isPresented: $showDeleteKnowledgeAlert) {
+            Button("Delete", role: .destructive) { deleteAllKnowledge() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes every page, website, topic, summary, embedding, and annotation Lumen has stored. Your reading history in the knowledge base will be gone. This cannot be undone.")
         }
     }
 
@@ -210,6 +217,14 @@ struct SettingsPage: View {
             settingsGroup {
                 settingsRow(icon: "trash", title: "Clear Browsing Data", destructive: true) {
                     showClearDataAlert = true
+                }
+                divider
+                settingsRow(
+                    icon: "brain.head.profile",
+                    title: "Delete All Knowledge",
+                    destructive: true
+                ) {
+                    showDeleteKnowledgeAlert = true
                 }
             }
 
@@ -768,6 +783,12 @@ struct SettingsPage: View {
     private func pop() {
         if !navigationPath.isEmpty {
             navigationPath.removeLast()
+        }
+    }
+
+    private func deleteAllKnowledge() {
+        Task.detached(priority: .userInitiated) {
+            try? await KnowledgeStorage.shared.deleteAllKnowledge()
         }
     }
 

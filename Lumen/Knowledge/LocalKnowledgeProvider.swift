@@ -296,7 +296,7 @@ actor LocalKnowledgeProvider {
 
         let prompt = await KnowledgePrompts.websiteSummary(content: content, title: title)
 
-        let parameters = GenerateParameters(maxTokens: 25, temperature: 0.1)
+        let parameters = GenerateParameters(maxTokens: 60, temperature: 0.1)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
 
@@ -331,7 +331,7 @@ actor LocalKnowledgeProvider {
 
         let prompt = await KnowledgePrompts.websiteReadingSynthesis(summaries: summaries)
 
-        let parameters = GenerateParameters(maxTokens: 60, temperature: 0.15)
+        let parameters = GenerateParameters(maxTokens: 140, temperature: 0.15)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
 
@@ -506,7 +506,8 @@ actor LocalKnowledgeProvider {
         sources: [PageContent],
         highlights: [String] = [],
         history: [(role: String, text: String)] = [],
-        conversationSummary: String? = nil
+        conversationSummary: String? = nil,
+        dateScopePhrase: String? = nil
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task<Void, Never> {
@@ -540,16 +541,29 @@ actor LocalKnowledgeProvider {
                         sources: sources,
                         highlights: highlights,
                         history: history,
-                        conversationSummary: conversationSummary
+                        conversationSummary: conversationSummary,
+                        includeReadDates: dateScopePhrase != nil
                     )
 
-                    let prompt = await KnowledgePrompts.ragAnswer(
-                        query: query,
-                        context: blocks.context,
-                        highlightsBlock: blocks.highlightsBlock,
-                        highlightsGuideline: blocks.highlightsGuideline,
-                        historyBlock: blocks.historyBlock
-                    )
+                    let prompt: String
+                    if let scope = dateScopePhrase {
+                        prompt = await KnowledgePrompts.ragAnswerDateScoped(
+                            query: query,
+                            context: blocks.context,
+                            highlightsBlock: blocks.highlightsBlock,
+                            highlightsGuideline: blocks.highlightsGuideline,
+                            historyBlock: blocks.historyBlock,
+                            scopePhrase: scope
+                        )
+                    } else {
+                        prompt = await KnowledgePrompts.ragAnswer(
+                            query: query,
+                            context: blocks.context,
+                            highlightsBlock: blocks.highlightsBlock,
+                            highlightsGuideline: blocks.highlightsGuideline,
+                            historyBlock: blocks.historyBlock
+                        )
+                    }
 
                     let parameters = GenerateParameters(
                         maxTokens: 8192,
@@ -625,6 +639,16 @@ actor LocalKnowledgeProvider {
             text = text.replacingOccurrences(of: " \(punct)", with: punct)
         }
 
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let last = text.last, !".!?".contains(last),
+           let lastTerminal = text.lastIndex(where: { ".!?".contains($0) }) {
+            let trimmed = String(text[...lastTerminal])
+            if Double(trimmed.count) >= Double(text.count) * 0.5 {
+                text = trimmed
+            }
+        }
+
+        return text
     }
 }
