@@ -50,15 +50,13 @@ struct KnowledgeAIView: View {
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
         ) { notification in
             guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-            let dur = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
             let height = max(0, frame.height - safeAreaBottom)
-            withAnimation(.spring(duration: dur * 0.85, bounce: 0)) { keyboardHeight = height }
+            withAnimation(Self.keyboardAnimation(from: notification)) { keyboardHeight = height }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
         ) { notification in
-            let dur = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
-            withAnimation(.easeOut(duration: dur * 0.9)) { keyboardHeight = 0 }
+            withAnimation(Self.keyboardAnimation(from: notification)) { keyboardHeight = 0 }
         }
     }
 
@@ -205,6 +203,20 @@ struct KnowledgeAIView: View {
         !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty
             && !viewModel.isThinking
             && !viewModel.isModelLoading
+    }
+
+    private static func keyboardAnimation(from notification: Notification) -> Animation {
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 7
+
+        switch UIView.AnimationCurve(rawValue: curveRaw) {
+        case .easeIn:    return .easeIn(duration: duration)
+        case .easeOut:   return .easeOut(duration: duration)
+        case .linear:    return .linear(duration: duration)
+        case .easeInOut: return .easeInOut(duration: duration)
+        default:
+            return .timingCurve(0.2, 0.8, 0.2, 1.0, duration: duration)
+        }
     }
 }
 

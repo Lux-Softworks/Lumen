@@ -20,7 +20,7 @@ actor LocalKnowledgeProvider {
     private var idleTask: Task<Void, Never>?
     private var lastUsed: Date?
     private var isWarmed: Bool = false
-    private static let idleUnloadSeconds: UInt64 = 180
+    private static let idleUnloadSeconds: UInt64 = 30
 
     private var shutdownRequested: Bool = false
     private var inflightCount: Int = 0
@@ -82,6 +82,13 @@ actor LocalKnowledgeProvider {
         let center = NotificationCenter.default
         center.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in await self?.handleShutdown() }
+        }
+        center.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -441,6 +448,106 @@ actor LocalKnowledgeProvider {
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    func classifyConversationalIntent(
+        query: String,
+        history: [(role: String, text: String)]
+    ) async -> Bool {
+        if modelContainer == nil {
+            do { try await loadModel() } catch { return false }
+        }
+        guard let container = modelContainer else { return false }
+
+        beginInference()
+        defer { endInference() }
+
+        let prompt = await KnowledgePrompts.intentClassifier(query: query, recentTurns: history)
+        let parameters = GenerateParameters(maxTokens: 4, temperature: 0.0)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
+
+        do {
+            let stream = try await container.generate(input: input, parameters: parameters)
+            var output = ""
+            for await event in stream {
+                if Task.isCancelled { break }
+                if case .chunk(let text) = event { output += text }
+            }
+            clearGPUCache()
+            touch()
+            let normalized = output
+                .lowercased()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalized.hasPrefix("chat")
+        } catch {
+            return false
+        }
+    }
+
+    func chatStream(
+        query: String,
+        history: [(role: String, text: String)],
+        conversationSummary: String? = nil,
+        libraryContext: String? = nil
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task<Void, Never> {
+                self.beginInference()
+                defer { self.endInference() }
+
+                do {
+                    #if targetEnvironment(simulator)
+                    continuation.yield("Hey, what's on your mind?")
+                    continuation.finish()
+                    return
+                    #else
+
+                    if self.modelContainer == nil {
+                        try await self.loadModel()
+                    }
+
+                    guard let container = self.modelContainer else {
+                        throw NSError(
+                            domain: "LocalKnowledgeProvider", code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+                    }
+
+                    let prompt = await KnowledgePrompts.conversationalChat(
+                        query: query,
+                        history: history,
+                        conversationSummary: conversationSummary,
+                        libraryContext: libraryContext
+                    )
+
+                    let parameters = GenerateParameters(maxTokens: 256, temperature: 0.7)
+                    let tokens = await container.encode(prompt)
+                    let input = LMInput(tokens: MLXArray(tokens))
+
+                    let stream = try await container.generate(input: input, parameters: parameters)
+                    for await event in stream {
+                        if Task.isCancelled { break }
+                        if case .chunk(let text) = event {
+                            continuation.yield(text)
+                        }
+                    }
+
+                    self.clearGPUCache()
+                    self.touch()
+                    continuation.finish()
+                    #endif
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            Task { self.registerStreamTask(task) }
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+                Task { await self.unregisterStreamTask(task) }
+            }
+        }
+    }
+
     func answerFromKnowledge(
         query: String,
         sources: [PageContent],
@@ -597,7 +704,7 @@ actor LocalKnowledgeProvider {
 
             Task { self.registerStreamTask(task) }
 
-            continuation.onTermination = { _ in
+            continuation.onTermination = { @Sendable _ in
                 task.cancel()
                 Task { await self.unregisterStreamTask(task) }
             }

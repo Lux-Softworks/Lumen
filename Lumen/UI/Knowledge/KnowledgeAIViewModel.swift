@@ -24,6 +24,25 @@ final class KnowledgeAIViewModel {
     private let autoCompactThreshold = 8
     private let keepRecentTurns = 3
 
+    private static let thinkingMessages = [
+        "Thinking…",
+        "Pondering…",
+        "Wondering…",
+        "Reflecting…",
+    ]
+
+    private static let searchingMessages = [
+        "Searching…",
+        "Browsing…",
+        "Scanning…",
+        "Digging…",
+    ]
+
+    private static let compactingMessages = [
+        "Condensing…",
+        "Summarizing…",
+    ]
+
     private func setStatus(_ message: String?) {
         statusMessage = message
     }
@@ -49,11 +68,28 @@ final class KnowledgeAIViewModel {
         inputText = ""
         let priorMessages = messages
         messages.append(ChatMessage(role: .user, text: trimmed))
+
         isThinking = true
         sparklePhase = .spinning
-        setStatus("Searching your library…")
+        setStatus(Self.thinkingMessages.randomElement()!)
 
         await maybeCompactHistory(priorMessages: priorMessages)
+
+        let chatHistory: [(role: String, text: String)] = priorMessages.suffix(8).map { msg in
+            (msg.role == .user ? "user" : "assistant", msg.text)
+        }
+
+        let isConversational = await LocalKnowledgeProvider.shared.classifyConversationalIntent(
+            query: trimmed,
+            history: chatHistory
+        )
+
+        if isConversational {
+            await respondConversationally(query: trimmed, history: chatHistory)
+            return
+        }
+
+        setStatus(Self.searchingMessages.randomElement()!)
 
         let parsedDate = DateQueryParser.parse(trimmed)
         var searchResults: [PageContent] = []
@@ -80,10 +116,8 @@ final class KnowledgeAIViewModel {
 
             if searchResults.isEmpty {
                 finishThinking()
-                messages.append(ChatMessage(
-                    role: .assistant,
-                    text: "Nothing in your saved pages from \(parsedDate.phrase)."
-                ))
+                let fallback = await emptyResultMessage(scopePhrase: parsedDate.phrase)
+                messages.append(ChatMessage(role: .assistant, text: fallback))
 
                 return
             }
@@ -149,7 +183,8 @@ final class KnowledgeAIViewModel {
 
         guard !sources.isEmpty else {
             finishThinking()
-            messages.append(ChatMessage(role: .assistant, text: "I don't have that in your saved pages."))
+            let fallback = await emptyResultMessage(scopePhrase: nil)
+            messages.append(ChatMessage(role: .assistant, text: fallback))
             return
         }
 
@@ -170,7 +205,7 @@ final class KnowledgeAIViewModel {
         _ = match
         messages.append(ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true))
         let streamIndex = messages.count - 1
-        setStatus("Thinking…")
+        setStatus(Self.thinkingMessages.randomElement()!)
         let summary = conversationSummary
         let dateScopePhrase = parsedDate?.phrase
 
@@ -251,7 +286,7 @@ final class KnowledgeAIViewModel {
                         sources: sources,
                         sourceEmbeddings: vectors
                     )
-                    scoredMatch = AnswerValidityScorer.match(for: validity)
+                    scoredMatch = AnswerValidityScorer.match(answer: finalText, validity: validity)
                 } catch {
                     KnowledgeLogger.rag.error("validity scoring failed: \(String(describing: error), privacy: .public)")
                 }
@@ -300,6 +335,114 @@ final class KnowledgeAIViewModel {
         return tokens.joined(separator: " OR ")
     }
 
+    private func respondConversationally(
+        query: String,
+        history: [(role: String, text: String)]
+    ) async {
+        let libraryContext = await buildLibraryContext()
+
+        messages.append(ChatMessage(role: .assistant, text: "", isStreaming: true))
+        let streamIndex = messages.count - 1
+        let summary = conversationSummary
+
+        activeTask = Task {
+            var raw = ""
+            var streamError: Error? = nil
+            let flushInterval: TimeInterval = 0.08
+            var lastFlush = Date(timeIntervalSince1970: 0)
+
+            @MainActor func flushIfDue(force: Bool = false) {
+                let now = Date()
+                guard force || now.timeIntervalSince(lastFlush) >= flushInterval else { return }
+                lastFlush = now
+                if streamIndex < messages.count, messages[streamIndex].text != raw {
+                    messages[streamIndex].text = raw
+                }
+            }
+
+            do {
+                let stream = await LocalKnowledgeProvider.shared.chatStream(
+                    query: query,
+                    history: history,
+                    conversationSummary: summary,
+                    libraryContext: libraryContext
+                )
+                for try await chunk in stream {
+                    if Task.isCancelled { break }
+                    raw += chunk
+                    flushIfDue()
+                }
+                flushIfDue(force: true)
+            } catch {
+                if Task.isCancelled { return }
+                streamError = error
+            }
+
+            if streamIndex < messages.count {
+                if raw.isEmpty {
+                    messages[streamIndex].text = streamError != nil
+                        ? "Couldn't generate a reply."
+                        : "…"
+                } else {
+                    messages[streamIndex].text = raw
+                }
+                messages[streamIndex].isStreaming = false
+            }
+
+            finishThinking()
+        }
+    }
+
+    private func buildLibraryContext() async -> String? {
+        let total = (try? await KnowledgeStorage.shared.pageCount()) ?? 0
+
+        if total == 0 {
+            return "The user's library is completely empty — no saved pages yet."
+        }
+
+        let topics = ((try? await KnowledgeStorage.shared.fetchAllTopics()) ?? [])
+            .filter { !$0.isUncategorized }
+            .map { $0.name }
+
+        let pageWord = total == 1 ? "page" : "pages"
+
+        if topics.isEmpty {
+            return "The user has \(total) saved \(pageWord) but no categorized topics yet."
+        }
+
+        let list = topics.prefix(5).joined(separator: ", ")
+        return "The user has \(total) saved \(pageWord) across topics: \(list)."
+    }
+
+    private func emptyResultMessage(scopePhrase: String?) async -> String {
+        let total = (try? await KnowledgeStorage.shared.pageCount()) ?? 0
+
+        if total == 0 {
+            return "Your library is empty right now — there's nothing for me to dig through yet. Open an article in the browser and I will start remembering what you read, then ask me anything about it."
+        }
+
+        let topics = ((try? await KnowledgeStorage.shared.fetchAllTopics()) ?? [])
+            .filter { !$0.isUncategorized }
+            .map { $0.name }
+
+        let pageWord = total == 1 ? "page" : "pages"
+
+        if let scopePhrase {
+            if topics.isEmpty {
+                return "Nothing saved from \(scopePhrase). You've got \(total) \(pageWord) saved overall — try a different time window, or ask what's in your library."
+            }
+            let list = topics.prefix(3).joined(separator: ", ")
+            return "Nothing saved from \(scopePhrase). The topics in your library right now are \(list) — want to look at one of those instead?"
+        }
+
+        if topics.isEmpty {
+            return "Nothing in your saved pages matched that. You've got \(total) \(pageWord) saved — try asking about a title or topic from your library."
+        }
+
+        let list = topics.prefix(3).joined(separator: ", ")
+        return "Nothing in your saved pages matched that. You could try asking about \(list) — those are what you've been reading."
+    }
+
     private func finishThinking() {
         sparklePhase = .idle
         isThinking = false
@@ -318,7 +461,7 @@ final class KnowledgeAIViewModel {
         }
         guard !turns.isEmpty else { return }
 
-        setStatus("Compacting history...")
+        setStatus(Self.compactingMessages.randomElement()!)
         do {
             let newSummary = try await LocalKnowledgeProvider.shared.summarizeConversationWithLLM(
                 turns: turns,
@@ -331,7 +474,7 @@ final class KnowledgeAIViewModel {
         } catch {
             KnowledgeLogger.rag.error("conversation compaction failed: \(String(describing: error), privacy: .public)")
         }
-        setStatus("Searching your library…")
+        setStatus(Self.searchingMessages.randomElement()!)
     }
 
     func clearMessages() {

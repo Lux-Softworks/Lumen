@@ -6,6 +6,7 @@ struct KnowledgePanelView: View {
     @State var viewModel: KnowledgePanelViewModel
     @State private var panelWidth: CGFloat = 375 // default for iphone
     @State private var safeAreaBottom: CGFloat = 0
+    @State private var keyboardVisible: Bool = false
     @Environment(\.palette) private var palette
 
     init(viewModel: KnowledgePanelViewModel? = nil) {
@@ -51,6 +52,16 @@ struct KnowledgePanelView: View {
                 .first?.windows.first(where: { $0.isKeyWindow }) {
                 safeAreaBottom = window.safeAreaInsets.bottom
             }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+        ) { notification in
+            withAnimation(Self.keyboardAnimation(from: notification)) { keyboardVisible = true }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+        ) { notification in
+            withAnimation(Self.keyboardAnimation(from: notification)) { keyboardVisible = false }
         }
     }
 
@@ -120,8 +131,22 @@ struct KnowledgePanelView: View {
                 .stroke(palette.text.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 16)
-        .padding(.bottom, safeAreaBottom + 8)
+        .padding(.bottom, keyboardVisible ? 6 : safeAreaBottom + 8)
         .padding(.top, 8)
+    }
+
+    private static func keyboardAnimation(from notification: Notification) -> Animation {
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 7
+
+        switch UIView.AnimationCurve(rawValue: curveRaw) {
+        case .easeIn:    return .easeIn(duration: duration)
+        case .easeOut:   return .easeOut(duration: duration)
+        case .linear:    return .linear(duration: duration)
+        case .easeInOut: return .easeInOut(duration: duration)
+        default:
+            return .timingCurve(0.2, 0.8, 0.2, 1.0, duration: duration)
+        }
     }
 }
 
