@@ -89,6 +89,11 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             }
         }
 
+        if navigationAction.navigationType == .backForward,
+           navigationAction.targetFrame?.isMainFrame == true {
+            Task { @MainActor in Haptics.fire(.soft) }
+        }
+
         let action = HTTPSUpgradeLogic.decidePolicy(for: url, httpsOnly: httpsOnly)
 
         switch action {
@@ -301,6 +306,9 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         withError error: Error
     ) {
         logger.error("Navigation failed: \(error.localizedDescription, privacy: .public)")
+        if (error as NSError).code != NSURLErrorCancelled {
+            Task { @MainActor in Haptics.fire(.error) }
+        }
     }
 
     private func mapResourceType(_ action: WKNavigationAction) -> InterceptedRequest.ResourceType {

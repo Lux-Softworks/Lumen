@@ -18,6 +18,7 @@ enum SettingsSection: Hashable {
     case siteSectionSettings
     case bookmarks
     case exportKnowledge
+    case haptics
 }
 
 struct SettingsPage: View {
@@ -159,6 +160,8 @@ struct SettingsPage: View {
                         BookmarksListView(onNavigate: onNavigate, onDismiss: onDismiss)
                     case .exportKnowledge:
                         ExportView(initialScope: .wholeBase, onDismiss: onDismiss)
+                    case .haptics:
+                        hapticsList
                 }
             }
             .padding(.top, 12)
@@ -235,12 +238,72 @@ struct SettingsPage: View {
             }
 
             settingsGroup {
+                settingsRow(
+                    icon: "iphone.radiowaves.left.and.right",
+                    title: "Haptics",
+                    subtitle: settings.hapticsMode.label,
+                    showChevron: true
+                ) { push(.haptics) }
+            }
+
+            settingsGroup {
                 settingsRow(icon: "hand.raised", title: "Privacy Policy", showChevron: true) {
                     push(.privacyPolicy)
                 }
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    private var hapticsList: some View {
+        VStack(spacing: 16) {
+            settingsGroup {
+                let modes = HapticsMode.allCases
+                ForEach(Array(modes.enumerated()), id: \.element) { index, mode in
+                    let isSelected = settings.hapticsMode == mode
+
+                    Button {
+                        withAnimation(.smooth(duration: 0.3)) {
+                            settings.hapticsMode = mode
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: hapticsIcon(mode))
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
+                                .frame(width: 28)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.label)
+                                    .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
+                                    .foregroundColor(isSelected ? palette.accent : palette.text)
+
+                                Text(mode.caption)
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < modes.count - 1 { divider }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func hapticsIcon(_ mode: HapticsMode) -> String {
+        switch mode {
+        case .off: return "speaker.slash"
+        case .subtle: return "waveform"
+        case .full: return "iphone.radiowaves.left.and.right"
+        }
     }
 
     private var siteSettingsContent: some View {
@@ -776,6 +839,7 @@ struct SettingsPage: View {
         case .siteSectionSettings: return "Site Settings"
         case .bookmarks: return "Bookmarks"
         case .exportKnowledge: return "Export"
+        case .haptics: return "Haptics"
         }
     }
 

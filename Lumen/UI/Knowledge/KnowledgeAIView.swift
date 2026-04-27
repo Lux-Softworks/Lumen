@@ -58,6 +58,11 @@ struct KnowledgeAIView: View {
         ) { notification in
             withAnimation(Self.keyboardAnimation(from: notification)) { keyboardHeight = 0 }
         }
+        .onChange(of: hasStreamingMessage) { wasStreaming, isStreaming in
+            if wasStreaming && !isStreaming {
+                Haptics.fire(.success)
+            }
+        }
     }
 
     private var idleView: some View {
@@ -144,12 +149,14 @@ struct KnowledgeAIView: View {
                     .disabled(viewModel.isModelLoading)
                     .onSubmit {
                         guard canSend else { return }
+                        Haptics.fire(.tap)
                         Task { await viewModel.send() }
                     }
             }
 
             Button {
                 isFocused = false
+                Haptics.fire(.tap)
                 Task { await viewModel.send() }
             } label: {
                 Circle()

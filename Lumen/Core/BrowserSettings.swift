@@ -1,12 +1,39 @@
 import Foundation
 import SwiftUI
 import Combine
+import UIKit
 
 enum NativeAppsPolicy: String, CaseIterable, Identifiable {
     case ask = "Ask"
     case always = "Always Open"
     case never = "Stay in Browser"
     var id: String { rawValue }
+}
+
+enum HapticsMode: String, CaseIterable, Identifiable {
+    case off, subtle, full
+    var id: String { rawValue }
+    var rank: Int {
+        switch self {
+        case .off: return 0
+        case .subtle: return 1
+        case .full: return 2
+        }
+    }
+    var label: String {
+        switch self {
+        case .off: return "Off"
+        case .subtle: return "Subtle"
+        case .full: return "Full"
+        }
+    }
+    var caption: String {
+        switch self {
+        case .off: return "No vibrations."
+        case .subtle: return "Vibrate only on key changes — toggles, sheet snaps, confirmations."
+        case .full: return "Vibrate on every interaction."
+        }
+    }
 }
 
 @MainActor
@@ -36,6 +63,9 @@ class BrowserSettings: ObservableObject {
     @Published var collectKnowledge: Bool {
         didSet { defaults.set(collectKnowledge, forKey: "collectKnowledge") }
     }
+    @Published var hapticsMode: HapticsMode {
+        didSet { defaults.set(hapticsMode.rawValue, forKey: "hapticsMode") }
+    }
 
     var searchEngine: SearchEngine {
         get { SearchEngine(rawValue: defaultSearchEngine) ?? .google }
@@ -51,6 +81,12 @@ class BrowserSettings: ObservableObject {
         let savedPolicy = defaults.string(forKey: "nativeAppsPolicy") ?? ""
         self.nativeAppsPolicy = NativeAppsPolicy(rawValue: savedPolicy) ?? .ask
         self.collectKnowledge = defaults.object(forKey: "collectKnowledge") as? Bool ?? true
+        if let savedHaptics = defaults.string(forKey: "hapticsMode"),
+           let mode = HapticsMode(rawValue: savedHaptics) {
+            self.hapticsMode = mode
+        } else {
+            self.hapticsMode = UIAccessibility.isReduceMotionEnabled ? .subtle : .full
+        }
     }
 
     func policy(for url: URL?) -> PrivacyPolicy {

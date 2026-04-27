@@ -32,6 +32,7 @@ struct BrowserView: View {
         let next = activeTab?.isIncognito ?? false
         guard next != incognitoActive else { return }
 
+        Haptics.fire(.rigid)
         withAnimation(.easeInOut(duration: 0.22)) {
             incognitoActive = next
         }

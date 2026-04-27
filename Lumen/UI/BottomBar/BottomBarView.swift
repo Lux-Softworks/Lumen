@@ -276,7 +276,7 @@ struct BottomBarView: View {
             ZStack(alignment: .leading) {
                 HStack(spacing: 6) {
                     Button {
-                        Haptics.impact(.light)
+                        Haptics.fire(.tap)
                         onCopyUrl()
                     } label: {
                         Image(systemName: "link")
@@ -288,7 +288,10 @@ struct BottomBarView: View {
                     .accessibilityLabel("Copy URL")
 
                     HStack(spacing: 2) {
-                        Button(action: onBack) {
+                        Button {
+                            Haptics.fire(.tap)
+                            onBack()
+                        } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(
@@ -299,7 +302,10 @@ struct BottomBarView: View {
                         .disabled(!canGoBack)
                         .accessibilityLabel("Back")
 
-                        Button(action: onForward) {
+                        Button {
+                            Haptics.fire(.tap)
+                            onForward()
+                        } label: {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(
@@ -318,7 +324,7 @@ struct BottomBarView: View {
                 .allowsHitTesting(state == .siteSettings)
 
                 Button {
-                    Haptics.impact(.light)
+                    Haptics.fire(.tap)
                     onSettingsPressed()
                 } label: {
                     ZStack {
@@ -364,6 +370,7 @@ struct BottomBarView: View {
             .submitLabel(.go)
             .onSubmit {
                 guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                Haptics.fire(.tap)
                 onSubmit()
             }
             .frame(height: 44)
@@ -377,7 +384,7 @@ struct BottomBarView: View {
             HStack(spacing: 0) {
                 ZStack {
                     Button {
-                        Haptics.impact(.light)
+                        Haptics.fire(.tap)
                         onReload()
                     } label: {
                         Image(systemName: "arrow.clockwise")
@@ -409,8 +416,8 @@ struct BottomBarView: View {
                     height: 44)
 
                 Button(action: {
+                    Haptics.fire(.rigid)
                     onNewIncognitoTab?()
-                    Haptics.impact(.light)
                 }) {
                     ZStack {
                         Image(systemName: "eyes")

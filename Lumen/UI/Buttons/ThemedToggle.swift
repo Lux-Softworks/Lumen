@@ -23,5 +23,6 @@ struct ThemedToggle: View {
             }
         }
         .buttonStyle(.plain)
+        .haptic(.selection, trigger: isOn)
     }
 }

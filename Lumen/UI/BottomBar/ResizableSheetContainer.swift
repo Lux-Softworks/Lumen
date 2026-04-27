@@ -196,6 +196,8 @@ struct ResizableSheetContainer<Content: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .ignoresSafeArea(.all, edges: isExpanded ? .all : .bottom)
+            .haptic(.snap, trigger: isExpanded)
+            .haptic(.soft, trigger: isCollapsed)
         }
     }
 

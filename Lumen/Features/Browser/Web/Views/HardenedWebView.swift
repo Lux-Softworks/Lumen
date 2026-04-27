@@ -29,7 +29,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
         @objc func handleRefresh(_ sender: UIRefreshControl) {
             isRefreshing = true
             parent.viewModel.reload()
-            Haptics.impact(.light)
+            Task { @MainActor in Haptics.fire(.snap) }
             starView?.alpha = 1
             startSpinning()
         }

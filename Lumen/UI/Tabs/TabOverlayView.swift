@@ -334,6 +334,7 @@ private struct TabCardItemView: View {
                 onEnded: { translation, velocity in
                     isDeletingTab = false
                     if translation < -60 || velocity < -400 {
+                        Haptics.fire(.soft)
                         withAnimation(.spring(response: 0.22, dampingFraction: 0.9)) {
                             dragOffset = -1000
                         }
@@ -347,6 +348,9 @@ private struct TabCardItemView: View {
             )
         }
         .contentShape(Rectangle())
-        .onTapGesture { onTap() }
+        .onTapGesture {
+            Haptics.fire(.selection)
+            onTap()
+        }
     }
 }

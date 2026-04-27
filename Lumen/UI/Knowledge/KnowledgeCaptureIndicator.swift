@@ -49,6 +49,7 @@ struct KnowledgeCaptureIndicator: View {
     private func showPill() {
         hideTask?.cancel()
         isVisible = true
+        Haptics.fire(.success)
 
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: visibleDurationMs * 1_000_000)
