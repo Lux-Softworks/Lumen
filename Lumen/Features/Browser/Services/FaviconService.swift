@@ -33,4 +33,17 @@ enum FaviconService {
         cache.setObject(image, forKey: key, cost: cost)
         return image
     }
+
+    static func cachedFavicon(for pageURL: URL) -> UIImage? {
+        guard let url = faviconURL(for: pageURL) else { return nil }
+        return cache.object(forKey: url as NSURL)
+    }
+
+    static func prefetchFavicon(for pageURL: URL) {
+        guard let url = faviconURL(for: pageURL) else { return }
+        if cache.object(forKey: url as NSURL) != nil { return }
+        Task.detached(priority: .background) {
+            _ = await fetchFavicon(for: pageURL)
+        }
+    }
 }

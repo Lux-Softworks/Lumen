@@ -3,6 +3,7 @@ import UIKit
 
 @MainActor
 struct BrowserView: View {
+    @Environment(\.palette) private var palette
     @StateObject private var tabManager = TabManager(createDefaultTab: false)
     @State private var bottomBarState: BottomBarState = .collapsed
     @State private var isReady = false
@@ -10,6 +11,7 @@ struct BrowserView: View {
     @State private var shrinkProgress: CGFloat = 0
     @State private var scrollDownAccumulator: CGFloat = 0
     @State private var topBarOffset: CGFloat = 47
+    @State private var cornerProgress: CGFloat = 0
     @State private var urlText: String = ""
 
     @State private var bottomBarOpacity: CGFloat = 1
@@ -21,6 +23,9 @@ struct BrowserView: View {
 
     @State private var showNavigationCover = false
     @State private var navigationCoverProgress: CGFloat = 0
+    @State private var tabSelectionOrigin: CGPoint? = nil
+    @State private var tabOverlayResetToken: Int = 0
+    @State private var pendingShrinkBelowId: UUID? = nil
     @State private var navigationCoverOpacity: CGFloat = 1
 
     @FocusState private var isAddressBarFocused: Bool
@@ -124,6 +129,11 @@ struct BrowserView: View {
                 isAddressBarFocused: $isAddressBarFocused
             )
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
+            .onChange(of: tabManager.tabs.count) { old, new in
+                guard new < old else { return }
+                urlText = ""
+                activeTab?.viewModel.urlString = ""
+            }
             .onOpenURL { url in
                 tabManager.openExternalURL(url)
             }
@@ -247,7 +257,9 @@ struct BrowserView: View {
             hiddenTabId: (activeTabViewState == .fullScreen || activeTabViewState.isTransitioning)
                 ? activeTab?.id : nil,
             shrinkProgress: shrinkProgress,
-            onSelectTab: { id in handleSelectTab(id: id) }
+            resetToken: tabOverlayResetToken,
+            pendingShrinkBelowId: pendingShrinkBelowId,
+            onSelectTab: { id, origin in handleSelectTab(id: id, origin: origin) }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
@@ -437,7 +449,9 @@ struct BrowserView: View {
     @ViewBuilder
     private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
         let toolbarHeight: CGFloat = 80
-        let targetScale: CGFloat = 0.69
+        let baseTargetScale: CGFloat = 0.69
+        let multiTabBoost: CGFloat = tabManager.tabs.count > 1 ? 1.02 : 1.0
+        let targetScale: CGFloat = baseTargetScale * multiTabBoost
         let cornerRadius: CGFloat = 16
         let headerHeight: CGFloat = 36
 
@@ -446,25 +460,34 @@ struct BrowserView: View {
         let headerSpace = max(0, (toolbarYPosition - cardHeight) / 2)
         let cardCenterY = headerSpace + cardHeight / 2
 
-        let currentY = lerp(geometry.size.height / 2, cardCenterY, progress)
+        let centerX = geometry.size.width / 2
+        let originX = tabSelectionOrigin?.x ?? centerX
+        let originY = tabSelectionOrigin?.y ?? cardCenterY
+
+        let currentX = lerp(centerX, originX, progress)
+        let currentY = lerp(geometry.size.height / 2, originY, progress)
         let currentScale = lerp(1.0, targetScale, progress)
         let lerpCornerRadius = lerp(0, cornerRadius / targetScale, progress)
+        let delayedCornerRadius = lerp(0, cornerRadius / targetScale, cornerProgress)
 
         let currentCardWidth = geometry.size.width * currentScale
         let currentCardHeight = geometry.size.height * currentScale
         let cardTopEdgeY = currentY - (currentCardHeight / 2)
 
-        let currentHeaderTranslate = lerp(0, headerHeight / targetScale, progress)
+        let currentHeaderTranslate = lerp(0, headerHeight / baseTargetScale, progress)
         let headerSlotHeight = lerp(
-            getStatusBarHeight(geometry), headerHeight / targetScale, progress)
+            getStatusBarHeight(geometry), headerHeight / baseTargetScale, progress)
         let visualGapHeight = currentHeaderTranslate * currentScale
 
+        let isMultiTab = tabManager.tabs.count > 1
         let titleOpacity: CGFloat = {
             switch activeTabViewState {
-            case .shrinking:
-                return lerp(0, 1, progress)
-            case .expanding:
-                return lerp(1, 0, progress)
+            case .shrinking, .expanding:
+                if isMultiTab {
+                    return max(0, 1 - progress * 2)
+                } else {
+                    return progress
+                }
             default:
                 return 0
             }
@@ -472,14 +495,14 @@ struct BrowserView: View {
 
         ZStack(alignment: .top) {
             if let tab = activeTab {
-                tabCardHeader(tab: tab)
-                    .frame(
-                        width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top
-                    )
+                tabHeaderContent(tab: tab, textOpacity: titleOpacity)
+                    .padding(.horizontal, 10)
+                    .frame(height: headerHeight)
+                    .padding(.bottom, 5)
+                    .frame(width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top)
                     .clipped()
-                    .position(x: geometry.size.width / 2, y: cardTopEdgeY + (visualGapHeight / 2))
+                    .position(x: currentX, y: cardTopEdgeY + (visualGapHeight / 2))
                     .zIndex(1)
-                    .opacity(titleOpacity)
             }
 
             VStack(spacing: 0) {
@@ -490,7 +513,15 @@ struct BrowserView: View {
 
                     headerStripColor(tab: activeTab)
                         .clipShape(
-                            RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous)
+                            UnevenRoundedRectangle(
+                                cornerRadii: .init(
+                                    topLeading: lerpCornerRadius,
+                                    bottomLeading: 0,
+                                    bottomTrailing: 0,
+                                    topTrailing: lerpCornerRadius
+                                ),
+                                style: .continuous
+                            )
                         )
                         .offset(y: currentHeaderTranslate)
                 }
@@ -506,12 +537,20 @@ struct BrowserView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipShape(
-                    RoundedRectangle(cornerRadius: lerpCornerRadius, style: .continuous)
+                    UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: delayedCornerRadius,
+                            bottomLeading: lerpCornerRadius,
+                            bottomTrailing: lerpCornerRadius,
+                            topTrailing: delayedCornerRadius
+                        ),
+                        style: .continuous
+                    )
                 )
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .scaleEffect(currentScale, anchor: .center)
-            .position(x: geometry.size.width / 2, y: currentY)
+            .position(x: currentX, y: currentY)
             .zIndex(2)
         }
         .allowsHitTesting(false)
@@ -542,49 +581,15 @@ struct BrowserView: View {
     }
 
     @ViewBuilder
-    private func tabHeaderContent(tab: Tab) -> some View {
-        HStack(spacing: 8) {
-            let url = tab.viewModel.currentURL ?? tab.url
-            if tab.isIncognito {
-                Image(systemName: "eyeglasses")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(IncognitoPalette.accent)
-                    .frame(width: 16, height: 16)
-            } else if let url, let faviconURL = FaviconService.faviconURL(for: url) {
-                AsyncImage(url: faviconURL) { phaseImage in
-                    phaseImage.resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 16, height: 16)
-                }
-            } else {
-                Image(systemName: "globe")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.8))
-                    .frame(width: 16, height: 16)
-            }
-
-            Text(
-                tab.isIncognito
-                    ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
-                    : (tab.title.isEmpty ? "New Tab" : tab.title)
-            )
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : .white)
-            .lineLimit(1)
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func tabCardHeader(tab: Tab) -> some View {
-        tabHeaderContent(tab: tab)
-            .padding(.horizontal, 10)
-            .frame(height: 36)
+    private func tabHeaderContent(tab: Tab, textOpacity: CGFloat = 1) -> some View {
+        TabHeaderLabel(
+            title: tab.title,
+            url: tab.viewModel.currentURL ?? tab.url,
+            isIncognito: tab.isIncognito,
+            textOpacity: textOpacity,
+            iconSize: 20,
+            contrastBackground: tab.themeColor
+        )
     }
 
     @ViewBuilder
@@ -656,7 +661,10 @@ struct BrowserView: View {
                 bottomBarState = .collapsed
             },
             onNewIncognitoTab: handleNewIncognitoTab,
-            isIncognitoActive: incognitoActive
+            isIncognitoActive: incognitoActive,
+            backdropOpacity: bottomBarState == .search
+                ? 1
+                : max(0, min(1, 1 - shrinkProgress))
         )
     }
 
@@ -686,38 +694,69 @@ struct BrowserView: View {
 
         Task { @MainActor in
             let image = await activeTab.viewModel.captureSnapshot()
+
+            guard self.activeTabViewState == .fullScreen else { return }
+
             if let image {
                 activeTab.snapshot = image
             }
 
-            tabManager.moveActiveTabToTop()
+            if tabManager.tabs.count > 1, let below = tabManager.tabBelowActive {
+                pendingShrinkBelowId = below.id
+                tabSelectionOrigin = computeRightLandingPoint()
+            } else {
+                pendingShrinkBelowId = nil
+                tabSelectionOrigin = nil
+            }
 
-            updateState { activeTabViewState = .shrinking }
-            updateState {
-                withAnimation(.smooth(duration: 0.2)) {
-                    self.shrinkProgress = 1.0
-                } completion: {
-                    self.activeTabViewState = .shrunk
-                }
+            activeTabViewState = .shrinking
+
+            withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.35)) {
+                self.shrinkProgress = 1.0
+            } completion: {
+                self.activeTabViewState = .shrunk
+                self.pendingShrinkBelowId = nil
+            }
+            withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.21).delay(0.14)) {
+                self.cornerProgress = 1.0
             }
         }
     }
 
-    private func handleSelectTab(id: UUID) {
+    private func computeRightLandingPoint() -> CGPoint {
+        let screen = UIScreen.main.bounds.size
+        let toolbarHeight: CGFloat = 80
+        let targetScale: CGFloat = 0.69
+        let toolbarYPosition = screen.height - toolbarHeight
+        let cardHeight = min(screen.height * targetScale, toolbarYPosition)
+        let headerSpace = max(0, (toolbarYPosition - cardHeight) / 2)
+        let cardCenterY = headerSpace + cardHeight / 2
+        let centerX = screen.width / 2
+        let cardWidth = screen.width * targetScale
+        let landingX = centerX + cardWidth * 0.90
+        return CGPoint(x: landingX, y: cardCenterY)
+    }
+
+    private func handleSelectTab(id: UUID, origin: CGPoint? = nil) {
         guard !isTransitioning else { return }
         guard activeTabViewState == .shrunk else { return }
         guard tabManager.tabs.contains(where: { $0.id == id }) else { return }
 
+        tabSelectionOrigin = origin
         tabManager.switchTab(id: id)
-        updateState { activeTabViewState = .expanding }
+        activeTabViewState = .expanding
 
-        updateState {
-            withAnimation(.smooth(duration: 0.2)) {
-                self.shrinkProgress = 0.0
-            } completion: {
-                self.activeTabViewState = .fullScreen
-                self.webViewReady = true
-            }
+        withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.35)) {
+            self.shrinkProgress = 0.0
+        } completion: {
+            self.tabManager.moveActiveTabToTop()
+            self.activeTabViewState = .fullScreen
+            self.webViewReady = true
+            self.tabSelectionOrigin = nil
+            self.tabOverlayResetToken &+= 1
+        }
+        withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.14)) {
+            self.cornerProgress = 0.0
         }
     }
 
@@ -756,6 +795,8 @@ struct BrowserView: View {
 
         isAddressBarFocused = false
         urlText = query
+
+        recordSearchQueryIfNeeded(query)
 
         beginNavigation()
 
@@ -807,6 +848,17 @@ struct BrowserView: View {
 
     private func handleHistoryTap(url: String) {
         handleSubmit(queryOverride: url)
+    }
+
+    private func recordSearchQueryIfNeeded(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2, !incognitoActive else { return }
+        if let parsed = URL(string: trimmed), parsed.scheme != nil,
+           parsed.host != nil || parsed.scheme == "about" {
+            return
+        }
+        if trimmed.contains(".") && !trimmed.contains(" ") { return }
+        SearchHistoryStore.shared.record(query: trimmed, isIncognito: incognitoActive)
     }
 
     private func handleCopyUrl() {

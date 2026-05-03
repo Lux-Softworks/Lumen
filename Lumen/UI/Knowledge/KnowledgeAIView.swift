@@ -32,7 +32,7 @@ struct KnowledgeAIView: View {
 
             if showThinkingIndicator {
                 HStack(spacing: 8) {
-                    LumenSparkle(size: 18, phase: .spinning)
+                    LumenSparkleMatrix(size: 18, phase: .spinning)
                     StatusLabel(text: viewModel.statusMessage)
                 }
                 .padding(.leading, 16)
@@ -67,7 +67,7 @@ struct KnowledgeAIView: View {
 
     private var idleView: some View {
         VStack(spacing: 14) {
-            LumenSparkle(
+            LumenSparkleMatrix(
                 size: 38,
                 phase: viewModel.isModelLoading ? .spinning : viewModel.sparklePhase
             )
@@ -784,90 +784,193 @@ private struct StatusLabel: View {
     }
 }
 
-private struct LumenSparkle: View {
+private struct LumenSparkleMatrix: View {
     let size: CGFloat
     let phase: SparklePhase
 
-    @State private var isSpinning = false
     @Environment(\.palette) private var palette
-    @State private var tickSpread: Double = 0
-    @State private var tickOpacity: Double = 0
-    @State private var glowOpacity: Double = 0.2
-    @State private var glowScale: Double = 1.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let tickCount = 8
+    @State private var unlockStartedAt: Date?
+
+    private static let lapDuration: TimeInterval = 1.5
+    private static let unlockDuration: TimeInterval = 0.45
+    private static let baseOpacity: Double = 0.18
+    private static let tailLength: Double = 4
+
+    private static let dotPositions: [(x: CGFloat, y: CGFloat)] = {
+        let layout: [[Int]] = [
+            [3],
+            [3],
+            [2, 3, 4],
+            [0, 1, 2, 3, 4, 5, 6],
+            [2, 3, 4],
+            [3],
+            [3]
+        ]
+        var result: [(CGFloat, CGFloat)] = []
+        for (row, cols) in layout.enumerated() {
+            let y = (CGFloat(row) - 3) / 3
+            for col in cols {
+                let x = (CGFloat(col) - 3) / 3
+                result.append((x, y))
+            }
+        }
+        return result
+    }()
+
+    private static let pathOrder: [Int] = [
+        0, 1, 3, 2, 7, 6, 5, 6, 7, 8,
+        12, 13, 15, 16, 15, 13, 14, 11, 10, 9,
+        8, 4, 3, 1
+    ]
+
+    private static let dotPathPositions: [[Int]] = {
+        var arr: [[Int]] = Array(repeating: [], count: LumenSparkleMatrix.dotPositions.count)
+        for (i, idx) in LumenSparkleMatrix.pathOrder.enumerated() {
+            arr[idx].append(i)
+        }
+        return arr
+    }()
 
     var body: some View {
-        ZStack {
-            if isSpinning {
-                TimelineView(.animation) { timeline in
-                    let angle = timeline.date.timeIntervalSinceReferenceDate * 120
-                    ZStack {
-                        ForEach(0..<tickCount, id: \.self) { index in
-                            Capsule()
-                                .fill(palette.accent)
-                                .frame(width: 1.5, height: size * 0.2)
-                                .offset(y: -(size * 0.75 * tickSpread))
-                                .rotationEffect(
-                                    .degrees(Double(index) * (360.0 / Double(tickCount)) + angle)
-                                )
-                                .opacity(tickOpacity)
-                        }
-                    }
-                }
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+            Canvas(rendersAsynchronously: false) { ctx, canvasSize in
+                draw(ctx: ctx, canvasSize: canvasSize, now: context.date)
             }
-
-            Image(systemName: "sparkle")
-                .font(.system(size: size * 1.2, weight: .thin))
-                .foregroundColor(palette.accent)
-                .blur(radius: size * 0.22)
-                .opacity(glowOpacity)
-                .scaleEffect(glowScale)
-
-            Image(systemName: "sparkle")
-                .font(.system(size: size, weight: .thin))
-                .foregroundColor(palette.accent)
         }
         .frame(width: size * 1.7, height: size * 1.7)
-        .onChange(of: phase) { _, newPhase in
-            applyPhase(newPhase)
-        }
         .onAppear {
-            applyPhase(phase)
+            handlePhaseChange(from: phase, to: phase)
+        }
+        .onChange(of: phase) { oldPhase, newPhase in
+            handlePhaseChange(from: oldPhase, to: newPhase)
         }
     }
 
-    private func applyPhase(_ p: SparklePhase) {
-        switch p {
-        case .idle:
-            isSpinning = false
-            withAnimation(.easeOut(duration: 0.3)) {
-                tickSpread = 0
-                tickOpacity = 0
-                glowOpacity = 0.2
-                glowScale = 1.0
+    private func handlePhaseChange(from oldPhase: SparklePhase, to newPhase: SparklePhase) {
+        if newPhase == .collapsing || (oldPhase == .spinning && newPhase == .idle) {
+            unlockStartedAt = Date()
+            Haptics.fire(.success)
+        } else if newPhase == .spinning {
+            unlockStartedAt = nil
+        }
+    }
+
+    private func draw(ctx: GraphicsContext, canvasSize: CGSize, now: Date) {
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let layoutRadius = min(canvasSize.width, canvasSize.height) / 2 * 0.85
+        let dotRadius = max(1.7, size * 0.08)
+        let accent = palette.accent
+
+        let timeRef = now.timeIntervalSinceReferenceDate
+        let pathLen = Double(Self.pathOrder.count)
+        let orbitHead = (timeRef / Self.lapDuration).truncatingRemainder(dividingBy: 1) * pathLen
+        let ambientPulse = (sin(2 * Double.pi * timeRef * 0.2) + 1) / 2
+
+        let unlockActive: Bool
+        let unlockProgress: Double
+        if let start = unlockStartedAt {
+            let elapsed = now.timeIntervalSince(start)
+            if elapsed < Self.unlockDuration {
+                unlockActive = true
+                unlockProgress = elapsed / Self.unlockDuration
+            } else {
+                unlockActive = false
+                unlockProgress = 1
             }
-        case .spinning:
-            isSpinning = true
-            withAnimation(.spring(duration: 0.45, bounce: 0.1)) {
-                tickSpread = 1
-                tickOpacity = 0.55
-                glowOpacity = 0.35
-                glowScale = 1.05
-            }
-        case .collapsing:
-            withAnimation(.spring(duration: 0.8, bounce: 0.05)) {
-                tickSpread = 0
-            }
-            withAnimation(.smooth(duration: 0.65)) {
-                tickOpacity = 0
-                glowOpacity = 0.15
-                glowScale = 0.95
-            }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 800_000_000)
-                isSpinning = false
+        } else {
+            unlockActive = false
+            unlockProgress = 0
+        }
+
+        let effectivePhase: SparklePhase = unlockActive ? .collapsing : phase
+
+        let scaleFactor: CGFloat
+        if effectivePhase == .collapsing {
+            scaleFactor = 1.0 + 0.08 * CGFloat(sin(Double.pi * unlockProgress))
+        } else {
+            scaleFactor = 1.0
+        }
+
+        let appliedDotRadius = dotRadius * scaleFactor
+
+        for (idx, pos) in Self.dotPositions.enumerated() {
+            let opacity = computeDotOpacity(
+                dotIndex: idx,
+                effectivePhase: effectivePhase,
+                orbitHead: orbitHead,
+                unlockProgress: unlockProgress,
+                ambient: ambientPulse
+            )
+
+            let cx = center.x + pos.x * layoutRadius
+            let cy = center.y + pos.y * layoutRadius
+
+            ctx.fill(
+                Path(ellipseIn: CGRect(
+                    x: cx - appliedDotRadius,
+                    y: cy - appliedDotRadius,
+                    width: appliedDotRadius * 2,
+                    height: appliedDotRadius * 2
+                )),
+                with: .color(accent.opacity(opacity))
+            )
+        }
+    }
+
+    private func computeDotOpacity(
+        dotIndex: Int,
+        effectivePhase: SparklePhase,
+        orbitHead: Double,
+        unlockProgress u: Double,
+        ambient: Double
+    ) -> Double {
+        if reduceMotion {
+            switch effectivePhase {
+            case .spinning, .collapsing:
+                return 0.4 + 0.15 * ambient
+            case .idle:
+                return 0.3 + 0.08 * ambient
             }
         }
+
+        let orbitOp = orbitOpacity(dotIndex: dotIndex, head: orbitHead)
+        let ambientOp = 0.18 + 0.10 * ambient
+
+        switch effectivePhase {
+        case .spinning:
+            return orbitOp
+        case .collapsing:
+            if u < 0.3 {
+                let t = u / 0.3
+                return orbitOp + (1.0 - orbitOp) * easeOutCubic(t)
+            } else {
+                let t = (u - 0.3) / 0.7
+                return 1.0 - (1.0 - ambientOp) * easeOutCubic(t)
+            }
+        case .idle:
+            return ambientOp
+        }
+    }
+
+    private func orbitOpacity(dotIndex: Int, head: Double) -> Double {
+        let pathLen = Double(Self.pathOrder.count)
+        let positions = Self.dotPathPositions[dotIndex]
+        var maxTail = 0.0
+        for p in positions {
+            var forward = head - Double(p)
+            if forward < 0 { forward += pathLen }
+            if forward < Self.tailLength {
+                let f = 1 - forward / Self.tailLength
+                if f > maxTail { maxTail = f }
+            }
+        }
+        return Self.baseOpacity + (1 - Self.baseOpacity) * maxTail
+    }
+
+    private func easeOutCubic(_ t: Double) -> Double {
+        let p = 1 - t
+        return 1 - p * p * p
     }
 }

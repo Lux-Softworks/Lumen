@@ -1148,13 +1148,29 @@ actor KnowledgeStorage {
         return results
     }
 
+    private static let sqliteInClauseLimit = 900
+
     private func scoreChunks(queryVector: [Double], pageIDFilter: Set<String>? = nil) throws -> [(pageID: String, score: Double)] {
-        let sql = """
-            SELECT pc.page_id, pc.vector FROM page_chunks pc
-            JOIN pages p ON pc.page_id = p.id
-            ORDER BY p.timestamp DESC
-            LIMIT 2000
-        """
+        let usePushdown = (pageIDFilter?.count ?? 0) > 0
+            && (pageIDFilter?.count ?? 0) <= Self.sqliteInClauseLimit
+        let sql: String
+        if usePushdown, let filter = pageIDFilter {
+            let placeholders = Array(repeating: "?", count: filter.count).joined(separator: ",")
+            sql = """
+                SELECT pc.page_id, pc.vector FROM page_chunks pc
+                JOIN pages p ON pc.page_id = p.id
+                WHERE pc.page_id IN (\(placeholders))
+                ORDER BY p.timestamp DESC
+                LIMIT 2000
+            """
+        } else {
+            sql = """
+                SELECT pc.page_id, pc.vector FROM page_chunks pc
+                JOIN pages p ON pc.page_id = p.id
+                ORDER BY p.timestamp DESC
+                LIMIT 2000
+            """
+        }
 
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -1163,11 +1179,19 @@ actor KnowledgeStorage {
             return []
         }
 
+        if usePushdown, let filter = pageIDFilter {
+            var idx: Int32 = 1
+            for id in filter {
+                sqlite3_bind_text(statement, idx, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                idx += 1
+            }
+        }
+
         var bestPerPage: [String: Double] = [:]
 
         while sqlite3_step(statement) == SQLITE_ROW {
             let pageID = String(cString: sqlite3_column_text(statement, 0))
-            if let filter = pageIDFilter, !filter.contains(pageID) { continue }
+            if !usePushdown, let filter = pageIDFilter, !filter.contains(pageID) { continue }
 
             guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
             let blobSize = Int(sqlite3_column_bytes(statement, 1))
@@ -1186,12 +1210,26 @@ actor KnowledgeStorage {
     }
 
     private func scorePages(queryVector: [Double], pageIDFilter: Set<String>? = nil) throws -> [(pageID: String, score: Double)] {
-        let sql = """
-            SELECT pe.page_id, pe.vector FROM page_embeddings pe
-            JOIN pages p ON pe.page_id = p.id
-            ORDER BY p.timestamp DESC
-            LIMIT 500
-        """
+        let usePushdown = (pageIDFilter?.count ?? 0) > 0
+            && (pageIDFilter?.count ?? 0) <= Self.sqliteInClauseLimit
+        let sql: String
+        if usePushdown, let filter = pageIDFilter {
+            let placeholders = Array(repeating: "?", count: filter.count).joined(separator: ",")
+            sql = """
+                SELECT pe.page_id, pe.vector FROM page_embeddings pe
+                JOIN pages p ON pe.page_id = p.id
+                WHERE pe.page_id IN (\(placeholders))
+                ORDER BY p.timestamp DESC
+                LIMIT 500
+            """
+        } else {
+            sql = """
+                SELECT pe.page_id, pe.vector FROM page_embeddings pe
+                JOIN pages p ON pe.page_id = p.id
+                ORDER BY p.timestamp DESC
+                LIMIT 500
+            """
+        }
 
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -1200,11 +1238,19 @@ actor KnowledgeStorage {
             return []
         }
 
+        if usePushdown, let filter = pageIDFilter {
+            var idx: Int32 = 1
+            for id in filter {
+                sqlite3_bind_text(statement, idx, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                idx += 1
+            }
+        }
+
         var scores: [(String, Double)] = []
 
         while sqlite3_step(statement) == SQLITE_ROW {
             let pageID = String(cString: sqlite3_column_text(statement, 0))
-            if let filter = pageIDFilter, !filter.contains(pageID) { continue }
+            if !usePushdown, let filter = pageIDFilter, !filter.contains(pageID) { continue }
 
             guard let rawPtr = sqlite3_column_blob(statement, 1) else { continue }
             let blobSize = Int(sqlite3_column_bytes(statement, 1))
@@ -1479,6 +1525,13 @@ actor KnowledgeStorage {
 
     func deleteTopic(id: String) throws {
         try initialize()
+
+        if id == Topic.uncategorizedID {
+            try execute("DELETE FROM page_embeddings WHERE page_id IN (SELECT p.id FROM pages p JOIN websites w ON p.website_id = w.id WHERE w.topic_id IS NULL)")
+            try execute("DELETE FROM pages WHERE website_id IN (SELECT id FROM websites WHERE topic_id IS NULL)")
+            try execute("DELETE FROM websites WHERE topic_id IS NULL")
+            return
+        }
 
         let steps: [String] = [
             "DELETE FROM page_embeddings WHERE page_id IN (SELECT p.id FROM pages p JOIN websites w ON p.website_id = w.id WHERE w.topic_id = ?)",

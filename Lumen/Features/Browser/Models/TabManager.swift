@@ -4,12 +4,18 @@ import WebKit
 
 @MainActor
 final class TabManager: ObservableObject {
-    @Published private(set) var tabs: [Tab] = []
+    @Published private(set) var tabs: [Tab] = [] {
+        didSet { rebuildIndex() }
+    }
     @Published private(set) var activeTabId: UUID
 
+    private var indexById: [UUID: Int] = [:]
+
     var activeTab: Tab? {
-        guard !tabs.isEmpty else { return nil }
-        return tabs.first { $0.id == activeTabId } ?? tabs.first
+        if let i = indexById[activeTabId], i < tabs.count {
+            return tabs[i]
+        }
+        return tabs.first
     }
 
     private var activeViewModelCancellable: AnyCancellable?
@@ -25,9 +31,16 @@ final class TabManager: ObservableObject {
             self.activeTabId = UUID()
         }
 
+        rebuildIndex()
+
         if createDefaultTab {
             observeActiveViewModel()
         }
+    }
+
+    private func rebuildIndex() {
+        indexById.removeAll(keepingCapacity: true)
+        for (i, t) in tabs.enumerated() { indexById[t.id] = i }
     }
 
     func newTab(incognito: Bool = false) {
@@ -86,19 +99,26 @@ final class TabManager: ObservableObject {
     }
 
     func switchTab(id: UUID) {
-        guard tabs.contains(where: { $0.id == id }) else { return }
+        guard indexById[id] != nil else { return }
         activeTabId = id
         observeActiveViewModel()
     }
 
     func moveActiveTabToTop() {
-        guard let index = tabs.firstIndex(where: { $0.id == activeTabId }) else { return }
+        guard let index = indexById[activeTabId] else { return }
         let tab = tabs.remove(at: index)
         tabs.append(tab)
     }
 
+    var tabBelowActive: Tab? {
+        guard tabs.count > 1 else { return nil }
+        guard let activeIndex = indexById[activeTabId] else { return nil }
+        let belowIndex = activeIndex == 0 ? tabs.count - 1 : activeIndex - 1
+        return tabs[belowIndex]
+    }
+
     func closeTab(id: UUID) {
-        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = indexById[id] else { return }
 
         if activeTabId == id && tabs.count > 1 {
             let newIndex = (index > 0) ? index - 1 : (index + 1 < tabs.count ? index + 1 : 0)
@@ -113,7 +133,7 @@ final class TabManager: ObservableObject {
             activeTabId = UUID()
             activeViewModelCancellable = nil
         } else {
-            if !tabs.contains(where: { $0.id == activeTabId }) {
+            if indexById[activeTabId] == nil {
                 activeTabId = tabs[max(0, min(index, tabs.count - 1))].id
             }
             observeActiveViewModel()
@@ -121,7 +141,9 @@ final class TabManager: ObservableObject {
     }
 
     func updateSnapshot(_ snapshot: UIImage, for id: UUID) {
-        tabs.first { $0.id == id }?.snapshot = snapshot
+        if let i = indexById[id] {
+            tabs[i].snapshot = snapshot
+        }
     }
 
     private func observeActiveViewModel() {

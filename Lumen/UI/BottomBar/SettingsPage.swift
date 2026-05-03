@@ -878,6 +878,7 @@ struct SettingsPage: View {
 
         Task { @MainActor in
             HistoryStore.shared.clearAll()
+            SearchHistoryStore.shared.clearAll()
         }
     }
 

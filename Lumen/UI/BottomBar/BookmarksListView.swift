@@ -70,29 +70,7 @@ struct BookmarksListView: View {
 
     @ViewBuilder
     private func faviconView(for domain: String) -> some View {
-        let pageURL = URL(string: "https://\(domain)")
-        let faviconURL = pageURL.flatMap { FaviconService.faviconURL(for: $0) }
-
-        if let faviconURL {
-            AsyncImage(url: faviconURL) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFit()
-                } else {
-                    globeIcon
-                }
-            }
-            .frame(width: 22, height: 22)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-        } else {
-            globeIcon
-        }
-    }
-
-    private var globeIcon: some View {
-        Image(systemName: "globe")
-            .font(.system(size: 14))
-            .foregroundColor(palette.text.opacity(0.4))
-            .frame(width: 22, height: 22)
+        FaviconView(url: URL(string: "https://\(domain)"), size: 22, cornerRadius: 5)
     }
 
     private func group<Content: View>(@ViewBuilder content: () -> Content) -> some View {

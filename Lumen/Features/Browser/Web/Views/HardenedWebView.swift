@@ -111,9 +111,10 @@ struct HardenedWebView: UIViewControllerRepresentable {
 
         let starConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
         let starImageView = UIImageView(image: UIImage(systemName: "sparkle", withConfiguration: starConfig))
-        starImageView.tintColor = .white
+        let starTint = ContrastForeground.uiColor(for: viewModel.themeColor)
+        starImageView.tintColor = starTint
         starImageView.alpha = 0
-        starImageView.layer.shadowColor = UIColor.white.cgColor
+        starImageView.layer.shadowColor = starTint.cgColor
         starImageView.layer.shadowRadius = 8
         starImageView.layer.shadowOpacity = 0.45
         starImageView.layer.shadowOffset = .zero
@@ -154,6 +155,12 @@ struct HardenedWebView: UIViewControllerRepresentable {
         context.coordinator.updateTintColor(viewModel.themeColor, controller: controller)
         webView.scrollView.backgroundColor = viewModel.themeColor ?? .black
         webView.backgroundColor = viewModel.themeColor ?? .black
+
+        let starTint = ContrastForeground.uiColor(for: viewModel.themeColor)
+        if context.coordinator.starView?.tintColor != starTint {
+            context.coordinator.starView?.tintColor = starTint
+            context.coordinator.starView?.layer.shadowColor = starTint.cgColor
+        }
 
         if context.coordinator.lastPageReadyToken != viewModel.pageReadyToken {
             context.coordinator.lastBottom = -1

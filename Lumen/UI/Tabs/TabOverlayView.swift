@@ -5,7 +5,9 @@ struct TabOverlayView: View {
     @ObservedObject var tabManager: TabManager
     var hiddenTabId: UUID? = nil
     var shrinkProgress: CGFloat = 1
-    var onSelectTab: (UUID) -> Void
+    var resetToken: Int = 0
+    var pendingShrinkBelowId: UUID? = nil
+    var onSelectTab: (UUID, CGPoint) -> Void
 
     private let scale: CGFloat = 0.69
     private let toolbarHeight: CGFloat = 80
@@ -23,8 +25,8 @@ struct TabOverlayView: View {
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 0) {
-                            ForEach(tabManager.tabs, id: \.id) { tab in
+                        HStack(spacing: 0) {
+                            ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
                                 TabCardWrapper(
                                     tab: tab,
                                     config: config,
@@ -35,11 +37,14 @@ struct TabOverlayView: View {
                                     lastScrolledToId: $lastScrolledToId,
                                     isDeletingTab: $isDeletingTab
                                 )
+                                .zIndex(Double(index))
                             }
                         }
                         .padding(.horizontal, config.hPadding)
+                        .scrollTargetLayout()
                     }
                     .coordinateSpace(name: "scrollView")
+                    .scrollTargetBehavior(TabSnapBehavior(cardWidth: config.cardWidth))
                     .scrollClipDisabled()
                     .scrollDisabled(isDeletingTab)
                     .frame(height: config.cardHeight)
@@ -56,10 +61,23 @@ struct TabOverlayView: View {
                         }
                         lastScrolledToId = id
                     }
-                    .onChange(of: tabManager.tabs.firstIndex(where: { $0.id == tabManager.activeTabId })) { _, _ in
-                        withAnimation(.smooth(duration: 0.2)) {
-                            proxy.scrollTo(tabManager.activeTabId, anchor: .center)
+                    .onChange(of: resetToken) { _, _ in
+                        let target = tabManager.tabBelowActive?.id ?? tabManager.activeTabId
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            proxy.scrollTo(target, anchor: .center)
                         }
+                        lastScrolledToId = target
+                    }
+                    .onChange(of: pendingShrinkBelowId) { _, belowId in
+                        guard let belowId else { return }
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            proxy.scrollTo(belowId, anchor: .center)
+                        }
+                        lastScrolledToId = belowId
                     }
                 }
 
@@ -111,7 +129,7 @@ private struct TabCardWrapper: View {
     @ObservedObject var tabManager: TabManager
     let hiddenTabId: UUID?
     let shrinkProgress: CGFloat
-    let onSelectTab: (UUID) -> Void
+    let onSelectTab: (UUID, CGPoint) -> Void
     @Binding var lastScrolledToId: UUID?
     @Binding var isDeletingTab: Bool
 
@@ -130,7 +148,7 @@ private struct TabCardWrapper: View {
 
             let cardScale: CGFloat = (
                 normalizedDelta >= 0
-                ? 1.0
+                ? min(1.04, 1.0 + (normalizedDelta * 0.02))
                 : max(0.90, 1.0 + (normalizedDelta * 0.03))
             )
 
@@ -144,29 +162,14 @@ private struct TabCardWrapper: View {
                 }
             }()
 
-            let pushAmount: CGFloat = 20.0
-            let rawProgress = (1.0 - shrinkProgress)
-            let animationPush: CGFloat = {
-                if rawProgress <= 0 || hidden { return 0 }
-                if displacement < -10 {
-                    return -pushAmount * rawProgress
-                } else if displacement > 10 {
-                    return pushAmount * rawProgress
-                }
-                return 0
-            }()
-
-            let xOffset = targetVisualDisplacement - displacement + animationPush
+            let xOffset = targetVisualDisplacement - displacement
 
             let cardOpacity: CGFloat = {
-                if hidden {
-                    return 0
-                } else if normalizedDelta >= -1.0 {
-                    return 1.0
-                } else {
-                    let fadeDistance = abs(normalizedDelta) - 1.0
-                    return max(0, 1.0 - (fadeDistance * 0.35))
-                }
+                if hidden { return 0 }
+                if normalizedDelta >= 0 { return 1.0 }
+                let absDelta = abs(normalizedDelta)
+                if absDelta <= 1.0 { return 1.0 }
+                return max(0, 1.0 - (absDelta - 1.0) * 0.25)
             }()
 
             let headerOpacity = max(0, 1.0 - abs(normalizedDelta) * 2.5)
@@ -180,8 +183,13 @@ private struct TabCardWrapper: View {
                     }
                 },
                 onTap: {
+                    let nominalFrame = cardGeo.frame(in: .global)
+                    let visualCenter = CGPoint(
+                        x: nominalFrame.midX + xOffset,
+                        y: nominalFrame.midY
+                    )
                     lastScrolledToId = tab.id
-                    onSelectTab(tab.id)
+                    onSelectTab(tab.id, visualCenter)
                 },
                 isDeletingTab: $isDeletingTab
             )
@@ -264,47 +272,17 @@ private struct TabCardItemView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if tab.isIncognito {
-                    Image(systemName: "eyeglasses")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(IncognitoPalette.accent)
-                        .frame(width: 16, height: 16)
-                } else {
-                    let url = tab.viewModel.currentURL ?? tab.url
-                    if let url, let faviconURL = FaviconService.faviconURL(for: url) {
-                        AsyncImage(url: faviconURL) { img in
-                            img.resizable()
-                                .scaledToFit()
-                                .frame(width: 16, height: 16)
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        } placeholder: {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(palette.text.opacity(0.3))
-                                .frame(width: 16, height: 16)
-                        }
-                    } else {
-                        Image(systemName: "globe")
-                            .font(.system(size: 11))
-                            .foregroundColor(palette.text.opacity(0.8))
-                            .frame(width: 16, height: 16)
-                    }
-                }
-
-                Text(tab.isIncognito
-                     ? "Incognito · " + (tab.title.isEmpty ? "New Tab" : tab.title)
-                     : (tab.title.isEmpty ? "New Tab" : tab.title))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(tab.isIncognito ? IncognitoPalette.accent : palette.text)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
+            TabHeaderLabel(
+                title: tab.title,
+                url: tab.viewModel.currentURL ?? tab.url,
+                isIncognito: tab.isIncognito,
+                textOpacity: headerOpacity,
+                iconSize: 20
+            )
             .padding(.horizontal, 10)
             .frame(height: 36)
-            .opacity(headerOpacity)
 
-            ZStack {
+        ZStack {
                 if let snapshot = tab.snapshot {
                     Image(uiImage: snapshot)
                         .resizable()
@@ -335,10 +313,10 @@ private struct TabCardItemView: View {
                     isDeletingTab = false
                     if translation < -60 || velocity < -400 {
                         Haptics.fire(.soft)
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.9)) {
-                            dragOffset = -1000
+                        withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
+                            dragOffset = -700
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { onClose() }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { onClose() }
                     } else {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                             dragOffset = 0
@@ -352,5 +330,18 @@ private struct TabCardItemView: View {
             Haptics.fire(.selection)
             onTap()
         }
+    }
+}
+
+private struct TabSnapBehavior: ScrollTargetBehavior {
+    let cardWidth: CGFloat
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        let originalCenter = context.originalTarget.rect.midX
+        let projectedCenter = target.rect.midX
+        let displacement = projectedCenter - originalCenter
+        let stepsToTransfer = (displacement / cardWidth).rounded()
+        let snappedCenter = originalCenter + stepsToTransfer * cardWidth
+        target.rect.origin.x = snappedCenter - target.rect.width / 2
     }
 }

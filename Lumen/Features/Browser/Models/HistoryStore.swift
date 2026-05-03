@@ -68,7 +68,7 @@ final class HistoryStore: ObservableObject {
 
         let normalizedURL = Self.normalizeURL(url)
         let stableID = Self.stableID(for: normalizedURL)
-        
+
         entries.removeAll { $0.id == stableID }
 
         let entry = HistoryEntry(url: url, title: title)
@@ -79,6 +79,10 @@ final class HistoryStore: ObservableObject {
         }
 
         saveSubject.send()
+
+        if let parsed = URL(string: url) {
+            FaviconService.prefetchFavicon(for: parsed)
+        }
     }
 
     nonisolated static func normalizeURL(_ url: String) -> String {
@@ -107,7 +111,7 @@ final class HistoryStore: ObservableObject {
 
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: key) else { return }
-        
+
         guard let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data) else {
             UserDefaults.standard.removeObject(forKey: key)
             return
@@ -118,7 +122,7 @@ final class HistoryStore: ObservableObject {
         for entry in decoded {
             let normalizedURL = Self.normalizeURL(entry.url)
             let stableID = Self.stableID(for: normalizedURL)
-            
+
             if !seen.contains(stableID) {
                 seen.insert(stableID)
                 deduped.append(entry)
@@ -126,5 +130,11 @@ final class HistoryStore: ObservableObject {
         }
 
         entries = deduped
+
+        for entry in deduped {
+            if let parsed = URL(string: entry.url) {
+                FaviconService.prefetchFavicon(for: parsed)
+            }
+        }
     }
 }

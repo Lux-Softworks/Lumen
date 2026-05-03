@@ -131,8 +131,9 @@ struct KnowledgeWebsiteView: View {
         .padding(.bottom, 20)
     }
 
+    @ViewBuilder
     private func pageCard(_ page: PageContent) -> some View {
-        Button {
+        let card = Button {
             onSelectPage?(page)
         } label: {
             HStack(spacing: 0) {
@@ -176,14 +177,17 @@ struct KnowledgeWebsiteView: View {
             )
         }
         .buttonStyle(.plain)
-        .contextMenu {
-            if let onExportPage {
+
+        if let onExportPage {
+            card.contextMenu {
                 Button {
                     onExportPage(page)
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
             }
+        } else {
+            card
         }
     }
 }

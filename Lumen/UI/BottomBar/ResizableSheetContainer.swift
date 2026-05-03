@@ -8,6 +8,7 @@ struct ResizableSheetContainer<Content: View>: View {
     var progress: Double
     var expandedHeightRatio: CGFloat
     var themeColor: UIColor?
+    var backdropOpacity: CGFloat
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
     var onCollapse: (() -> Void)?
@@ -31,6 +32,7 @@ struct ResizableSheetContainer<Content: View>: View {
         progress: Double,
         expandedHeightRatio: CGFloat = 0.65,
         themeColor: UIColor? = nil,
+        backdropOpacity: CGFloat = 1,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
         onCollapse: (() -> Void)? = nil,
@@ -44,6 +46,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self.progress = progress
         self.expandedHeightRatio = expandedHeightRatio
         self.themeColor = themeColor
+        self.backdropOpacity = backdropOpacity
         self.onDragStart = onDragStart
         self.onExpand = onExpand
         self.onCollapse = onCollapse
@@ -101,6 +104,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                         .stroke(palette.text.opacity(0.15), lineWidth: 0.5)
                                 )
                                 .shadow(color: Color.black.opacity(0.18), radius: 6, y: -1)
+                                .opacity(backdropOpacity)
 
                             ProgressView(
                                 progress: progress,
@@ -113,35 +117,27 @@ struct ResizableSheetContainer<Content: View>: View {
                     .gesture(
                         DragGesture(minimumDistance: 10, coordinateSpace: .global)
                             .updating($activeDragTranslation) { value, state, _ in
-                                let translation = value.translation.height
-                                let rubberBanded: CGFloat
+                                state = value.translation.height
 
-                                if isExpanded {
-                                    if translation > 0 {
-                                        rubberBanded = translation
-                                    } else {
-                                        rubberBanded = 0
+                                let screenH = outerGeometry.size.height
+                                guard screenH > 0 else { return }
+                                let expandedH = screenH * expandedHeightRatio
+
+                                if !isExpanded {
+                                    let upDrag = max(0, -value.translation.height)
+                                    let resistedHeight = logarithmicResistance(upDrag)
+                                    let totalTravel = expandedH - collapsedHeight
+                                    if totalTravel > 0 {
+                                        let progress = resistedHeight / totalTravel
+                                        onDragProgress?(max(0, min(progress, 1)))
                                     }
                                 } else {
-                                    if translation < 0 {
-                                        rubberBanded = translation
-                                    } else {
-                                        rubberBanded = translation * 0.1
+                                    let downDrag = max(0, value.translation.height)
+                                    let totalTravel = expandedH - collapsedHeight
+                                    if totalTravel > 0 {
+                                        let progress = 1 - min(1, downDrag / totalTravel)
+                                        onDragProgress?(max(0, progress))
                                     }
-                                }
-                                state = rubberBanded
-
-                                let screenHeight = outerGeometry.size.height
-                                let currentHeight =
-                                    isExpanded
-                                    ? screenHeight * expandedHeightRatio : collapsedHeight
-                                let targetHeight =
-                                    isExpanded
-                                    ? collapsedHeight : screenHeight * expandedHeightRatio
-                                let diff = abs(targetHeight - currentHeight)
-                                if diff > 0 {
-                                    let progress = abs(rubberBanded) / diff
-                                    onDragProgress?(max(0, min(progress, 1)))
                                 }
                             }
                             .onChanged { value in
@@ -209,14 +205,29 @@ struct ResizableSheetContainer<Content: View>: View {
         return releaseOffset
     }
 
-    private func currentHeight(screenHeight: CGFloat) -> CGFloat {
-        if isCollapsed {
-            return sliverHeight
-        }
-        let baseHeight: CGFloat = isExpanded ? screenHeight * expandedHeightRatio : collapsedHeight
-        let calculatedHeight = baseHeight - effectiveDrag
+    private func logarithmicResistance(_ raw: CGFloat) -> CGFloat {
+        guard raw > 0 else { return 0 }
+        let k: CGFloat = 600
+        return k * (1 - exp(-raw / k))
+    }
 
-        return min(calculatedHeight, screenHeight * expandedHeightRatio)
+    private func currentHeight(screenHeight: CGFloat) -> CGFloat {
+        if isCollapsed { return sliverHeight }
+
+        let expandedH = screenHeight * expandedHeightRatio
+        let drag = effectiveDrag
+
+        if isExpanded {
+            if drag < 0 {
+                return expandedH + logarithmicResistance(-drag)
+            }
+            return max(expandedH - drag, sliverHeight)
+        } else {
+            if drag < 0 {
+                return min(collapsedHeight + logarithmicResistance(-drag), expandedH)
+            }
+            return max(collapsedHeight - logarithmicResistance(drag) * 0.35, sliverHeight)
+        }
     }
 
     private func animatedCornerRadius(screenHeight: CGFloat) -> CGFloat {

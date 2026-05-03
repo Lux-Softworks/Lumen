@@ -14,6 +14,7 @@ final class Tab: Identifiable, ObservableObject {
 
     private var titleCancellable: AnyCancellable?
     private var themeColorCancellable: AnyCancellable?
+    private var faviconPrefetchCancellable: AnyCancellable?
 
     init(id: UUID = UUID(), url: URL? = nil, isIncognito: Bool = false) {
         self.id = id
@@ -42,6 +43,12 @@ final class Tab: Identifiable, ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] color in
                 self?.themeColor = color
+            }
+        faviconPrefetchCancellable = viewModel.$currentURL
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] url in
+                guard let self, !self.isIncognito, let url else { return }
+                FaviconService.prefetchFavicon(for: url)
             }
     }
 }

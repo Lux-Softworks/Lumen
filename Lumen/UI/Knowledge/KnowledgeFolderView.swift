@@ -239,18 +239,11 @@ struct WebsitePageButton: View {
 
     @ViewBuilder
     private var faviconView: some View {
-        let url = URL(string: "https://www.google.com/s2/favicons?domain=\(website.domain)&sz=64")
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            default:
-                monogram
-            }
-        }
+        FaviconView(
+            url: URL(string: "https://\(website.domain)"),
+            size: 20,
+            cornerRadius: 4
+        )
     }
 
     private var monogram: some View {
@@ -436,11 +429,11 @@ struct KnowledgeFolderView: View {
                                         } label: {
                                             Label("Export", systemImage: "square.and.arrow.up")
                                         }
-                                        Button(role: .destructive) {
-                                            topicToDelete = topic
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
+                                    }
+                                    Button(role: .destructive) {
+                                        topicToDelete = topic
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
                                 }
                             }
