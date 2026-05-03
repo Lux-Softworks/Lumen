@@ -91,7 +91,14 @@ final class HistoryStore: ObservableObject {
     
     nonisolated static func stableID(for normalizedURL: String) -> String {
         let hash = SHA256.hash(data: Data(normalizedURL.utf8))
-        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(16).lowercased()
+        let hexChars: [UInt8] = Array("0123456789abcdef".utf8)
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(16)
+        for byte in hash.prefix(8) {
+            bytes.append(hexChars[Int(byte >> 4)])
+            bytes.append(hexChars[Int(byte & 0x0F)])
+        }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     var recentEntries: [HistoryEntry] {

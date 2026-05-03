@@ -234,7 +234,9 @@ struct BottomBarView: View {
             let showsGear = newState == .browserSettings
             let showsFolder = newState == .knowledge
 
-            searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
+            withTransaction(Transaction(animation: nil)) {
+                searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
+            }
             magGlassOpacity = showsMag ? 1.0 : 0.0
             if !showsGear { gearIconOpacity = 0.0 }
             if !showsFolder { folderIconOpacity = 0.0 }
@@ -375,6 +377,8 @@ struct BottomBarView: View {
                             )
                         Spacer(minLength: 0)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
                 }
@@ -449,15 +453,46 @@ struct BottomBarView: View {
                     Haptics.fire(.rigid)
                     onNewIncognitoTab?()
                 }) {
-                    ZStack {
-                        Image(systemName: "eyes")
-                            .opacity(isIncognitoActive ? 0 : 1)
-                        ClosedEyes()
-                            .opacity(isIncognitoActive ? 1 : 0)
+                    ZStack(alignment: .trailing) {
+                        HStack(spacing: 6) {
+                            if isIncognitoActive {
+                                Text("Incognito")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .transition(
+                                        .asymmetric(
+                                            insertion: .move(edge: .trailing)
+                                                .combined(with: .opacity),
+                                            removal: .move(edge: .trailing)
+                                                .combined(with: .opacity)
+                                        )
+                                    )
+                            }
+                            Color.clear.frame(width: 24, height: 16)
+                        }
+                        .mask(alignment: .leading) {
+                            GeometryReader { geo in
+                                Rectangle()
+                                    .fill(.black)
+                                    .frame(width: max(0, geo.size.width - 30))
+                            }
+                        }
+
+                        ZStack {
+                            Image(systemName: "eyes")
+                                .opacity(isIncognitoActive ? 0 : 1)
+                                .scaleEffect(isIncognitoActive ? 0.85 : 1)
+                            ClosedEyes()
+                                .opacity(isIncognitoActive ? 1 : 0)
+                                .scaleEffect(isIncognitoActive ? 1 : 0.85)
+                        }
+                        .frame(width: 24, height: 16)
                     }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
-                    .frame(width: 32, height: 44)
+                    .padding(.horizontal, isIncognitoActive ? 4 : 0)
+                    .frame(height: 44)
                     .animation(AppTheme.Motion.snappy, value: isIncognitoActive)
                 }
                 .buttonStyle(.plain)
@@ -466,7 +501,8 @@ struct BottomBarView: View {
                 )
                 .opacity(state == .search ? 1 : 0)
                 .allowsHitTesting(state == .search)
-                .frame(width: state == .search ? 32 : 0)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: state == .search ? nil : 0, alignment: .trailing)
             }
         }
         .padding(.horizontal, 16)
@@ -502,10 +538,9 @@ struct BottomBarView: View {
             if hasInput {
                 let httpsPrefix = "https://" + lowered
                 let httpPrefix = "http://" + lowered
+                let maxTotal = 8
                 var prefixHits: [HistoryEntry] = []
-                var substringHits: [HistoryEntry] = []
-                prefixHits.reserveCapacity(8)
-                substringHits.reserveCapacity(8)
+                prefixHits.reserveCapacity(maxTotal)
                 for entry in historyStore.entries {
                     let urlLower = entry.url.lowercased()
                     let titleLower = entry.title.lowercased()
@@ -513,10 +548,23 @@ struct BottomBarView: View {
                         || urlLower.hasPrefix(httpPrefix)
                         || titleLower.hasPrefix(lowered) {
                         prefixHits.append(entry)
-                    } else if urlLower.contains(lowered) || titleLower.contains(lowered) {
-                        substringHits.append(entry)
+                        if prefixHits.count >= maxTotal { break }
                     }
-                    if prefixHits.count + substringHits.count >= 8 { break }
+                }
+                let remaining = max(0, maxTotal - prefixHits.count)
+                var substringHits: [HistoryEntry] = []
+                if remaining > 0 {
+                    let prefixIds = Set(prefixHits.map { $0.id })
+                    substringHits.reserveCapacity(remaining)
+                    for entry in historyStore.entries {
+                        if prefixIds.contains(entry.id) { continue }
+                        let urlLower = entry.url.lowercased()
+                        let titleLower = entry.title.lowercased()
+                        if urlLower.contains(lowered) || titleLower.contains(lowered) {
+                            substringHits.append(entry)
+                            if substringHits.count >= remaining { break }
+                        }
+                    }
                 }
                 raw = prefixHits + substringHits
             } else {
@@ -526,8 +574,7 @@ struct BottomBarView: View {
             var picked: [HistoryEntry] = []
             picked.reserveCapacity(4)
             for entry in raw {
-                guard let url = URL(string: entry.url),
-                      FaviconService.cachedFavicon(for: url) != nil else { continue }
+                guard URL(string: entry.url) != nil else { continue }
                 picked.append(entry)
                 if picked.count >= 4 { break }
             }
@@ -537,6 +584,12 @@ struct BottomBarView: View {
         var seenQueryKeys = Set<String>()
         for q in searchMatches {
             seenQueryKeys.insert(SearchHistoryStore.normalize(q.query))
+        }
+        for u in urlMatches {
+            seenQueryKeys.insert(SearchHistoryStore.normalize(u.url))
+            if !u.title.isEmpty {
+                seenQueryKeys.insert(SearchHistoryStore.normalize(u.title))
+            }
         }
 
         let dedupedSuggestions = searchSuggestions.filter { suggestion in
@@ -648,23 +701,20 @@ struct BottomBarView: View {
         let typed = text
         let typedCount = typed.count
         guard typedCount >= 1 else { return "" }
-        let lowered = typed.lowercased()
 
         for entry in searchHistoryStore.entries {
-            let id = entry.id
-            if id.count > typedCount, id.hasPrefix(lowered) {
+            if entry.query.count > typedCount, entry.query.hasPrefix(typed) {
                 return String(entry.query.dropFirst(typedCount))
             }
         }
 
         for entry in historyStore.entries {
             let urlStr = entry.url
-            let urlLower = urlStr.lowercased()
-            if urlStr.count > typedCount, urlLower.hasPrefix(lowered) {
+            if urlStr.count > typedCount, urlStr.hasPrefix(typed) {
                 return String(urlStr.dropFirst(typedCount))
             }
-            let stripped = stripURLChrome(urlStr, lower: urlLower)
-            if stripped.display.count > typedCount, stripped.lower.hasPrefix(lowered) {
+            let stripped = stripURLChrome(urlStr, lower: urlStr.lowercased())
+            if stripped.display.count > typedCount, stripped.display.hasPrefix(typed) {
                 return String(stripped.display.dropFirst(typedCount))
             }
         }
@@ -900,20 +950,33 @@ private struct SearchSuggestionRow: View {
 private struct ClosedEyesShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let lidWidth: CGFloat = 8
-        let lidHeight: CGFloat = 5
-        let gap: CGFloat = 3
-        let totalWidth = lidWidth * 2 + gap
+        let eyeWidth: CGFloat = 9
+        let eyeArc: CGFloat = 4
+        let gap: CGFloat = 4
+        let lashLen: CGFloat = 3
+        let totalWidth = eyeWidth * 2 + gap
         let startX = (rect.width - totalWidth) / 2
-        let y = rect.height / 2
+        let baseY = rect.height / 2 + 1.5
 
         for i in 0..<2 {
-            let x = startX + CGFloat(i) * (lidWidth + gap)
-            path.move(to: CGPoint(x: x, y: y))
+            let leftX = startX + CGFloat(i) * (eyeWidth + gap)
+            let rightX = leftX + eyeWidth
+
+            path.move(to: CGPoint(x: leftX, y: baseY))
             path.addQuadCurve(
-                to: CGPoint(x: x + lidWidth, y: y),
-                control: CGPoint(x: x + lidWidth / 2, y: y - lidHeight)
+                to: CGPoint(x: rightX, y: baseY),
+                control: CGPoint(x: leftX + eyeWidth / 2, y: baseY - eyeArc)
             )
+
+            let outerX = (i == 0) ? leftX : rightX
+            let direction: CGFloat = (i == 0) ? -1 : 1
+            let lashStart = CGPoint(x: outerX, y: baseY - 0.3)
+            let lashTip = CGPoint(
+                x: outerX + direction * lashLen * 0.65,
+                y: baseY - lashLen * 0.85
+            )
+            path.move(to: lashStart)
+            path.addLine(to: lashTip)
         }
         return path
     }
@@ -922,8 +985,8 @@ private struct ClosedEyesShape: Shape {
 private struct ClosedEyes: View {
     var body: some View {
         ClosedEyesShape()
-            .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
-            .frame(width: 22, height: 16)
+            .stroke(style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
+            .frame(width: 24, height: 16)
             .contentShape(Rectangle())
     }
 }

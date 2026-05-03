@@ -346,13 +346,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             haystack.append(query.lowercased())
         }
 
-        for keyword in Self.xhrKeywords {
-            if haystack.contains(keyword) {
-                return .xhr
-            }
-        }
-
-        return .other
+        return Self.xhrKeywords.contains(where: haystack.contains) ? .xhr : .other
     }
 
     private func logThreatSummary() {
@@ -392,7 +386,12 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         let now = Date()
         var events = fingerprintEventsByScript[scriptUrl, default: []]
-        events = events.filter { now.timeIntervalSince($0) < Self.fingerprintBlockWindow }
+        var dropCount = 0
+        for event in events {
+            if now.timeIntervalSince(event) < Self.fingerprintBlockWindow { break }
+            dropCount += 1
+        }
+        if dropCount > 0 { events.removeFirst(dropCount) }
         events.append(now)
         fingerprintEventsByScript[scriptUrl] = events
 

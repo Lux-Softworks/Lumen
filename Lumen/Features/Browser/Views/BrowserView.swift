@@ -29,6 +29,7 @@ struct BrowserView: View {
     @State private var navigationCoverOpacity: CGFloat = 1
 
     @FocusState private var isAddressBarFocused: Bool
+    @Environment(\.scenePhase) private var scenePhase
 
     private var isTransitioning: Bool { activeTabViewState.isTransitioning }
     private var activeTab: Tab? { tabManager.activeTab }
@@ -129,6 +130,11 @@ struct BrowserView: View {
                 isAddressBarFocused: $isAddressBarFocused
             )
             .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .background || newPhase == .inactive {
+                    SearchHistoryStore.shared.flush()
+                }
+            }
             .onChange(of: tabManager.tabs.count) { old, new in
                 guard new < old else { return }
                 urlText = ""
@@ -167,12 +173,12 @@ struct BrowserView: View {
                 .zIndex(1.5)
             transitionLayer(geometry: geometry)
                 .zIndex(2)
-            bottomBarLayer(geometry: geometry)
-                .zIndex(3)
             knowledgeIndicatorLayer(geometry: geometry)
                 .zIndex(9)
             navigationLayer(geometry: geometry)
                 .zIndex(10)
+            bottomBarLayer(geometry: geometry)
+                .zIndex(11)
             if !isReady {
                 launchScreen.zIndex(200)
             }
@@ -181,60 +187,7 @@ struct BrowserView: View {
 
     @ViewBuilder
     private func backgroundLayer(geometry: GeometryProxy) -> some View {
-        backgroundGradient(geometry: geometry)
-    }
-
-    @ViewBuilder
-    private func backgroundDecorations(geometry: GeometryProxy) -> some View {
-        Group {
-            Circle()
-                .fill(AppTheme.Colors.accent.opacity(0.4))
-                .frame(width: geometry.size.width * 1.2)
-                .blur(radius: 100)
-                .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.2)
-            Circle()
-                .fill(AppTheme.Colors.secondaryAccent.opacity(0.3))
-                .frame(width: geometry.size.width * 1.1)
-                .blur(radius: 90)
-                .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.3)
-        }
-        .opacity(0.8)
-    }
-
-    @ViewBuilder
-    private func backgroundGradient(geometry: GeometryProxy) -> some View {
-        ZStack {
-            if incognitoActive {
-                LinearGradient(
-                    colors: [IncognitoPalette.background, IncognitoPalette.uiElement],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-                Circle()
-                    .fill(IncognitoPalette.accent.opacity(0.10))
-                    .frame(width: geometry.size.width * 1.2)
-                    .blur(radius: 110)
-                    .offset(x: -geometry.size.width * 0.2, y: -geometry.size.height * 0.2)
-                Circle()
-                    .fill(IncognitoPalette.secondaryAccent.opacity(0.07))
-                    .frame(width: geometry.size.width * 1.1)
-                    .blur(radius: 100)
-                    .offset(x: geometry.size.width * 0.3, y: geometry.size.height * 0.3)
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
-                    .opacity(0.55)
-            } else {
-                AppTheme.Colors.background
-                backgroundDecorations(geometry: geometry)
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
-                    .opacity(0.7)
-            }
-        }
-        .frame(width: geometry.size.width, height: geometry.size.height)
-        .clipped()
-        .ignoresSafeArea()
+        VibrantBackground(size: geometry.size, isIncognito: incognitoActive)
     }
 
     @ViewBuilder
@@ -319,6 +272,7 @@ struct BrowserView: View {
         bottomBar()
             .frame(maxHeight: .infinity, alignment: .bottom)
             .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
+            .allowsHitTesting(activeTabViewState != .expanding)
     }
 
     @ViewBuilder
@@ -498,10 +452,9 @@ struct BrowserView: View {
                 tabHeaderContent(tab: tab, textOpacity: titleOpacity)
                     .padding(.horizontal, 10)
                     .frame(height: headerHeight)
-                    .padding(.bottom, 5)
                     .frame(width: currentCardWidth, height: max(0, visualGapHeight), alignment: .top)
                     .clipped()
-                    .position(x: currentX, y: cardTopEdgeY + (visualGapHeight / 2))
+                    .position(x: currentX, y: cardTopEdgeY + (visualGapHeight / 2) - 2)
                     .zIndex(1)
             }
 
@@ -853,12 +806,22 @@ struct BrowserView: View {
     private func recordSearchQueryIfNeeded(_ raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2, !incognitoActive else { return }
-        if let parsed = URL(string: trimmed), parsed.scheme != nil,
-           parsed.host != nil || parsed.scheme == "about" {
-            return
-        }
-        if trimmed.contains(".") && !trimmed.contains(" ") { return }
+        if looksLikeURL(trimmed) { return }
         SearchHistoryStore.shared.record(query: trimmed, isIncognito: incognitoActive)
+    }
+
+    private func looksLikeURL(_ s: String) -> Bool {
+        guard !s.contains(" ") else { return false }
+        if let parsed = URL(string: s), parsed.scheme != nil,
+           parsed.host != nil || parsed.scheme == "about" {
+            return true
+        }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-/_~"))
+        guard s.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return false }
+        let host = s.split(separator: "/", maxSplits: 1).first.map(String.init) ?? s
+        let parts = host.split(separator: ".")
+        guard parts.count >= 2, let tld = parts.last else { return false }
+        return tld.count >= 2 && tld.count <= 24 && tld.allSatisfy { $0.isLetter }
     }
 
     private func handleCopyUrl() {
@@ -892,7 +855,7 @@ struct BrowserView: View {
         }
 
         updateState {
-            withAnimation(.smooth(duration: 0.45)) {
+            withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.30)) {
                 self.navigationCoverProgress = 1.0
             }
         }

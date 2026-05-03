@@ -87,6 +87,10 @@ final class SearchHistoryStore: ObservableObject {
         try? FileManager.default.removeItem(at: storeURL)
     }
 
+    func flush() {
+        performSave()
+    }
+
     nonisolated static func normalize(_ s: String) -> String {
         s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
@@ -101,8 +105,15 @@ final class SearchHistoryStore: ObservableObject {
         if s.range(of: #"\b(?:\d[ -]*?){13,19}\b"#, options: .regularExpression) != nil {
             return true
         }
-        if s.count >= 32, !s.contains(" "),
-           s.range(of: #"^[A-Za-z0-9._\-]+$"#, options: .regularExpression) != nil {
+        if s.count >= 32,
+           s.range(of: #"^[a-fA-F0-9]+$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.count >= 40, !s.contains("."), !s.contains(" "),
+           s.range(of: #"^[A-Za-z0-9+/=_\-]+$"#, options: .regularExpression) != nil,
+           s.range(of: #"[A-Z]"#, options: .regularExpression) != nil,
+           s.range(of: #"[a-z]"#, options: .regularExpression) != nil,
+           s.range(of: #"\d"#, options: .regularExpression) != nil {
             return true
         }
         return false
@@ -123,7 +134,7 @@ final class SearchHistoryStore: ObservableObject {
                 rebuildIndex()
                 data = try JSONEncoder().encode(entries)
             }
-            try data.write(to: storeURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: storeURL, options: [.atomic, .completeFileProtectionUnlessOpen])
         } catch {}
     }
 

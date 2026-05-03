@@ -400,10 +400,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
             webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self, weak webView] _, change in
                 guard let newY = change.newValue?.y,
                       let oldY = change.oldValue?.y else { return }
+                let delta = newY - oldY
+                guard abs(delta) >= 0.5 else { return }
 
                 DispatchQueue.main.async {
                     guard let self = self, let webView = webView else { return }
-                    let delta = newY - oldY
                     self.onScrollUpdate?(newY, delta, webView.scrollView.contentSize.height, webView.scrollView.bounds.height)
                 }
             }

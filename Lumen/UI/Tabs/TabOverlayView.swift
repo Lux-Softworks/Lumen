@@ -201,6 +201,12 @@ private struct TabCardWrapper: View {
         }
         .frame(width: config.cardWidth, height: config.cardHeight)
         .id(tab.id)
+        .transition(
+            .asymmetric(
+                insertion: .identity,
+                removal: .move(edge: .top).combined(with: .opacity)
+            )
+        )
     }
 }
 
@@ -313,10 +319,15 @@ private struct TabCardItemView: View {
                     isDeletingTab = false
                     if translation < -60 || velocity < -400 {
                         Haptics.fire(.soft)
-                        withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
-                            dragOffset = -700
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.92)) {
+                            dragOffset = -1400
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { onClose() }
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(80))
+                            withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+                                onClose()
+                            }
+                        }
                     } else {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                             dragOffset = 0

@@ -76,19 +76,27 @@ struct TabHeaderLabel: View {
         HStack(spacing: 8) {
             FaviconView(url: url, size: iconSize, isIncognito: isIncognito)
 
-            Text(displayTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(textColor)
-                .lineLimit(1)
-                .opacity(textOpacity)
+            HStack(spacing: 0) {
+                if isIncognito {
+                    Text("Incognito · ")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(textColor)
+                        .lineLimit(1)
+                }
+                Text(visibleTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(textColor)
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
+            .opacity(textOpacity)
 
             Spacer(minLength: 0)
         }
     }
 
-    private var displayTitle: String {
-        let base = title.isEmpty ? "New Tab" : title
-        return isIncognito ? "Incognito · " + base : base
+    private var visibleTitle: String {
+        title.isEmpty ? "New Tab" : title
     }
 
     private var textColor: Color {
