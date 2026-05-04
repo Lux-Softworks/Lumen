@@ -10,6 +10,7 @@ struct ProgressView: View {
     @State private var visible: Bool = false
     @State private var isFinishing: Bool = false
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var barGradient: LinearGradient {
         LinearGradient(
@@ -93,12 +94,12 @@ struct ProgressView: View {
                     displayedProgress = 0
                 }
 
-                withAnimation(.smooth(duration: 0.3)) {
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                     visible = true
                 }
             } else {
                 isFinishing = true
-                withAnimation(.smooth(duration: 0.3)) {
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                     displayedProgress = 1.0
                 }
 
@@ -106,7 +107,7 @@ struct ProgressView: View {
                     try? await Task.sleep(nanoseconds: 300_000_000)
                     guard self.isFinishing else { return }
 
-                    withAnimation(.smooth(duration: 0.3)) {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                         visible = false
                     }
 
@@ -127,7 +128,7 @@ struct ProgressView: View {
             guard !isFinishing else { return }
 
             if newValue > displayedProgress {
-                withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 1.0)) {
                     displayedProgress = newValue
                 }
             }

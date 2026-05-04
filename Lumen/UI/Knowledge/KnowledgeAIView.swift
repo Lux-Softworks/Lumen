@@ -8,6 +8,9 @@ struct KnowledgeAIView: View {
     @State private var scrollWorkItem: DispatchWorkItem?
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var idleLabelSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var sendButtonIconSize: CGFloat = 12
 
     private var safeAreaBottom: CGFloat {
         UIApplication.shared.connectedScenes
@@ -21,9 +24,11 @@ struct KnowledgeAIView: View {
                 if viewModel.messages.isEmpty && !viewModel.isThinking {
                     idleView
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        .dynamicTypeSize(.xSmall ... .accessibility2)
                 } else {
                     messageList
                         .transition(.opacity)
+                        .dynamicTypeSize(.xSmall ... .accessibility5)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -40,9 +45,11 @@ struct KnowledgeAIView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.opacity)
                 .allowsHitTesting(false)
+                .dynamicTypeSize(.xSmall ... .accessibility2)
             }
 
             inputBar
+                .dynamicTypeSize(.xSmall ... .accessibility2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, keyboardHeight)
@@ -72,7 +79,7 @@ struct KnowledgeAIView: View {
                 phase: viewModel.isModelLoading ? .spinning : viewModel.sparklePhase
             )
             Text("Ask about what you've read")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: idleLabelSize, weight: .semibold))
                 .foregroundColor(palette.text.opacity(0.28))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -126,21 +133,10 @@ struct KnowledgeAIView: View {
     }
 
     private var inputBar: some View {
-        HStack(alignment: .center, spacing: 10) {
-            ZStack(alignment: .leading) {
-                if viewModel.inputText.isEmpty {
-                    if viewModel.isModelLoading {
-                        ThreeDotsView()
-                            .allowsHitTesting(false)
-                    } else {
-                        Text("What do you want to know?")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(palette.text.opacity(0.3))
-                            .allowsHitTesting(false)
-                    }
-                }
+        HStack(alignment: .top, spacing: 10) {
+            ZStack(alignment: .topLeading) {
                 TextField("", text: $viewModel.inputText, axis: .vertical)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(palette.text)
                     .tint(palette.accent)
                     .lineLimit(1...5)
@@ -152,6 +148,23 @@ struct KnowledgeAIView: View {
                         Haptics.fire(.tap)
                         Task { await viewModel.send() }
                     }
+
+                if viewModel.inputText.isEmpty {
+                    if viewModel.isModelLoading {
+                        Text(" ")
+                            .font(.subheadline.weight(.semibold))
+                            .opacity(0)
+                            .overlay(alignment: .leading) {
+                                ThreeDotsView()
+                            }
+                            .allowsHitTesting(false)
+                    } else {
+                        Text("What do you want to know?")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(palette.text.opacity(0.3))
+                            .allowsHitTesting(false)
+                    }
+                }
             }
 
             Button {
@@ -164,10 +177,13 @@ struct KnowledgeAIView: View {
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: sendButtonIconSize, weight: .bold))
                             .foregroundColor(canSend ? .white : palette.text.opacity(0.25))
                     )
                     .animation(AppTheme.Motion.snappy, value: canSend)
+                    .padding(7)
+                    .contentShape(Rectangle())
+                    .padding(-7)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -231,6 +247,9 @@ private struct ChatBubbleView: View {
     let message: ChatMessage
     private var isUser: Bool { message.role == .user }
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var matchIconSize: CGFloat = 9
+    @ScaledMetric(relativeTo: .body) private var matchLabelSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .body) private var sourceLabelSize: CGFloat = 10
 
     var body: some View {
         Group {
@@ -246,7 +265,7 @@ private struct ChatBubbleView: View {
 
     private var userBubble: some View {
         Text(message.text)
-            .font(.system(size: 15))
+            .font(.subheadline)
             .foregroundColor(palette.text)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
@@ -296,9 +315,9 @@ private struct ChatBubbleView: View {
         }
         return HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: matchIconSize, weight: .semibold))
             Text(match.label)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: matchLabelSize, weight: .medium))
         }
         .foregroundColor(color)
         .padding(.horizontal, 8)
@@ -317,12 +336,12 @@ private struct ChatBubbleView: View {
                             .fill(palette.accent.opacity(0.4))
                             .frame(width: 2, height: 10)
                         Text(source.domain)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: sourceLabelSize, weight: .medium))
                             .foregroundColor(palette.text.opacity(0.35))
                             .lineLimit(1)
                         if let title = source.title, !title.isEmpty {
                             Text("· \(title)")
-                                .font(.system(size: 10))
+                                .font(.system(size: sourceLabelSize))
                                 .foregroundColor(palette.text.opacity(0.2))
                                 .lineLimit(1)
                         }
@@ -338,13 +357,18 @@ private struct StaggeredFade<Content: View>: View {
     let delay: Double
     @ViewBuilder var content: Content
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         content
             .opacity(appeared ? 1 : 0)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.32).delay(delay)) {
+                if reduceMotion {
                     appeared = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.32).delay(delay)) {
+                        appeared = true
+                    }
                 }
             }
     }
@@ -353,6 +377,7 @@ private struct StaggeredFade<Content: View>: View {
 private struct StreamingText: View {
     let text: String
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var codeFontSize: CGFloat = 13
 
     private struct Line: Identifiable {
         let id: Int
@@ -393,7 +418,7 @@ private struct StreamingText: View {
                 HStack(alignment: .top, spacing: 6) {
                     if line.isBullet {
                         Text("•")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                             .foregroundColor(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
@@ -415,7 +440,7 @@ private struct StreamingText: View {
     @ViewBuilder
     private func codeView(body: String) -> some View {
         Text(body)
-            .font(.system(size: 13, design: .monospaced))
+            .font(.system(size: codeFontSize, design: .monospaced))
             .foregroundColor(palette.text)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -522,15 +547,20 @@ private struct FadingWord: View {
     let globalIndex: Int
     @State private var appeared = false
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Text(word)
-            .font(.system(size: 15, weight: bold ? .bold : .regular))
+            .font(.subheadline.weight(bold ? .bold : .regular))
             .foregroundColor(palette.text)
             .opacity(appeared ? 1 : 0)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.25)) {
+                if reduceMotion {
                     appeared = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        appeared = true
+                    }
                 }
             }
     }
@@ -630,7 +660,7 @@ private struct RevealText: View {
                 HStack(alignment: .top, spacing: 6) {
                     if item.block.isBullet {
                         Text("•")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                             .foregroundColor(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
@@ -656,7 +686,7 @@ private struct RevealText: View {
                 HStack(alignment: .top, spacing: 6) {
                     if item.block.isBullet {
                         Text("•")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                             .foregroundColor(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
@@ -720,15 +750,20 @@ private struct WordView: View {
 
     @State private var appeared = false
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Text(word)
-            .font(.system(size: 15, weight: bold ? .bold : .regular))
+            .font(.subheadline.weight(bold ? .bold : .regular))
             .foregroundColor(palette.text)
             .opacity(appeared ? 1 : 0)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.25).delay(delay)) {
+                if reduceMotion {
                     appeared = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.25).delay(delay)) {
+                        appeared = true
+                    }
                 }
             }
     }
@@ -741,7 +776,7 @@ private struct StaticWord: View {
 
     var body: some View {
         Text(word)
-            .font(.system(size: 15, weight: bold ? .bold : .regular))
+            .font(.subheadline.weight(bold ? .bold : .regular))
             .foregroundColor(palette.text)
     }
 }
@@ -749,17 +784,19 @@ private struct StaticWord: View {
 private struct ThreeDotsView: View {
     @State private var phase: Int = 0
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(palette.text.opacity(phase == index ? 0.4 : 0.12))
+                    .fill(palette.text.opacity(reduceMotion ? 0.25 : (phase == index ? 0.4 : 0.12)))
                     .frame(width: 5, height: 5)
-                    .animation(.easeInOut(duration: 0.3).delay(Double(index) * 0.1), value: phase)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.3).delay(Double(index) * 0.1), value: phase)
             }
         }
         .task {
+            guard !reduceMotion else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 450_000_000)
                 phase = (phase + 1) % 3
@@ -771,16 +808,17 @@ private struct ThreeDotsView: View {
 private struct StatusLabel: View {
     let text: String?
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isHidden: Bool { (text ?? "").isEmpty }
 
     var body: some View {
         Text(text ?? "")
-            .font(.system(size: 13, weight: .semibold))
+            .font(.footnote.weight(.semibold))
             .foregroundColor(palette.text.opacity(0.5))
             .opacity(isHidden ? 0 : 1)
             .blur(radius: isHidden ? 2 : 0)
-            .animation(.easeOut(duration: 0.25), value: text)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: text)
     }
 }
 
@@ -834,9 +872,17 @@ private struct LumenSparkleMatrix: View {
     }()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
-            Canvas(rendersAsynchronously: false) { ctx, canvasSize in
-                draw(ctx: ctx, canvasSize: canvasSize, now: context.date)
+        Group {
+            if reduceMotion {
+                Canvas(rendersAsynchronously: false) { ctx, canvasSize in
+                    draw(ctx: ctx, canvasSize: canvasSize, now: Date(timeIntervalSinceReferenceDate: 0))
+                }
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+                    Canvas(rendersAsynchronously: false) { ctx, canvasSize in
+                        draw(ctx: ctx, canvasSize: canvasSize, now: context.date)
+                    }
+                }
             }
         }
         .frame(width: size * 1.7, height: size * 1.7)
@@ -850,7 +896,9 @@ private struct LumenSparkleMatrix: View {
 
     private func handlePhaseChange(from oldPhase: SparklePhase, to newPhase: SparklePhase) {
         if newPhase == .collapsing || (oldPhase == .spinning && newPhase == .idle) {
-            unlockStartedAt = Date()
+            if !reduceMotion {
+                unlockStartedAt = Date()
+            }
             Haptics.fire(.success)
         } else if newPhase == .spinning {
             unlockStartedAt = nil
@@ -887,7 +935,7 @@ private struct LumenSparkleMatrix: View {
         let effectivePhase: SparklePhase = unlockActive ? .collapsing : phase
 
         let scaleFactor: CGFloat
-        if effectivePhase == .collapsing {
+        if effectivePhase == .collapsing && !reduceMotion {
             scaleFactor = 1.0 + 0.08 * CGFloat(sin(Double.pi * unlockProgress))
         } else {
             scaleFactor = 1.0

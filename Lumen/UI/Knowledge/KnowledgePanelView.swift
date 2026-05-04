@@ -88,10 +88,7 @@ struct KnowledgePanelView: View {
                     viewModel.activeTab = .ai
                 } label: {
                     Text("Ask")
-                        .font(AppTheme.Typography.sansBody(
-                            size: 15,
-                            weight: viewModel.activeTab == .ai ? .bold : .medium
-                        ))
+                        .font(.subheadline.weight(viewModel.activeTab == .ai ? .bold : .medium))
                         .foregroundColor(
                             viewModel.activeTab == .ai
                                 ? palette.text
@@ -107,10 +104,7 @@ struct KnowledgePanelView: View {
                     viewModel.activeTab = .folder
                 } label: {
                     Text("Library")
-                        .font(AppTheme.Typography.sansBody(
-                            size: 15,
-                            weight: viewModel.activeTab == .folder ? .bold : .medium
-                        ))
+                        .font(.subheadline.weight(viewModel.activeTab == .folder ? .bold : .medium))
                         .foregroundColor(
                             viewModel.activeTab == .folder
                                 ? palette.text
@@ -133,6 +127,7 @@ struct KnowledgePanelView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, keyboardVisible ? 6 : safeAreaBottom + 8)
         .padding(.top, 8)
+        .dynamicTypeSize(.xSmall ... .accessibility2)
     }
 
     private static func keyboardAnimation(from notification: Notification) -> Animation {

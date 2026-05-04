@@ -103,7 +103,7 @@ struct ExportView: View {
             HStack {
                 Button(action: onDismiss) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.callout.weight(.bold))
                         .foregroundColor(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
@@ -112,7 +112,7 @@ struct ExportView: View {
                 Spacer()
             }
             Text("Export")
-                .font(AppTheme.Typography.display(size: 20, weight: .bold))
+                .font(.title3.weight(.bold))
                 .foregroundColor(palette.text)
         }
         .padding(.horizontal, 16)
@@ -123,11 +123,11 @@ struct ExportView: View {
     private var fixedScopeHeader: some View {
         HStack(spacing: 14) {
             Image(systemName: fixedScopeIcon)
-                .font(.system(size: 18, weight: .medium))
+                .font(.body.weight(.medium))
                 .foregroundColor(palette.accent)
                 .frame(width: 32, height: 32)
             Text(fixedScopeTitle)
-                .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
+                .font(.callout.weight(.bold))
                 .foregroundColor(palette.text)
             Spacer()
         }
@@ -179,12 +179,12 @@ struct ExportView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundColor(scope == value ? palette.accent : palette.text.opacity(0.4))
                     .frame(width: 32, height: 32)
 
                 Text(title)
-                    .font(AppTheme.Typography.sansBody(size: 16, weight: scope == value ? .bold : .medium))
+                    .font(.callout.weight(scope == value ? .bold : .medium))
                     .foregroundColor(scope == value ? palette.accent : palette.text)
 
                 Spacer()
@@ -220,12 +220,12 @@ struct ExportView: View {
     private func toggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
+                .font(.body.weight(.medium))
                 .foregroundColor(palette.accent)
                 .frame(width: 32, height: 32)
 
             Text(title)
-                .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
+                .font(.callout.weight(.medium))
                 .foregroundColor(palette.text)
 
             Spacer()
@@ -249,7 +249,7 @@ struct ExportView: View {
     private func datePickerRow(title: String, selection: Binding<Date>) -> some View {
         HStack {
             Text(title)
-                .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
+                .font(.callout.weight(.medium))
                 .foregroundColor(palette.text)
             Spacer()
             DatePicker("", selection: selection, displayedComponents: .date)
@@ -290,10 +290,10 @@ struct ExportView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Exported \(current) / \(total)")
-                    .font(AppTheme.Typography.sansBody(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(palette.text)
                 Text(progressPhase(progress))
-                    .font(AppTheme.Typography.sansBody(size: 12, weight: .regular))
+                    .font(.caption)
                     .foregroundColor(palette.text.opacity(0.55))
             }
 
@@ -316,17 +316,17 @@ struct ExportView: View {
             ZStack {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                     Text("Export")
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
+                        .font(.callout.weight(.bold))
                 }
                 .opacity(isRunning ? 0 : 1)
 
                 HStack(spacing: 8) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                     Text("Cancel")
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
+                        .font(.callout.weight(.bold))
                 }
                 .opacity(isRunning ? 1 : 0)
             }

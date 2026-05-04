@@ -16,6 +16,8 @@ struct TabOverlayView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var isDeletingTab: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geo in
             let config = calculateLayout(in: geo)
@@ -35,7 +37,8 @@ struct TabOverlayView: View {
                                     shrinkProgress: shrinkProgress,
                                     onSelectTab: onSelectTab,
                                     lastScrolledToId: $lastScrolledToId,
-                                    isDeletingTab: $isDeletingTab
+                                    isDeletingTab: $isDeletingTab,
+                                    reduceMotion: reduceMotion
                                 )
                                 .zIndex(Double(index))
                             }
@@ -55,7 +58,7 @@ struct TabOverlayView: View {
                     .onChange(of: tabManager.activeTabId) { _, id in
                         guard id != lastScrolledToId else { return }
                         DispatchQueue.main.async {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
                                 proxy.scrollTo(id, anchor: .center)
                             }
                         }
@@ -84,6 +87,7 @@ struct TabOverlayView: View {
                 Color.clear.frame(height: toolbarHeight)
             }
         }
+        .dynamicTypeSize(.xSmall ... .accessibility3)
     }
 
     fileprivate struct LayoutConfig {
@@ -132,6 +136,7 @@ private struct TabCardWrapper: View {
     let onSelectTab: (UUID, CGPoint) -> Void
     @Binding var lastScrolledToId: UUID?
     @Binding var isDeletingTab: Bool
+    let reduceMotion: Bool
 
     var body: some View {
         let hidden = tab.id == hiddenTabId
@@ -178,7 +183,7 @@ private struct TabCardWrapper: View {
                 tab: tab,
                 headerOpacity: headerOpacity,
                 onClose: {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.85)) {
                         tabManager.closeTab(id: tab.id)
                     }
                 },
@@ -191,7 +196,8 @@ private struct TabCardWrapper: View {
                     lastScrolledToId = tab.id
                     onSelectTab(tab.id, visualCenter)
                 },
-                isDeletingTab: $isDeletingTab
+                isDeletingTab: $isDeletingTab,
+                reduceMotion: reduceMotion
             )
             .frame(width: config.cardWidth, height: config.cardHeight)
             .scaleEffect(cardScale)
@@ -272,8 +278,10 @@ private struct TabCardItemView: View {
     var onClose: () -> Void
     var onTap: () -> Void
     @Binding var isDeletingTab: Bool
+    let reduceMotion: Bool
     @Environment(\.palette) private var palette
 
+    @ScaledMetric(relativeTo: .body) private var placeholderIconSize: CGFloat = 36
     @State private var dragOffset: CGFloat = 0
 
     var body: some View {
@@ -283,7 +291,8 @@ private struct TabCardItemView: View {
                 url: tab.viewModel.currentURL ?? tab.url,
                 isIncognito: tab.isIncognito,
                 textOpacity: headerOpacity,
-                iconSize: 20
+                iconSize: 20,
+                contrastBackground: tab.themeColor ?? .black
             )
             .padding(.horizontal, 10)
             .frame(height: 36)
@@ -297,7 +306,7 @@ private struct TabCardItemView: View {
                 } else {
                     Color(white: 0.10)
                     Image(systemName: "globe")
-                        .font(.system(size: 36, weight: .thin))
+                        .font(.system(size: placeholderIconSize, weight: .thin))
                         .foregroundColor(palette.text.opacity(0.12))
                 }
             }
@@ -319,17 +328,17 @@ private struct TabCardItemView: View {
                     isDeletingTab = false
                     if translation < -60 || velocity < -400 {
                         Haptics.fire(.soft)
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.92)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.92)) {
                             dragOffset = -1400
                         }
                         Task { @MainActor in
                             try? await Task.sleep(for: .milliseconds(80))
-                            withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.88)) {
                                 onClose()
                             }
                         }
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85)) {
                             dragOffset = 0
                         }
                     }

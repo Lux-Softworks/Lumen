@@ -186,6 +186,9 @@ struct WebsitePageButton: View {
     var website: Website
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var domainLabelSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .body) private var statsLabelSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .body) private var monogramLabelSize: CGFloat = 11
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -211,7 +214,7 @@ struct WebsitePageButton: View {
                         Spacer(minLength: 4)
 
                         Text(website.domain)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: domainLabelSize, weight: .medium))
                             .foregroundColor(palette.text.opacity(0.45))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -220,7 +223,7 @@ struct WebsitePageButton: View {
                     Spacer(minLength: 0)
 
                     Text(statsLine)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: statsLabelSize, weight: .semibold))
                         .foregroundColor(palette.text.opacity(0.35))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -231,7 +234,7 @@ struct WebsitePageButton: View {
             .aspectRatio(3/4, contentMode: .fit)
 
             Text(website.displayName)
-                .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundColor(palette.text)
                 .lineLimit(1)
         }
@@ -249,7 +252,7 @@ struct WebsitePageButton: View {
     private var monogram: some View {
         let letter = String(website.displayName.first ?? Character("?")).uppercased()
         return Text(letter)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: monogramLabelSize, weight: .bold))
             .foregroundColor(palette.accent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(palette.accent.opacity(0.15))
@@ -270,6 +273,7 @@ struct KnowledgeFolderView: View {
     @State private var topicToDelete: Topic? = nil
     @State private var exportSheet: ExportSheetItem? = nil
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct ExportSheetItem: Identifiable {
         let id = UUID()
@@ -307,6 +311,7 @@ struct KnowledgeFolderView: View {
             .animation(.smooth(duration: 0.3), value: viewModel.navigationPath)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .dynamicTypeSize(.xSmall ... .accessibility2)
         .sheet(item: $exportSheet) { item in
             ExportView(
                 initialScope: initialScope(for: item.scope),
@@ -374,7 +379,7 @@ struct KnowledgeFolderView: View {
             if viewModel.topics.isEmpty {
                 VStack(spacing: 16) {
                     Text("No topics yet")
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                         .foregroundColor(palette.text.opacity(0.35))
 
                     if seedKnowledge {
@@ -385,7 +390,7 @@ struct KnowledgeFolderView: View {
                                 Image(systemName: "plus.square.fill.on.square.fill")
                                 Text("Seed test data")
                             }
-                            .font(AppTheme.Typography.sansBody(size: 14, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                             .foregroundColor(palette.accent)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
@@ -415,7 +420,7 @@ struct KnowledgeFolderView: View {
                                         FolderItemButton(topic: topic)
 
                                         Text(topic.name)
-                                            .font(AppTheme.Typography.sansBody(size: 13, weight: .bold))
+                                            .font(.footnote.weight(.bold))
                                             .foregroundColor(palette.text)
                                             .lineLimit(1)
                                     }
@@ -453,14 +458,17 @@ struct KnowledgeFolderView: View {
                     viewModel.navigateBack()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.callout.weight(.bold))
                         .foregroundColor(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
                         .cornerRadius(20)
+                        .padding(2)
+                        .contentShape(Rectangle())
+                        .padding(-2)
                 }
                 Text(viewModel.selectedTopic?.name ?? "")
-                    .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundColor(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -517,6 +525,7 @@ struct KnowledgeFolderView: View {
 private struct StaggerFadeModifier: ViewModifier {
     let delay: Double
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
@@ -524,8 +533,12 @@ private struct StaggerFadeModifier: ViewModifier {
             .offset(y: appeared ? 0 : 8)
             .blur(radius: appeared ? 0 : 2)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.35).delay(delay)) {
+                if reduceMotion {
                     appeared = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.35).delay(delay)) {
+                        appeared = true
+                    }
                 }
             }
     }
@@ -537,20 +550,24 @@ private struct PageDetailView: View {
 
     @State private var annotations: [Annotation] = []
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var deleteIconSize: CGFloat = 10
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.callout.weight(.bold))
                         .foregroundColor(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
                         .cornerRadius(20)
+                        .padding(2)
+                        .contentShape(Rectangle())
+                        .padding(-2)
                 }
                 Text(page.title ?? page.domain)
-                    .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundColor(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -563,7 +580,7 @@ private struct PageDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if let summary = page.summary, !summary.isEmpty {
                         Text((try? AttributedString(markdown: summary)) ?? AttributedString(summary))
-                            .font(AppTheme.Typography.sansBody(size: 14, weight: .regular))
+                            .font(.subheadline.weight(.regular))
                             .foregroundColor(palette.text.opacity(0.5))
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -572,9 +589,10 @@ private struct PageDetailView: View {
                             .padding(.bottom, 16)
                     }
 
+
                     if let meta = pageMetaLine {
                         Text(meta)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.caption2.weight(.medium))
                             .foregroundColor(palette.text.opacity(0.25))
                             .padding(.horizontal, 16)
                             .padding(.bottom, 20)
@@ -595,7 +613,7 @@ private struct PageDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         ForEach(Array(contentParagraphs.enumerated()), id: \.offset) { _, para in
                             Text(para)
-                                .font(AppTheme.Typography.sansBody(size: 15, weight: .regular))
+                                .font(.subheadline)
                                 .foregroundColor(palette.text.opacity(0.8))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .lineSpacing(5)
@@ -606,6 +624,7 @@ private struct PageDetailView: View {
                 .padding(.bottom, 32)
                 .animation(.smooth(duration: 0.25), value: annotations.isEmpty)
             }
+            .dynamicTypeSize(.xSmall ... .accessibility5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await loadAnnotations() }
@@ -614,7 +633,7 @@ private struct PageDetailView: View {
     private var highlightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Highlights")
-                .font(AppTheme.Typography.sansBody(size: 11, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundColor(palette.text.opacity(0.35))
                 .textCase(.uppercase)
                 .kerning(0.4)
@@ -636,7 +655,7 @@ private struct PageDetailView: View {
                 .frame(width: 3)
 
             Text(annotation.text)
-                .font(AppTheme.Typography.sansBody(size: 13, weight: .regular))
+                .font(.footnote)
                 .foregroundColor(palette.text.opacity(0.75))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -646,10 +665,12 @@ private struct PageDetailView: View {
                 Task { await delete(annotation) }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: deleteIconSize, weight: .semibold))
                     .foregroundColor(palette.text.opacity(0.3))
                     .frame(width: 22, height: 22)
+                    .padding(11)
                     .contentShape(Rectangle())
+                    .padding(-11)
             }
             .buttonStyle(.plain)
         }

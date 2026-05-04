@@ -9,6 +9,7 @@ struct ResizableSheetContainer<Content: View>: View {
     var expandedHeightRatio: CGFloat
     var themeColor: UIColor?
     var backdropOpacity: CGFloat
+    var hideProgressBar: Bool = false
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
     var onCollapse: (() -> Void)?
@@ -20,6 +21,7 @@ struct ResizableSheetContainer<Content: View>: View {
     @State private var releaseOffset: CGFloat = 0
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.palette) var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let collapsedHeight: CGFloat = 80
     private let sliverHeight: CGFloat = 20
@@ -33,6 +35,7 @@ struct ResizableSheetContainer<Content: View>: View {
         expandedHeightRatio: CGFloat = 0.65,
         themeColor: UIColor? = nil,
         backdropOpacity: CGFloat = 1,
+        hideProgressBar: Bool = false,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
         onCollapse: (() -> Void)? = nil,
@@ -47,6 +50,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self.expandedHeightRatio = expandedHeightRatio
         self.themeColor = themeColor
         self.backdropOpacity = backdropOpacity
+        self.hideProgressBar = hideProgressBar
         self.onDragStart = onDragStart
         self.onExpand = onExpand
         self.onCollapse = onCollapse
@@ -66,7 +70,7 @@ struct ResizableSheetContainer<Content: View>: View {
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(AppTheme.Motion.sheet) {
+                        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
                             isExpanded = false
                         }
                         onCollapse?()
@@ -112,6 +116,8 @@ struct ResizableSheetContainer<Content: View>: View {
                                 width: outerGeometry.size.width,
                                 cornerRadius: cornerR,
                             )
+                            .opacity(hideProgressBar ? 0 : 1)
+                            .animation(.easeInOut(duration: 0.05), value: hideProgressBar)
                         }
                     )
                     .gesture(
@@ -176,7 +182,7 @@ struct ResizableSheetContainer<Content: View>: View {
                                     shouldExpand = translation < -50 || velocity < -500
                                 }
 
-                                withAnimation(AppTheme.Motion.sheet) {
+                                withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
                                     isExpanded = shouldExpand
                                     releaseOffset = 0
                                 }

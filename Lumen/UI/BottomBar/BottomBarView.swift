@@ -45,6 +45,7 @@ struct BottomBarView: View {
     @ObservedObject private var searchHistoryStore = SearchHistoryStore.shared
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Namespace private var animation
     @State private var isSpinning = false
@@ -54,6 +55,22 @@ struct BottomBarView: View {
     @State private var magGlassOpacity: Double = 1.0
     @State private var gearIconOpacity: Double = 0.0
     @State private var folderIconOpacity: Double = 0.0
+    @ScaledMetric(relativeTo: .body) private var dtFactor: CGFloat = 1.0
+    @ScaledMetric(relativeTo: .body) private var smallIcon: CGFloat = 18
+
+    private func scaled(_ base: CGFloat, max: CGFloat) -> CGFloat {
+        min(base * dtFactor, max)
+    }
+
+    private var expandedCapsuleHeight: CGFloat { scaled(52, max: 58) }
+    private var rowFaviconSize: CGFloat { scaled(21, max: 24) }
+    private var eyesIconHeight: CGFloat { scaled(17, max: 20) }
+    private var incognitoPadding: CGFloat { scaled(4, max: 6) }
+    private var magGlassSize: CGFloat { scaled(19, max: 22) }
+    private var urlFontSize: CGFloat { scaled(20, max: 24) }
+    private var historyFontSize: CGFloat { scaled(19, max: 24) }
+    private var historyIconSize: CGFloat { scaled(20, max: 24) }
+    private var incognitoFontSize: CGFloat { scaled(14, max: 17) }
 
     var isExpanded: Bool {
         state == .search || state == .browserSettings || state == .siteSettings
@@ -70,208 +87,264 @@ struct BottomBarView: View {
         return state == .knowledge ? 0.9 : 0.67
     }
 
+    private var isExpandedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                state == .search || state == .browserSettings || state == .siteSettings
+                    || state == .knowledge || state == .submittingSearch
+            },
+            set: { expanded in
+                if expanded {
+                    if state == .collapsed || state == .hidden {
+                        text = ""
+                        state = .search
+                    }
+                } else {
+                    state = .collapsed
+                }
+            }
+        )
+    }
+
+    private var isCollapsedBinding: Binding<Bool> {
+        Binding(
+            get: { state == .hidden },
+            set: { collapsed in
+                if collapsed {
+                    state = .hidden
+                } else if state == .hidden {
+                    state = .collapsed
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        VStack(spacing: 0) {
+            sheetTopRow
+            sheetBody
+            if state == .search || state == .collapsed || state == .hidden
+                || state == .browserSettings || state == .siteSettings
+            {
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var capsuleH: CGFloat {
+        isExpanded ? expandedCapsuleHeight : 44
+    }
+
+    private var sheetTopRow: some View {
+        ZStack(alignment: .top) {
+            frostedBackground
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(palette.text.opacity(0.15), lineWidth: 1))
+                .frame(width: isExpanded ? nil : 80, height: capsuleH)
+                .padding(.top, 18)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .zIndex(0)
+
+            collapsedContent
+                .opacity(isExpanded ? 0 : 1)
+                .allowsHitTesting(!isExpanded)
+                .zIndex(1)
+
+            searchBarRow
+                .opacity(isExpanded ? 1 : 0)
+                .allowsHitTesting(isExpanded)
+                .zIndex(2)
+
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: magGlassSize, weight: .bold))
+                .foregroundColor(palette.text)
+                .frame(width: magGlassSize, height: magGlassSize)
+                .matchedGeometryEffect(
+                    id: "magnifyingGlass_icon", in: animation, isSource: false
+                )
+                .opacity(magGlassOpacity)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var sheetBody: some View {
+        if state == .knowledge {
+            knowledgeContent
+                .id(state)
+                .transition(
+                    reduceMotion
+                        ? .identity
+                        : .asymmetric(
+                            insertion: .opacity.animation(AppTheme.Motion.fade.delay(0.15)),
+                            removal: .opacity.animation(.easeOut(duration: 0.08))
+                        )
+                )
+        } else if state == .browserSettings || state == .siteSettings {
+            SettingsPage(
+                type: state == .browserSettings ? .browser : .site,
+                currentURL: currentURL,
+                onDismiss: { state = .collapsed },
+                trackerCount: trackerCount,
+                initialZoom: initialZoom,
+                initialDesktopMode: initialDesktopMode,
+                onFindOnPage: onFindOnPage,
+                onShare: onShare,
+                onZoomChanged: onZoomChanged,
+                onRequestDesktopSite: onRequestDesktopSite,
+                onReloadPage: onReloadPage,
+                onNavigate: onNavigate
+            )
+            .id(state)
+            .transition(
+                reduceMotion
+                    ? .identity
+                    : .asymmetric(
+                        insertion: .opacity.animation(.smooth(duration: 0.25).delay(0.15)),
+                        removal: .opacity.animation(.smooth(duration: 0.05))
+                    )
+            )
+        } else {
+            searchSuggestionsArea
+                .allowsHitTesting(state == .search)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .opacity(isExpanded ? 1 : min(1, toolbarDragFraction * 2.0))
+        }
+    }
+
+    private func handleSheetDragStart() {
+        if state == .collapsed || state == .hidden {}
+    }
+
+    private func handleSheetExpand() {
+        if state == .collapsed || state == .hidden {
+            text = ""
+            state = .search
+        }
+
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+            toolbarDragFraction = 1.0
+        }
+
+        if state == .search {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isFocused = true
+            }
+        }
+    }
+
+    private func handleSheetCollapse() {
+        isFocused = false
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+            toolbarDragFraction = 0
+        }
+    }
+
+    private func handleSheetDismissFocused() {
+        isFocused = false
+    }
+
+    private func handleSheetDragProgress(_ fraction: CGFloat) {
+        if fraction == 0 {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+                toolbarDragFraction = 0
+            }
+        } else {
+            toolbarDragFraction = fraction
+        }
+    }
+
     var body: some View {
         ResizableSheetContainer(
-            isExpanded: Binding(
-                get: {
-                    state == .search || state == .browserSettings || state == .siteSettings
-                        || state == .knowledge || state == .submittingSearch
-                },
-                set: { expanded in
-                    if expanded {
-                        if state == .collapsed || state == .hidden {
-                            text = ""
-                            state = .search
-                        }
-                    } else {
-                        state = .collapsed
-                    }
-                }
-            ),
-            isCollapsed: Binding(
-                get: { state == .hidden },
-                set: { collapsed in
-                    if collapsed {
-                        state = .hidden
-                    } else if state == .hidden {
-                        state = .collapsed
-                    }
-                }
-            ),
+            isExpanded: isExpandedBinding,
+            isCollapsed: isCollapsedBinding,
             isLoading: isLoading,
             progress: progress,
             expandedHeightRatio: expandedHeightRatio,
             themeColor: themeColor,
             backdropOpacity: backdropOpacity,
-            onDragStart: {
-                if state == .collapsed || state == .hidden {}
-            },
-            onExpand: {
-                if state == .collapsed || state == .hidden {
-                    text = ""
-                    state = .search
-                }
-
-                withAnimation(AppTheme.Motion.sheet) {
-                    toolbarDragFraction = 1.0
-                }
-
-                if state == .search {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isFocused = true
-                    }
-                }
-            },
-            onCollapse: {
-                isFocused = false
-                withAnimation(AppTheme.Motion.sheet) {
-                    toolbarDragFraction = 0
-                }
-            },
-            onDismissFocused: {
-                isFocused = false
-            },
-            onDragProgress: { fraction in
-                if fraction == 0 {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        toolbarDragFraction = 0
-                    }
-                } else {
-                    toolbarDragFraction = fraction
-                }
-            }
+            hideProgressBar: isTabOverlayVisible,
+            onDragStart: handleSheetDragStart,
+            onExpand: handleSheetExpand,
+            onCollapse: handleSheetCollapse,
+            onDismissFocused: handleSheetDismissFocused,
+            onDragProgress: handleSheetDragProgress
         ) {
-            VStack(spacing: 0) {
-                ZStack(alignment: .top) {
-                    frostedBackground
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(palette.text.opacity(0.15), lineWidth: 1))
-                        .frame(width: isExpanded ? nil : 80, height: 44)
-                        .padding(.top, 18)
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .allowsHitTesting(false)
-                        .zIndex(0)
-
-                    collapsedContent
-                        .opacity(isExpanded ? 0 : 1)
-                        .allowsHitTesting(!isExpanded)
-                        .zIndex(1)
-
-                    searchBarRow
-                        .opacity(isExpanded ? 1 : 0)
-                        .allowsHitTesting(isExpanded)
-                        .zIndex(2)
-
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(palette.text)
-                        .frame(width: 18, height: 18)
-                        .matchedGeometryEffect(
-                            id: "magnifyingGlass_icon", in: animation, isSource: false
-                        )
-                        .opacity(magGlassOpacity)
-                        .allowsHitTesting(false)
-                }
-
-                if state == .knowledge {
-                    knowledgeContent
-                        .id(state)
-                        .transition(
-                            .asymmetric(
-                                insertion: .opacity.animation(AppTheme.Motion.fade.delay(0.15)),
-                                removal: .opacity.animation(.easeOut(duration: 0.08))
-                            )
-                        )
-                } else if state == .browserSettings || state == .siteSettings {
-                    SettingsPage(
-                        type: state == .browserSettings ? .browser : .site,
-                        currentURL: currentURL,
-                        onDismiss: { state = .collapsed },
-                        trackerCount: trackerCount,
-                        initialZoom: initialZoom,
-                        initialDesktopMode: initialDesktopMode,
-                        onFindOnPage: onFindOnPage,
-                        onShare: onShare,
-                        onZoomChanged: onZoomChanged,
-                        onRequestDesktopSite: onRequestDesktopSite,
-                        onReloadPage: onReloadPage,
-                        onNavigate: onNavigate
-                    )
-                    .id(state)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.animation(.smooth(duration: 0.25).delay(0.15)),
-                            removal: .opacity.animation(.smooth(duration: 0.05))
-                        )
-                    )
-                } else {
-                    searchSuggestionsArea
-                        .allowsHitTesting(state == .search)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .opacity(isExpanded ? 1 : min(1, toolbarDragFraction * 2.0))
-                }
-
-                if state == .search || state == .collapsed || state == .hidden
-                    || state == .browserSettings || state == .siteSettings
-                {
-                    Spacer(minLength: 0)
-                }
-            }
+            sheetContent
         }
-        .animation(AppTheme.Motion.sheet, value: state)
+        .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: state)
+        .dynamicTypeSize(.xSmall ... .accessibility3)
         .ignoresSafeArea(.keyboard)
         .onChange(of: tabCount) { oldCount, newCount in
-            guard newCount == 0, oldCount > 0 else { return }
-            state = .search
+            handleTabCountChange(oldCount, newCount)
         }
-        .onChange(of: state) { _, newState in
-            let isExpandingToSearch =
-                newState == .search || newState == .browserSettings || newState == .siteSettings
-                || newState == .knowledge
-            let showsMag =
-                newState == .collapsed || newState == .hidden
-                || newState == .search || newState == .submittingSearch
-            let showsGear = newState == .browserSettings
-            let showsFolder = newState == .knowledge
-
-            withTransaction(Transaction(animation: nil)) {
-                searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
-            }
-            magGlassOpacity = showsMag ? 1.0 : 0.0
-            if !showsGear { gearIconOpacity = 0.0 }
-            if !showsFolder { folderIconOpacity = 0.0 }
-
-            if showsGear || showsFolder {
-                withAnimation(.easeIn(duration: 0.22).delay(0.12)) {
-                    if showsGear { gearIconOpacity = 1.0 }
-                    if showsFolder { folderIconOpacity = 1.0 }
-                }
-            }
-
-            if newState != .search {
-                toolbarDragFraction = 0
-                DispatchQueue.main.async {
-                    isFocused = false
-                }
-            }
+        .onChange(of: state) { oldState, newState in
+            handleStateChange(oldState, newState)
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
         ) { notification in
-            if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey]
-                as? CGRect
-            {
-                withTransaction(Transaction(animation: nil)) {
-                    keyboardHeight = frame.height
-                }
-            }
+            handleKeyboardWillShow(notification)
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
-        ) { _ in
-            withTransaction(Transaction(animation: nil)) {
-                keyboardHeight = 0
+        ) { notification in
+            handleKeyboardWillHide(notification)
+        }
+    }
+
+    private func handleTabCountChange(_ oldCount: Int, _ newCount: Int) {
+        guard newCount == 0, oldCount > 0 else { return }
+        state = .search
+    }
+
+    private func handleStateChange(_ oldState: BottomBarState, _ newState: BottomBarState) {
+        let isExpandingToSearch =
+            newState == .search || newState == .browserSettings || newState == .siteSettings
+            || newState == .knowledge
+        let showsMag =
+            newState == .collapsed || newState == .hidden
+            || newState == .search || newState == .submittingSearch
+        let showsGear = newState == .browserSettings
+        let showsFolder = newState == .knowledge
+
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+            searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
+        }
+        magGlassOpacity = showsMag ? 1.0 : 0.0
+        if !showsGear { gearIconOpacity = 0.0 }
+        if !showsFolder { folderIconOpacity = 0.0 }
+
+        if showsGear || showsFolder {
+            withAnimation(reduceMotion ? nil : .easeIn(duration: 0.22).delay(0.12)) {
+                if showsGear { gearIconOpacity = 1.0 }
+                if showsFolder { folderIconOpacity = 1.0 }
             }
+        }
+
+        if newState != .search {
+            toolbarDragFraction = 0
+            DispatchQueue.main.async {
+                isFocused = false
+            }
+        }
+    }
+
+    private func handleKeyboardWillShow(_ notification: Notification) {
+        if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey]
+            as? CGRect
+        {
+            withTransaction(Transaction(animation: nil)) {
+                keyboardHeight = frame.height
+            }
+        }
+    }
+
+    private func handleKeyboardWillHide(_ notification: Notification) {
+        withTransaction(Transaction(animation: nil)) {
+            keyboardHeight = 0
         }
     }
 
@@ -285,7 +358,7 @@ struct BottomBarView: View {
                         onCopyUrl()
                     } label: {
                         Image(systemName: "link")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.callout.weight(.bold))
                             .foregroundColor(palette.text.opacity(0.8))
                             .frame(width: 28, height: 28)
                             .clipShape(Circle())
@@ -298,7 +371,7 @@ struct BottomBarView: View {
                             onBack()
                         } label: {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.subheadline.weight(.bold))
                                 .foregroundColor(
                                     canGoBack ? palette.text : palette.text.opacity(0.2)
                                 )
@@ -312,7 +385,7 @@ struct BottomBarView: View {
                             onForward()
                         } label: {
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.subheadline.weight(.bold))
                                 .foregroundColor(
                                     canGoForward ? palette.text : palette.text.opacity(0.2)
                                 )
@@ -334,7 +407,7 @@ struct BottomBarView: View {
                 } label: {
                     ZStack {
                         Color.clear
-                            .frame(width: 18, height: 18)
+                            .frame(width: magGlassSize, height: magGlassSize)
                             .matchedGeometryEffect(
                                 id: "magnifyingGlass_icon",
                                 in: animation,
@@ -345,7 +418,7 @@ struct BottomBarView: View {
                         Image(systemName: "folder.fill")
                             .opacity(folderIconOpacity)
                     }
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: historyIconSize, weight: .medium))
                     .foregroundColor(palette.text.opacity(0.6))
                     .frame(width: 44, height: 44)
                 }
@@ -362,12 +435,12 @@ struct BottomBarView: View {
                 if isFocused && state == .search && !ghostCompletion.isEmpty {
                     HStack(spacing: 0) {
                         Text(text)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(size: urlFontSize, weight: .bold))
                             .foregroundColor(.clear)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                         Text(ghostCompletion)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(size: urlFontSize, weight: .bold))
                             .foregroundColor(palette.text)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -388,11 +461,7 @@ struct BottomBarView: View {
                     text: displayBinding
                 )
                 .accessibilityIdentifier("browser.urlField")
-                .font(
-                    (state == .browserSettings || state == .siteSettings || state == .knowledge)
-                        ? AppTheme.Typography.display(size: 17, weight: .bold)
-                        : AppTheme.Typography.sansBody(size: 17, weight: .bold)
-                )
+                .font(.system(size: urlFontSize, weight: .bold))
                 .textFieldStyle(.plain)
                 .foregroundColor(palette.text)
                 .tint(palette.accent)
@@ -425,9 +494,9 @@ struct BottomBarView: View {
                             .resizable()
                             .antialiased(true)
                             .scaledToFit()
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: urlFontSize, weight: .bold))
                             .foregroundColor(palette.text.opacity(0.8))
-                            .frame(width: 18, height: 18)
+                            .frame(width: smallIcon, height: smallIcon)
                             .rotationEffect(.degrees(reloadRotation), anchor: .center)
                             .frame(width: 44, height: 44)
                     }
@@ -457,7 +526,7 @@ struct BottomBarView: View {
                         HStack(spacing: 6) {
                             if isIncognitoActive {
                                 Text("Incognito")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: incognitoFontSize, weight: .semibold))
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
                                     .transition(
@@ -469,13 +538,13 @@ struct BottomBarView: View {
                                         )
                                     )
                             }
-                            Color.clear.frame(width: 24, height: 16)
+                            Color.clear.frame(width: magGlassSize * 1.5, height: magGlassSize)
                         }
                         .mask(alignment: .leading) {
                             GeometryReader { geo in
                                 Rectangle()
                                     .fill(.black)
-                                    .frame(width: max(0, geo.size.width - 30))
+                                    .frame(width: max(0, geo.size.width - (magGlassSize * 1.5 + 6)))
                             }
                         }
 
@@ -487,13 +556,14 @@ struct BottomBarView: View {
                                 .opacity(isIncognitoActive ? 1 : 0)
                                 .scaleEffect(isIncognitoActive ? 1 : 0.85)
                         }
-                        .frame(width: 24, height: 16)
+                        .frame(width: magGlassSize * 1.5, height: magGlassSize)
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: magGlassSize, weight: .semibold))
                     .foregroundColor(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
-                    .padding(.horizontal, isIncognitoActive ? 4 : 0)
+                    .padding(.horizontal, isIncognitoActive ? incognitoPadding : 0)
+                    .padding(.trailing, isIncognitoActive ? incognitoPadding : 0)
                     .frame(height: 44)
-                    .animation(AppTheme.Motion.snappy, value: isIncognitoActive)
+                    .animation(reduceMotion ? nil : AppTheme.Motion.snappy, value: isIncognitoActive)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
@@ -506,7 +576,7 @@ struct BottomBarView: View {
             }
         }
         .padding(.horizontal, 16)
-        .frame(height: 44)
+        .frame(height: capsuleH)
         .padding(.top, 18)
         .onChange(of: isLoading) { _, loading in
             if loading {
@@ -648,14 +718,14 @@ struct BottomBarView: View {
         onTap: @escaping () -> Void
     ) -> some View {
         Button(action: onTap) {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: historyIconSize, weight: .medium))
                     .foregroundColor(palette.text.opacity(0.6))
-                    .frame(width: 28)
+                    .frame(width: max(22, rowFaviconSize + 4))
 
                 Text(autofillBolded(title, matching: query))
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: urlFontSize, weight: .bold))
                     .foregroundColor(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -663,7 +733,7 @@ struct BottomBarView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -677,12 +747,12 @@ struct BottomBarView: View {
         onTap: @escaping () -> Void
     ) -> some View {
         Button(action: onTap) {
-            HStack(spacing: 14) {
-                FaviconView(url: url, size: 24, cornerRadius: 6)
-                    .frame(width: 28)
+            HStack(spacing: 12) {
+                FaviconView(url: url, size: rowFaviconSize, cornerRadius: 4)
+                    .frame(width: max(22, rowFaviconSize + 4))
 
                 Text(autofillBolded(title, matching: query))
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: urlFontSize, weight: .bold))
                     .foregroundColor(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -690,7 +760,7 @@ struct BottomBarView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -765,6 +835,10 @@ struct BottomBarView: View {
     private func triggerSpin() {
         guard isSpinning else { return }
 
+        if reduceMotion {
+            return
+        }
+
         withAnimation(.interpolatingSpring(stiffness: 100, damping: 10)) {
             reloadRotation += 360
         } completion: {
@@ -808,7 +882,7 @@ struct BottomBarView: View {
             }) {
                 ZStack {
                     Color.clear
-                        .frame(width: 18, height: 18)
+                        .frame(width: magGlassSize, height: magGlassSize)
                         .matchedGeometryEffect(
                             id: "magnifyingGlass_icon", in: animation, isSource: !isExpanded
                         )
@@ -816,9 +890,9 @@ struct BottomBarView: View {
                     Image(systemName: "arrow.clockwise")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: urlFontSize, weight: .bold))
                         .foregroundColor(palette.text)
-                        .frame(width: 18, height: 18)
+                        .frame(width: smallIcon, height: smallIcon)
                         .rotationEffect(.degrees(0))
                         .opacity(0)
                         .matchedGeometryEffect(
@@ -858,7 +932,7 @@ struct BottomBarView: View {
             .opacity(isTabOverlayVisible ? 0 : 1)
             .allowsHitTesting(!isTabOverlayVisible)
         }
-        .animation(AppTheme.Motion.micro, value: isTabOverlayVisible)
+        .animation(reduceMotion ? nil : AppTheme.Motion.micro, value: isTabOverlayVisible)
     }
 
     private var knowledgeContent: some View {

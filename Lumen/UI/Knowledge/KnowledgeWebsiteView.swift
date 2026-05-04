@@ -7,6 +7,7 @@ struct KnowledgeWebsiteView: View {
     var onSelectPage: ((PageContent) -> Void)? = nil
     var onExportPage: ((PageContent) -> Void)? = nil
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var pageChevronSize: CGFloat = 10
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,10 +51,10 @@ struct KnowledgeWebsiteView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "book.closed")
-                .font(.system(size: 28, weight: .light))
+                .font(.title.weight(.light))
                 .foregroundColor(palette.text.opacity(0.25))
             Text("No pages saved yet")
-                .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(palette.text.opacity(0.35))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,14 +64,14 @@ struct KnowledgeWebsiteView: View {
         HStack(spacing: 12) {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.callout.weight(.bold))
                     .foregroundColor(palette.accent)
                     .frame(width: 40, height: 40)
                     .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
             }
             Text(viewModel.website.displayName)
-                .font(AppTheme.Typography.sansBody(size: 17, weight: .bold))
+                .font(.body.weight(.bold))
                 .foregroundColor(palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -96,7 +97,7 @@ struct KnowledgeWebsiteView: View {
 
     private func synthesisCard(text: String) -> some View {
         Text((try? AttributedString(markdown: text)) ?? AttributedString(text))
-            .font(AppTheme.Typography.sansBody(size: 14, weight: .regular))
+            .font(.subheadline.weight(.regular))
             .foregroundColor(palette.text.opacity(0.55))
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
@@ -115,7 +116,7 @@ struct KnowledgeWebsiteView: View {
     private func sessionSection(_ session: ReadingSession) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(session.headerLabel)
-                .font(AppTheme.Typography.sansBody(size: 11, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundColor(palette.text.opacity(0.25))
                 .textCase(.uppercase)
                 .kerning(0.4)
@@ -139,14 +140,14 @@ struct KnowledgeWebsiteView: View {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(page.title ?? page.domain)
-                        .font(AppTheme.Typography.sansBody(size: 14, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundColor(palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     if let summary = page.summary, !summary.isEmpty {
                         Text(summary)
-                            .font(AppTheme.Typography.sansBody(size: 12, weight: .regular))
+                            .font(.caption.weight(.regular))
                             .foregroundColor(palette.text.opacity(0.35))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -157,13 +158,13 @@ struct KnowledgeWebsiteView: View {
 
                 if let readingTime = page.readingTime, readingTime > 0 {
                     Text("\(readingTime)m")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundColor(palette.text.opacity(0.2))
                 }
 
                 if onSelectPage != nil {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: pageChevronSize, weight: .medium))
                         .foregroundColor(palette.text.opacity(0.15))
                         .padding(.leading, 8)
                 }

@@ -38,6 +38,7 @@ struct SettingsPage: View {
     @ObservedObject private var settings = BrowserSettings.shared
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var engineNamespace
     @Namespace private var nativeAppsNamespace
     @State private var navigationPath: [SettingsSection] = []
@@ -51,6 +52,35 @@ struct SettingsPage: View {
     @State private var siteBlockTrackers: Bool = false
     @State private var siteBlockPopups: Bool = false
     @State private var siteEnableJavaScript: Bool = true
+
+    @ScaledMetric(relativeTo: .body) private var listIconFont: CGFloat = 16
+    @ScaledMetric(relativeTo: .body) private var listIconGutter: CGFloat = 28
+
+    @ScaledMetric(relativeTo: .body) private var rowIconFont: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var rowIconFrame: CGFloat = 32
+
+    @ScaledMetric(relativeTo: .body) private var bodyFont16: CGFloat = 16
+
+    @ScaledMetric(relativeTo: .body) private var subtitleFont14: CGFloat = 14
+
+    @ScaledMetric(relativeTo: .body) private var chevronFont14: CGFloat = 14
+
+    @ScaledMetric(relativeTo: .body) private var zoomMagFont: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var zoomMagFrame: CGFloat = 32
+
+    @ScaledMetric(relativeTo: .body) private var zoomBtnFont: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var zoomBtnFrame: CGFloat = 34
+
+    @ScaledMetric(relativeTo: .body) private var zoomPercentFont: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var zoomPercentMinWidth: CGFloat = 58
+
+    @ScaledMetric(relativeTo: .body) private var stepCircleSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .body) private var stepNumberFont: CGFloat = 13
+
+    @ScaledMetric(relativeTo: .body) private var policyTitleFont: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var policyBodyFont: CGFloat = 14
+
+    @ScaledMetric(relativeTo: .body) private var displayTitleFont: CGFloat = 20
 
     var body: some View {
         GeometryReader { geometry in
@@ -66,7 +96,7 @@ struct SettingsPage: View {
                     .offset(x: offsetFor(index: 1, width: width))
                     .opacity(opacityFor(index: 1))
             }
-            .animation(.smooth(duration: 0.3), value: navigationPath)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: navigationPath)
         }
         .clipped()
         .ignoresSafeArea(.keyboard)
@@ -263,23 +293,23 @@ struct SettingsPage: View {
                     let isSelected = settings.hapticsMode == mode
 
                     Button {
-                        withAnimation(.smooth(duration: 0.3)) {
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                             settings.hapticsMode = mode
                         }
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: hapticsIcon(mode))
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: listIconFont, weight: .medium))
                                 .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
-                                .frame(width: 28)
+                                .frame(width: listIconGutter)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(mode.label)
-                                    .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
+                                    .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
                                     .foregroundColor(isSelected ? palette.accent : palette.text)
 
                                 Text(mode.caption)
-                                    .font(.system(size: 13, weight: .regular))
+                                    .font(.footnote.weight(.regular))
                                     .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
@@ -379,23 +409,23 @@ struct SettingsPage: View {
         let ads = 0
 
         var trackersNumber = AttributedString("\(trackers) ")
-        trackersNumber.font = .system(size: 16, weight: .bold)
+        trackersNumber.font = .callout.weight(.bold)
         trackersNumber.foregroundColor = palette.accent
 
         var trackersLabel = AttributedString("trackers and ")
-        trackersLabel.font = .system(size: 16, weight: .regular)
+        trackersLabel.font = .callout.weight(.regular)
         trackersLabel.foregroundColor = palette.text
 
         var adsNumber = AttributedString("\(ads) ")
-        adsNumber.font = .system(size: 16, weight: .bold)
+        adsNumber.font = .callout.weight(.bold)
         adsNumber.foregroundColor = palette.accent
 
         var adsLabel = AttributedString("ads")
-        adsLabel.font = .system(size: 16, weight: .regular)
+        adsLabel.font = .callout.weight(.regular)
         adsLabel.foregroundColor = palette.text
 
         var base = AttributedString("Lumen scrubbed ")
-        base.font = .system(size: 16, weight: .regular)
+        base.font = .callout.weight(.regular)
         base.foregroundColor = palette.text
 
         let attributed = base + trackersNumber + trackersLabel + adsNumber + adsLabel
@@ -444,44 +474,44 @@ struct SettingsPage: View {
     private var pageZoomRow: some View {
         HStack(spacing: 14) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: zoomMagFont, weight: .medium))
                 .foregroundColor(palette.accent)
-                .frame(width: 32, height: 32)
+                .frame(width: zoomMagFrame, height: zoomMagFrame)
 
             Text("Page Zoom")
-                .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
+                .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .medium))
                 .foregroundColor(palette.text)
 
             Spacer()
 
             HStack(spacing: 0) {
                 Button {
-                    withAnimation(.smooth(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.15)) {
                         if pageZoom > 50 { pageZoom -= 10 }
                     }
                 } label: {
                     Image(systemName: "minus")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: zoomBtnFont, weight: .bold))
                         .foregroundColor(pageZoom > 50 ? palette.accent : palette.text.opacity(0.2))
-                        .frame(width: 34, height: 34)
+                        .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
 
                 Text("\(pageZoom)%")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .font(.system(size: zoomPercentFont, weight: .bold, design: .monospaced))
                     .foregroundColor(palette.text)
-                    .frame(minWidth: 58)
+                    .frame(minWidth: zoomPercentMinWidth)
                     .monospacedDigit()
 
                 Button {
-                    withAnimation(.smooth(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.15)) {
                         if pageZoom < 200 { pageZoom += 10 }
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: zoomBtnFont, weight: .bold))
                         .foregroundColor(pageZoom < 200 ? palette.accent : palette.text.opacity(0.2))
-                        .frame(width: 34, height: 34)
+                        .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
             }
@@ -542,18 +572,18 @@ struct SettingsPage: View {
                     let isSelected = settings.searchEngine == engine
 
                     Button {
-                        withAnimation(.smooth(duration: 0.3)) {
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                             settings.searchEngine = engine
                         }
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: listIconFont, weight: .medium))
                                 .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
-                                .frame(width: 28)
+                                .frame(width: listIconGutter)
 
                             Text(engine.rawValue)
-                                .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
+                                .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
                                 .foregroundColor(isSelected ? palette.accent : palette.text)
 
                             Spacer()
@@ -579,23 +609,23 @@ struct SettingsPage: View {
                     let isSelected = settings.nativeAppsPolicy == policy
 
                     Button {
-                        withAnimation(.smooth(duration: 0.3)) {
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
                             settings.nativeAppsPolicy = policy
                         }
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: policyIcon(policy))
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: listIconFont, weight: .medium))
                                 .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
-                                .frame(width: 28)
+                                .frame(width: listIconGutter)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(policy.rawValue)
-                                    .font(AppTheme.Typography.sansBody(size: 16, weight: isSelected ? .bold : .medium))
+                                    .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
                                     .foregroundColor(isSelected ? palette.accent : palette.text)
 
                                 Text(policyDescription(policy))
-                                    .font(.system(size: 13, weight: .regular))
+                                    .font(.footnote.weight(.regular))
                                     .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
@@ -640,16 +670,16 @@ struct SettingsPage: View {
             settingsGroup {
                 HStack(spacing: 12) {
                     Image(systemName: "globe")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: listIconFont, weight: .medium))
                         .foregroundColor(palette.accent)
-                        .frame(width: 28)
+                        .frame(width: listIconGutter)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(languageName)
-                            .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
+                            .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .bold))
                             .foregroundColor(palette.accent)
                         Text("System default")
-                            .font(.system(size: 13, weight: .regular))
+                            .font(.footnote.weight(.regular))
                             .foregroundColor(palette.accent.opacity(0.8))
                     }
 
@@ -663,7 +693,7 @@ struct SettingsPage: View {
             Text(
                 "Language preferences are managed in iOS language settings."
             )
-            .font(.system(size: 13))
+            .font(.footnote)
             .foregroundColor(palette.text.opacity(0.45))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 16)
@@ -675,7 +705,7 @@ struct SettingsPage: View {
         VStack(spacing: 28) {
             VStack(spacing: 12) {
                 Text("Links you tap in other apps will open in Lumen instead of Safari when set to default.")
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.subheadline.weight(.regular))
                     .foregroundColor(palette.text.opacity(0.55))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
@@ -701,9 +731,9 @@ struct SettingsPage: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "gear")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                     Text("Open Settings")
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .bold))
+                        .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .bold))
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
@@ -724,14 +754,14 @@ struct SettingsPage: View {
             ZStack {
                 Circle()
                     .fill(palette.accent.opacity(0.18))
-                    .frame(width: 28, height: 28)
+                    .frame(width: stepCircleSize, height: stepCircleSize)
                 Text(number)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: stepNumberFont, weight: .bold))
                     .foregroundColor(palette.accent)
             }
 
             Text(text)
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(palette.text.opacity(0.75))
 
             Spacer()
@@ -750,7 +780,7 @@ struct SettingsPage: View {
     private var privacyPolicyContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Last updated: 2026")
-                .font(.system(size: 13))
+                .font(.footnote)
                 .foregroundColor(palette.text.opacity(0.45))
                 .padding(.horizontal, 16)
 
@@ -790,10 +820,10 @@ struct SettingsPage: View {
     private func policySection(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: policyTitleFont, weight: .semibold))
                 .foregroundColor(palette.text)
             Text(body)
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: policyBodyFont, weight: .regular))
                 .foregroundColor(palette.text.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -808,7 +838,7 @@ struct SettingsPage: View {
                 Button(action: pop) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.callout.weight(.bold))
                     }
                     .foregroundColor(palette.accent)
                     .frame(width: 40, height: 40)
@@ -819,7 +849,7 @@ struct SettingsPage: View {
             }
 
             Text(sectionTitle(for: section))
-                .font(AppTheme.Typography.display(size: 20, weight: .bold))
+                .font(AppTheme.Typography.display(size: displayTitleFont, weight: .bold))
                 .foregroundColor(palette.text)
         }
         .padding(.horizontal, 16)
@@ -905,18 +935,18 @@ struct SettingsPage: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: rowIconFont, weight: .medium))
                     .foregroundColor(destructive ? .red : palette.accent)
-                    .frame(width: 32, height: 32)
+                    .frame(width: rowIconFrame, height: rowIconFrame)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
+                        .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .medium))
                         .foregroundColor(destructive ? .red : palette.text)
 
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 14, weight: .regular))
+                            .font(.system(size: subtitleFont14, weight: .regular))
                             .foregroundColor(palette.text.opacity(0.45))
                     }
                 }
@@ -927,7 +957,7 @@ struct SettingsPage: View {
                     ThemedToggle(isOn: isOnBinding)
                 } else if showChevron {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: chevronFont14, weight: .semibold))
                         .foregroundColor(palette.text.opacity(0.25))
                 }
             }

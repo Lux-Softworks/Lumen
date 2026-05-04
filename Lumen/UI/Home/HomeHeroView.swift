@@ -4,9 +4,13 @@ struct HomeHeroView: View {
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @ScaledMetric(relativeTo: .body) private var sparkleSize: CGFloat = 100
+    @ScaledMetric(relativeTo: .body) private var taglineSize: CGFloat = 18
+
     @State private var currentTagline: String = ""
     @State private var isBreathing: Bool = false
     @State private var isTranslating: Bool = false
+    @State private var hasAppeared: Bool = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -22,9 +26,15 @@ struct HomeHeroView: View {
                 : .easeInOut(duration: 4.5).repeatForever(autoreverses: true),
             value: isTranslating
         )
+        .opacity(hasAppeared ? 1 : 0)
+        .animation(
+            reduceMotion ? .none : .easeOut(duration: 0.5).delay(0.25),
+            value: hasAppeared
+        )
         .allowsHitTesting(false)
         .onAppear {
             currentTagline = Self.pickTagline(at: Date())
+            hasAppeared = true
             guard !reduceMotion else { return }
             isBreathing = true
         }
@@ -32,7 +42,7 @@ struct HomeHeroView: View {
 
     private var sparkleIcon: some View {
         Image(systemName: "sparkle")
-            .font(.system(size: 100, weight: .regular))
+            .font(.system(size: sparkleSize, weight: .regular))
             .foregroundStyle(
                 LinearGradient(
                     colors: [palette.accent, palette.secondaryAccent],
@@ -53,9 +63,10 @@ struct HomeHeroView: View {
 
     private var tagline: some View {
         Text(currentTagline)
-            .font(AppTheme.Typography.sansBody(size: 18, weight: .semibold))
+            .font(AppTheme.Typography.sansBody(size: taglineSize, weight: .semibold))
             .foregroundColor(palette.text.opacity(0.6))
             .multilineTextAlignment(.center)
+            .dynamicTypeSize(.xSmall ... .accessibility3)
             .transition(.opacity.animation(.easeOut(duration: 0.35)))
             .id(currentTagline)
             .frame(maxWidth: .infinity, alignment: .center)

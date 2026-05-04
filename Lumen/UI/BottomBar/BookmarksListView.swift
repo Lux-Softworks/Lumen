@@ -17,10 +17,10 @@ struct BookmarksListView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "bookmark.slash")
-                .font(.system(size: 32, weight: .light))
+                .font(.largeTitle.weight(.light))
                 .foregroundColor(palette.text.opacity(0.2))
             Text("No bookmarks yet")
-                .font(AppTheme.Typography.sansBody(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(palette.text.opacity(0.3))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -40,14 +40,14 @@ struct BookmarksListView: View {
                             faviconView(for: domain)
 
                             Text(domain)
-                                .font(AppTheme.Typography.sansBody(size: 16, weight: .medium))
+                                .font(.callout.weight(.medium))
                                 .foregroundColor(palette.text)
                                 .lineLimit(1)
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundColor(palette.text.opacity(0.25))
                         }
                         .padding(.horizontal, 16)
