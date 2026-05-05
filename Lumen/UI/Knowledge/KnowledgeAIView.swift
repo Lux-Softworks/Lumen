@@ -11,6 +11,11 @@ struct KnowledgeAIView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var idleLabelSize: CGFloat = 14
     @ScaledMetric(relativeTo: .body) private var sendButtonIconSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .body) private var sendButtonSize: CGFloat = 30
+    @ScaledMetric(relativeTo: .body) private var inputCornerRadius: CGFloat = 22
+
+    private var clampedSendButtonSize: CGFloat { min(sendButtonSize, 44) }
+    private var clampedCornerRadius: CGFloat { min(inputCornerRadius, 28) }
 
     private var safeAreaBottom: CGFloat {
         UIApplication.shared.connectedScenes
@@ -133,8 +138,8 @@ struct KnowledgeAIView: View {
     }
 
     private var inputBar: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ZStack(alignment: .topLeading) {
+        HStack(alignment: .center, spacing: 10) {
+            ZStack(alignment: .leading) {
                 TextField("", text: $viewModel.inputText, axis: .vertical)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(palette.text)
@@ -174,7 +179,7 @@ struct KnowledgeAIView: View {
             } label: {
                 Circle()
                     .fill(canSend ? palette.accent : palette.text.opacity(0.08))
-                    .frame(width: 30, height: 30)
+                    .frame(width: clampedSendButtonSize, height: clampedSendButtonSize)
                     .overlay(
                         Image(systemName: "arrow.up")
                             .font(.system(size: sendButtonIconSize, weight: .bold))
@@ -192,7 +197,7 @@ struct KnowledgeAIView: View {
         .padding(.vertical, 14)
         .background(inputBackground)
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: clampedCornerRadius, style: .continuous)
                 .strokeBorder(
                     palette.text.opacity(isFocused ? 0.18 : 0.07),
                     lineWidth: 0.75
@@ -205,7 +210,7 @@ struct KnowledgeAIView: View {
     }
 
     private var inputBackground: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: clampedCornerRadius, style: .continuous)
             .fill(palette.text.opacity(colorScheme == .dark || palette.isIncognito ? 0.08 : 0.05))
     }
 

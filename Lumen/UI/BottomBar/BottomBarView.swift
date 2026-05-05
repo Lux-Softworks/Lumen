@@ -74,7 +74,7 @@ struct BottomBarView: View {
 
     var isExpanded: Bool {
         state == .search || state == .browserSettings || state == .siteSettings
-            || state == .knowledge
+            || state == .knowledge || state == .submittingSearch
     }
 
     var showsMagnifier: Bool {
@@ -303,7 +303,7 @@ struct BottomBarView: View {
     private func handleStateChange(_ oldState: BottomBarState, _ newState: BottomBarState) {
         let isExpandingToSearch =
             newState == .search || newState == .browserSettings || newState == .siteSettings
-            || newState == .knowledge
+            || newState == .knowledge || newState == .submittingSearch
         let showsMag =
             newState == .collapsed || newState == .hidden
             || newState == .search || newState == .submittingSearch
@@ -312,8 +312,8 @@ struct BottomBarView: View {
 
         withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
             searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
+            magGlassOpacity = showsMag ? 1.0 : 0.0
         }
-        magGlassOpacity = showsMag ? 1.0 : 0.0
         if !showsGear { gearIconOpacity = 0.0 }
         if !showsFolder { folderIconOpacity = 0.0 }
 
@@ -414,12 +414,14 @@ struct BottomBarView: View {
                                 isSource: isExpanded
                             )
                         Image(systemName: "gearshape.fill")
+                            .font(.system(size: historyIconSize, weight: .medium))
+                            .foregroundColor(palette.text.opacity(0.6))
                             .opacity(gearIconOpacity)
                         Image(systemName: "folder.fill")
+                            .font(.system(size: historyIconSize, weight: .medium))
+                            .foregroundColor(palette.text.opacity(0.6))
                             .opacity(folderIconOpacity)
                     }
-                    .font(.system(size: historyIconSize, weight: .medium))
-                    .foregroundColor(palette.text.opacity(0.6))
                     .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)

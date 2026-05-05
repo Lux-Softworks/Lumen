@@ -194,6 +194,9 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                             }
                     )
+                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: isExpanded)
+                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: expandedHeightRatio)
+                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: isCollapsed)
                     .zIndex(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

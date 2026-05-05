@@ -11,7 +11,6 @@ struct BrowserView: View {
     @State private var shrinkProgress: CGFloat = 0
     @State private var scrollDownAccumulator: CGFloat = 0
     @State private var topBarOffset: CGFloat = 47
-    @State private var cornerProgress: CGFloat = 0
     @State private var urlText: String = ""
 
     @State private var bottomBarOpacity: CGFloat = 1
@@ -424,7 +423,6 @@ struct BrowserView: View {
         let currentY = lerp(geometry.size.height / 2, originY, progress)
         let currentScale = lerp(1.0, targetScale, progress)
         let lerpCornerRadius = lerp(0, cornerRadius / targetScale, progress)
-        let delayedCornerRadius = lerp(0, cornerRadius / targetScale, cornerProgress)
 
         let currentCardWidth = geometry.size.width * currentScale
         let currentCardHeight = geometry.size.height * currentScale
@@ -433,7 +431,6 @@ struct BrowserView: View {
         let currentHeaderTranslate = lerp(0, headerHeight / baseTargetScale, progress)
         let headerSlotHeight = lerp(
             getStatusBarHeight(geometry), headerHeight / baseTargetScale, progress)
-        let _ = currentHeaderTranslate * currentScale
 
         let isMultiTab = tabManager.tabs.count > 1
         let titleOpacity: CGFloat = {
@@ -490,10 +487,10 @@ struct BrowserView: View {
                 .clipShape(
                     UnevenRoundedRectangle(
                         cornerRadii: .init(
-                            topLeading: delayedCornerRadius,
+                            topLeading: lerpCornerRadius,
                             bottomLeading: lerpCornerRadius,
                             bottomTrailing: lerpCornerRadius,
-                            topTrailing: delayedCornerRadius
+                            topTrailing: lerpCornerRadius
                         ),
                         style: .continuous
                     )
@@ -668,9 +665,6 @@ struct BrowserView: View {
                 self.activeTabViewState = .shrunk
                 self.pendingShrinkBelowId = nil
             }
-            withAnimation(reduceMotion ? nil : .timingCurve(0.32, 0.72, 0, 1, duration: 0.21).delay(0.14)) {
-                self.cornerProgress = 1.0
-            }
         }
     }
 
@@ -705,9 +699,6 @@ struct BrowserView: View {
             self.webViewReady = true
             self.tabSelectionOrigin = nil
             self.tabOverlayResetToken &+= 1
-        }
-        withAnimation(reduceMotion ? nil : .timingCurve(0.32, 0.72, 0, 1, duration: 0.14)) {
-            self.cornerProgress = 0.0
         }
     }
 
