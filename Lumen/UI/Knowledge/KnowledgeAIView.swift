@@ -186,12 +186,12 @@ struct KnowledgeAIView: View {
                             .foregroundColor(canSend ? .white : palette.text.opacity(0.25))
                     )
                     .animation(AppTheme.Motion.snappy, value: canSend)
-                    .padding(7)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
-                    .padding(-7)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
+            .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)

@@ -406,29 +406,20 @@ struct SettingsPage: View {
 
     private var lumenFoundCard: some View {
         let trackers = trackerCount
-        let ads = 0
 
         var trackersNumber = AttributedString("\(trackers) ")
         trackersNumber.font = .callout.weight(.bold)
         trackersNumber.foregroundColor = palette.accent
 
-        var trackersLabel = AttributedString("trackers and ")
+        var trackersLabel = AttributedString(trackers == 1 ? "tracker" : "trackers")
         trackersLabel.font = .callout.weight(.regular)
         trackersLabel.foregroundColor = palette.text
-
-        var adsNumber = AttributedString("\(ads) ")
-        adsNumber.font = .callout.weight(.bold)
-        adsNumber.foregroundColor = palette.accent
-
-        var adsLabel = AttributedString("ads")
-        adsLabel.font = .callout.weight(.regular)
-        adsLabel.foregroundColor = palette.text
 
         var base = AttributedString("Lumen scrubbed ")
         base.font = .callout.weight(.regular)
         base.foregroundColor = palette.text
 
-        let attributed = base + trackersNumber + trackersLabel + adsNumber + adsLabel
+        let attributed = base + trackersNumber + trackersLabel
 
         return Text(attributed)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -496,12 +487,16 @@ struct SettingsPage: View {
                         .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Decrease zoom")
+                .accessibilityValue("\(pageZoom) percent")
 
                 Text("\(pageZoom)%")
                     .font(.system(size: zoomPercentFont, weight: .bold, design: .monospaced))
                     .foregroundColor(palette.text)
                     .frame(minWidth: zoomPercentMinWidth)
                     .monospacedDigit()
+                    .accessibilityLabel("Current zoom")
+                    .accessibilityValue("\(pageZoom) percent")
 
                 Button {
                     withAnimation(reduceMotion ? nil : .smooth(duration: 0.15)) {
@@ -514,6 +509,8 @@ struct SettingsPage: View {
                         .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Increase zoom")
+                .accessibilityValue("\(pageZoom) percent")
             }
             .background(palette.text.opacity(0.06))
             .cornerRadius(16)
@@ -844,7 +841,10 @@ struct SettingsPage: View {
                     .frame(width: 40, height: 40)
                     .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Back")
                 Spacer()
             }
 

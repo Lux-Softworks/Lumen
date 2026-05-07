@@ -230,6 +230,7 @@ struct BottomBarView: View {
 
         if state == .search {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard state == .search else { return }
                 isFocused = true
             }
         }
@@ -297,7 +298,9 @@ struct BottomBarView: View {
 
     private func handleTabCountChange(_ oldCount: Int, _ newCount: Int) {
         guard newCount == 0, oldCount > 0 else { return }
-        state = .search
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+            state = .search
+        }
     }
 
     private func handleStateChange(_ oldState: BottomBarState, _ newState: BottomBarState) {
@@ -313,9 +316,9 @@ struct BottomBarView: View {
         withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
             searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
             magGlassOpacity = showsMag ? 1.0 : 0.0
+            if !showsGear { gearIconOpacity = 0.0 }
+            if !showsFolder { folderIconOpacity = 0.0 }
         }
-        if !showsGear { gearIconOpacity = 0.0 }
-        if !showsFolder { folderIconOpacity = 0.0 }
 
         if showsGear || showsFolder {
             withAnimation(reduceMotion ? nil : .easeIn(duration: 0.22).delay(0.12)) {
@@ -325,7 +328,9 @@ struct BottomBarView: View {
         }
 
         if newState != .search {
-            toolbarDragFraction = 0
+            withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+                toolbarDragFraction = 0
+            }
             DispatchQueue.main.async {
                 isFocused = false
             }
@@ -816,7 +821,7 @@ struct BottomBarView: View {
         var searchRange = text.startIndex..<text.endIndex
         while let range = text.range(of: query, options: .caseInsensitive, range: searchRange) {
             if let attrRange = Range(range, in: result) {
-                result[attrRange].font = .system(size: 16, weight: .heavy)
+                result[attrRange].font = .system(size: urlFontSize, weight: .heavy)
             }
             searchRange = range.upperBound..<text.endIndex
         }
@@ -904,6 +909,7 @@ struct BottomBarView: View {
                 .contentShape(Rectangle())
             }
             .accessibilityIdentifier("bottombar.searchOpen")
+            .accessibilityLabel("Search")
 
             Spacer()
 
@@ -994,7 +1000,7 @@ private struct SearchSuggestionRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(attributedText)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundColor(palette.text)
                         .lineLimit(1)
                 }
@@ -1014,7 +1020,7 @@ private struct SearchSuggestionRow: View {
             var searchRange = suggestion.text.startIndex..<suggestion.text.endIndex
             while let range = suggestion.text.range(of: query, options: .caseInsensitive, range: searchRange) {
                 if let attrRange = Range(range, in: result) {
-                    result[attrRange].font = .system(size: 16, weight: .heavy)
+                    result[attrRange].font = .system(.subheadline, weight: .heavy)
                 }
                 searchRange = range.upperBound..<suggestion.text.endIndex
             }

@@ -93,8 +93,8 @@ final class KnowledgeAIViewModel {
 
         let parsedDate = DateQueryParser.parse(trimmed)
         var searchResults: [PageContent] = []
-        var ftsHitCount = 0
-        var topScore: Double = 0
+        let weakMinScore = 0.30
+        let strongMinScore = 0.40
 
         if let parsedDate {
             setStatus("Searching pages from \(parsedDate.phrase)…")
@@ -105,8 +105,7 @@ final class KnowledgeAIViewModel {
                     query: residual, range: parsedDate.range, limit: 6
                 )
 
-                topScore = scoped.first?.score ?? 0
-                searchResults = scoped.map { $0.page }
+                searchResults = scoped.filter { $0.score >= weakMinScore }.map { $0.page }
             } catch {
                 finishThinking()
                 messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
@@ -132,15 +131,11 @@ final class KnowledgeAIViewModel {
                 return
             }
 
-            let strongMinScore = 0.40
-            let weakMinScore = 0.30
-            topScore = scored.first?.score ?? 0
             searchResults = scored.filter { $0.score >= strongMinScore }.map { $0.page }
 
             if searchResults.isEmpty {
                 do {
                     let keywordHits = try await KnowledgeStorage.shared.searchPages(query: ftsQuery(from: trimmed), limit: 4)
-                    ftsHitCount = keywordHits.count
 
                     if !keywordHits.isEmpty {
                         let existing = Set(searchResults.map { $0.id })
@@ -161,12 +156,6 @@ final class KnowledgeAIViewModel {
                 }
             }
         }
-
-        let match = SourceMatch.classify(
-            topScore: topScore,
-            resultCount: searchResults.count,
-            ftsHits: ftsHitCount
-        )
 
         let priorSources = priorMessages.last { $0.role == .assistant }?.sources ?? []
         var seenIDs = Set<String>()
@@ -202,9 +191,9 @@ final class KnowledgeAIViewModel {
             }
         }
 
-        _ = match
-        messages.append(ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true))
-        let streamIndex = messages.count - 1
+        let streamMessage = ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true)
+        let streamMessageID = streamMessage.id
+        messages.append(streamMessage)
         setStatus(Self.thinkingMessages.randomElement()!)
         let summary = conversationSummary
         let dateScopePhrase = parsedDate?.phrase
@@ -215,12 +204,16 @@ final class KnowledgeAIViewModel {
             let flushInterval: TimeInterval = 0.08
             var lastFlush = Date(timeIntervalSince1970: 0)
 
+            @MainActor func streamingIndex() -> Int? {
+                messages.firstIndex(where: { $0.id == streamMessageID })
+            }
+
             @MainActor func flushIfDue(force: Bool = false) {
                 let now = Date()
                 guard force || now.timeIntervalSince(lastFlush) >= flushInterval else { return }
                 lastFlush = now
-                if streamIndex < messages.count, messages[streamIndex].text != raw {
-                    messages[streamIndex].text = raw
+                if let idx = streamingIndex(), messages[idx].text != raw {
+                    messages[idx].text = raw
                 }
             }
 
@@ -260,10 +253,10 @@ final class KnowledgeAIViewModel {
             }
 
             if !modelProducedOutput, streamError != nil {
-                if streamIndex < messages.count {
-                    messages[streamIndex].text = "Couldn't generate an answer."
-                    messages[streamIndex].isStreaming = false
-                    messages[streamIndex].sourceMatch = nil
+                if let idx = streamingIndex() {
+                    messages[idx].text = "Couldn't generate an answer."
+                    messages[idx].isStreaming = false
+                    messages[idx].sourceMatch = nil
                 }
                 finishThinking()
                 return
@@ -292,12 +285,12 @@ final class KnowledgeAIViewModel {
                 }
             }
 
-            if streamIndex < messages.count {
-                if messages[streamIndex].text != finalText {
-                    messages[streamIndex].text = finalText
+            if let idx = streamingIndex() {
+                if messages[idx].text != finalText {
+                    messages[idx].text = finalText
                 }
-                messages[streamIndex].sourceMatch = scoredMatch
-                messages[streamIndex].isStreaming = false
+                messages[idx].sourceMatch = scoredMatch
+                messages[idx].isStreaming = false
             }
 
             finishThinking()

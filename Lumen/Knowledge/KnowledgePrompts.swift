@@ -1,8 +1,29 @@
 import Foundation
 
 enum KnowledgePrompts {
-    static func pageSummary(content: String, title: String?) -> String {
-        """
+    private static let llamaSpecialTokens = [
+        "<|begin_of_text|>",
+        "<|end_of_text|>",
+        "<|eot_id|>",
+        "<|eom_id|>",
+        "<|start_header_id|>",
+        "<|end_header_id|>",
+        "<|finetune_right_pad_id|>",
+        "<|python_tag|>"
+    ]
+
+    static func sanitize(_ s: String) -> String {
+        var out = s
+        for token in llamaSpecialTokens {
+            out = out.replacingOccurrences(of: token, with: "")
+        }
+        return out
+    }
+
+    static func pageSummary(content: String, title: String?) async -> String {
+        let title = title.map(sanitize)
+        let content = sanitize(content)
+        return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         Summarize articles in one sentence.<|eot_id|>\
         <|start_header_id|>user<|end_header_id|>
@@ -16,8 +37,10 @@ enum KnowledgePrompts {
         """
     }
 
-    static func websiteSummary(content: String, title: String?) -> String {
-        """
+    static func websiteSummary(content: String, title: String?) async -> String {
+        let title = title.map(sanitize)
+        let content = sanitize(content)
+        return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         Describe a website's purpose in one short, complete sentence ending in a period. Maximum 20 words. Never trail off.<|eot_id|>\
         <|start_header_id|>user<|end_header_id|>
@@ -32,7 +55,7 @@ enum KnowledgePrompts {
     }
 
     static func websiteReadingSynthesis(summaries: [String]) -> String {
-        let joined = summaries.prefix(8).joined(separator: ". ")
+        let joined = sanitize(summaries.prefix(8).joined(separator: ". "))
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         Describe what these pages have in common in one or two complete sentences ending in a period. Maximum 40 words. Never trail off.<|eot_id|>\
@@ -43,8 +66,10 @@ enum KnowledgePrompts {
         """
     }
 
-    static func topicClassification(content: String, title: String?) -> String {
-        """
+    static func topicClassification(content: String, title: String?) async -> String {
+        let title = title.map(sanitize)
+        let content = sanitize(content)
+        return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         Assign ONE topic label from this exact list: AI, Technology, Programming, Finance, Business, Sports, Health, Science, Travel, Politics, Design, Gaming, Music, Film, Food, Education, Law, History, Art, Photography, Books, Fashion, Automotive, Climate, Productivity, Psychology, Philosophy, Culture.
 
@@ -83,9 +108,9 @@ enum KnowledgePrompts {
 
     static func conversationSummary(turns: [(role: String, text: String)], priorSummary: String?) -> String {
         let transcript = turns.map { turn in
-            "\(turn.role == "user" ? "User" : "Assistant"): \(turn.text)"
+            "\(turn.role == "user" ? "User" : "Assistant"): \(sanitize(turn.text))"
         }.joined(separator: "\n")
-        let priorBlock = priorSummary.map { "Prior summary: \($0)\n\n" } ?? ""
+        let priorBlock = priorSummary.map { "Prior summary: \(sanitize($0))\n\n" } ?? ""
 
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -98,8 +123,9 @@ enum KnowledgePrompts {
     }
 
     static func intentClassifier(query: String, recentTurns: [(role: String, text: String)]) -> String {
+        let query = sanitize(query)
         let recent = recentTurns.suffix(4).map { turn in
-            "\(turn.role == "user" ? "User" : "Assistant"): \(turn.text)"
+            "\(turn.role == "user" ? "User" : "Assistant"): \(sanitize(turn.text))"
         }.joined(separator: "\n")
         let historyBlock = recent.isEmpty ? "" : "Recent conversation:\n\(recent)\n\n"
 
@@ -146,12 +172,13 @@ enum KnowledgePrompts {
         conversationSummary: String?,
         libraryContext: String? = nil
     ) -> String {
+        let query = sanitize(query)
         let historyText = history.suffix(8).map { turn -> String in
             let role = turn.role == "user" ? "user" : "assistant"
-            return "<|start_header_id|>\(role)<|end_header_id|>\n\(turn.text)<|eot_id|>"
+            return "<|start_header_id|>\(role)<|end_header_id|>\n\(sanitize(turn.text))<|eot_id|>"
         }.joined()
-        let summaryBlock = conversationSummary.map { "\nEarlier conversation summary: \($0)\n" } ?? ""
-        let libraryBlock = libraryContext.map { "\nLibrary state: \($0)\n" } ?? ""
+        let summaryBlock = conversationSummary.map { "\nEarlier conversation summary: \(sanitize($0))\n" } ?? ""
+        let libraryBlock = libraryContext.map { "\nLibrary state: \(sanitize($0))\n" } ?? ""
 
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -184,16 +211,6 @@ enum KnowledgePrompts {
         """
     }
 
-    static func queryRefinement(query: String) -> String {
-        """
-        Your task is to refine the given query to be more suitable for database search.
-        Once the query is refined, please find the most relevant keyword from the refined query.
-        Respond with ONLY the keyword.
-
-        Query: \(query)
-        """
-    }
-
     static func ragAnswer(
         query: String,
         context: String,
@@ -201,7 +218,11 @@ enum KnowledgePrompts {
         highlightsGuideline: String,
         historyBlock: String
     ) -> String {
-        """
+        let query = sanitize(query)
+        let context = sanitize(context)
+        let highlightsBlock = sanitize(highlightsBlock)
+        let historyBlock = sanitize(historyBlock)
+        return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are Lumen, a friendly reading companion. You help the user explore their saved pages by answering naturally, the way a thoughtful friend would. Never refer to yourself by name — just say "I".
 
@@ -231,7 +252,12 @@ enum KnowledgePrompts {
         historyBlock: String,
         scopePhrase: String
     ) -> String {
-        """
+        let query = sanitize(query)
+        let context = sanitize(context)
+        let highlightsBlock = sanitize(highlightsBlock)
+        let historyBlock = sanitize(historyBlock)
+        let scopePhrase = sanitize(scopePhrase)
+        return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are Lumen, a friendly reading companion. Never refer to yourself by name — just say "I". The user is asking about what they read \(scopePhrase). Each source below is a page from their reading history, labeled with its title and read date (e.g. "Page Title (read [Date])").
 

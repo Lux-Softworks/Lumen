@@ -54,7 +54,7 @@ struct HomeHeroView: View {
             .opacity(isBreathing ? 1.0 : 0.7)
             .animation(
                 reduceMotion
-                    ? .default
+                    ? nil
                     : .easeInOut(duration: 3.5).repeatForever(autoreverses: true),
                 value: isBreathing
             )

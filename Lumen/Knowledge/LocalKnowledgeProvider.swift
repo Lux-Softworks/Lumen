@@ -415,39 +415,6 @@ actor LocalKnowledgeProvider {
         return TopicCanonicalizer.canonical(for: cleaned)
     }
 
-    func refineQueryAndFindKeywordWithLLM(query: String) async throws -> String {
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
-
-        beginInference()
-        defer { endInference() }
-
-        let prompt = await KnowledgePrompts.queryRefinement(query: query)
-
-        let parameters = GenerateParameters(maxTokens: 20, temperature: 0.1)
-        let tokens = await container.encode(prompt)
-        let input = LMInput(tokens: MLXArray(tokens))
-
-        let stream = try await container.generate(input: input, parameters: parameters)
-
-        var output = ""
-        for await event in stream {
-            if Task.isCancelled { break }
-            if case .chunk(let text) = event { output += text }
-        }
-
-        clearGPUCache()
-        touch()
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     func classifyConversationalIntent(
         query: String,
         history: [(role: String, text: String)]
@@ -548,66 +515,6 @@ actor LocalKnowledgeProvider {
         }
     }
 
-    func answerFromKnowledge(
-        query: String,
-        sources: [PageContent],
-        highlights: [String] = [],
-        history: [(role: String, text: String)] = [],
-        conversationSummary: String? = nil
-    ) async throws -> String {
-        guard !sources.isEmpty else { return "" }
-
-        #if targetEnvironment(simulator)
-        return simulatorAnswer(query: query, sources: sources)
-        #else
-
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
-
-        beginInference()
-        defer { endInference() }
-
-        let blocks = await PromptBudgeter.build(
-            query: query,
-            sources: sources,
-            highlights: highlights,
-            history: history,
-            conversationSummary: conversationSummary
-        )
-
-        let prompt = await KnowledgePrompts.ragAnswer(
-            query: query,
-            context: blocks.context,
-            highlightsBlock: blocks.highlightsBlock,
-            highlightsGuideline: blocks.highlightsGuideline,
-            historyBlock: blocks.historyBlock
-        )
-
-        let parameters = GenerateParameters(maxTokens: 320, temperature: 0.2)
-        let tokens = await container.encode(prompt)
-        let input = LMInput(tokens: MLXArray(tokens))
-
-        let stream = try await container.generate(input: input, parameters: parameters)
-
-        var output = ""
-        for await event in stream {
-            if Task.isCancelled { break }
-            if case .chunk(let text) = event { output += text }
-        }
-
-        clearGPUCache()
-        touch()
-        return cleanOutput(output)
-        #endif
-    }
-
     func answerStreamFromKnowledge(
         query: String,
         sources: [PageContent],
@@ -673,7 +580,7 @@ actor LocalKnowledgeProvider {
                     }
 
                     let parameters = GenerateParameters(
-                        maxTokens: 8192,
+                        maxTokens: 512,
                         temperature: 0.3
                     )
                     let tokens = await container.encode(prompt)
@@ -715,10 +622,6 @@ actor LocalKnowledgeProvider {
         let top = sources.first
         let title = top?.title ?? top?.domain ?? "your saved pages"
         return "Based on **\(title)** [1], this covers topics related to your query."
-    }
-
-    private func cleanOutput(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func cleanSummary(_ raw: String) -> String {

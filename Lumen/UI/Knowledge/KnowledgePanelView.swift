@@ -43,15 +43,17 @@ struct KnowledgePanelView: View {
             tabToggle
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { safeAreaBottom = proxy.safeAreaInsets.bottom }
+                    .onChange(of: proxy.safeAreaInsets.bottom) { _, b in safeAreaBottom = b }
+            }
+            .ignoresSafeArea()
+        )
         .task {
             await viewModel.menuViewModel.loadTopics()
             Task { await viewModel.aiViewModel.preloadModel() }
-
-            if let window = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first?.windows.first(where: { $0.isKeyWindow }) {
-                safeAreaBottom = window.safeAreaInsets.bottom
-            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
