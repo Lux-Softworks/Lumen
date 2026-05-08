@@ -91,7 +91,7 @@ struct KnowledgePanelView: View {
                 } label: {
                     Text("Ask")
                         .font(.subheadline.weight(viewModel.activeTab == .ai ? .bold : .medium))
-                        .foregroundColor(
+                        .foregroundStyle(
                             viewModel.activeTab == .ai
                                 ? palette.text
                                 : palette.text.opacity(0.45)
@@ -107,7 +107,7 @@ struct KnowledgePanelView: View {
                 } label: {
                     Text("Library")
                         .font(.subheadline.weight(viewModel.activeTab == .folder ? .bold : .medium))
-                        .foregroundColor(
+                        .foregroundStyle(
                             viewModel.activeTab == .folder
                                 ? palette.text
                                 : palette.text.opacity(0.45)

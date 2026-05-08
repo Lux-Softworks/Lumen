@@ -300,17 +300,17 @@ struct SettingsPage: View {
                         HStack(spacing: 12) {
                             Image(systemName: hapticsIcon(mode))
                                 .font(.system(size: listIconFont, weight: .medium))
-                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
+                                .foregroundStyle(isSelected ? palette.accent : palette.text.opacity(0.4))
                                 .frame(width: listIconGutter)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(mode.label)
                                     .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? palette.accent : palette.text)
+                                    .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                                 Text(mode.caption)
                                     .font(.footnote.weight(.regular))
-                                    .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
+                                    .foregroundStyle(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
                             Spacer()
@@ -466,12 +466,12 @@ struct SettingsPage: View {
         HStack(spacing: 14) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: zoomMagFont, weight: .medium))
-                .foregroundColor(palette.accent)
+                .foregroundStyle(palette.accent)
                 .frame(width: zoomMagFrame, height: zoomMagFrame)
 
             Text("Page Zoom")
                 .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .medium))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
 
             Spacer()
 
@@ -483,7 +483,7 @@ struct SettingsPage: View {
                 } label: {
                     Image(systemName: "minus")
                         .font(.system(size: zoomBtnFont, weight: .bold))
-                        .foregroundColor(pageZoom > 50 ? palette.accent : palette.text.opacity(0.2))
+                        .foregroundStyle(pageZoom > 50 ? palette.accent : palette.text.opacity(0.2))
                         .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
@@ -492,7 +492,7 @@ struct SettingsPage: View {
 
                 Text("\(pageZoom)%")
                     .font(.system(size: zoomPercentFont, weight: .bold, design: .monospaced))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .frame(minWidth: zoomPercentMinWidth)
                     .monospacedDigit()
                     .accessibilityLabel("Current zoom")
@@ -505,7 +505,7 @@ struct SettingsPage: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: zoomBtnFont, weight: .bold))
-                        .foregroundColor(pageZoom < 200 ? palette.accent : palette.text.opacity(0.2))
+                        .foregroundStyle(pageZoom < 200 ? palette.accent : palette.text.opacity(0.2))
                         .frame(width: zoomBtnFrame, height: zoomBtnFrame)
                 }
                 .buttonStyle(.plain)
@@ -576,12 +576,12 @@ struct SettingsPage: View {
                         HStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: listIconFont, weight: .medium))
-                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
+                                .foregroundStyle(isSelected ? palette.accent : palette.text.opacity(0.4))
                                 .frame(width: listIconGutter)
 
                             Text(engine.rawValue)
                                 .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
-                                .foregroundColor(isSelected ? palette.accent : palette.text)
+                                .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                             Spacer()
                         }
@@ -613,17 +613,17 @@ struct SettingsPage: View {
                         HStack(spacing: 12) {
                             Image(systemName: policyIcon(policy))
                                 .font(.system(size: listIconFont, weight: .medium))
-                                .foregroundColor(isSelected ? palette.accent : palette.text.opacity(0.4))
+                                .foregroundStyle(isSelected ? palette.accent : palette.text.opacity(0.4))
                                 .frame(width: listIconGutter)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(policy.rawValue)
                                     .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? palette.accent : palette.text)
+                                    .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                                 Text(policyDescription(policy))
                                     .font(.footnote.weight(.regular))
-                                    .foregroundColor(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
+                                    .foregroundStyle(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
                             Spacer()
@@ -668,16 +668,16 @@ struct SettingsPage: View {
                 HStack(spacing: 12) {
                     Image(systemName: "globe")
                         .font(.system(size: listIconFont, weight: .medium))
-                        .foregroundColor(palette.accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: listIconGutter)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(languageName)
                             .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .bold))
-                            .foregroundColor(palette.accent)
+                            .foregroundStyle(palette.accent)
                         Text("System default")
                             .font(.footnote.weight(.regular))
-                            .foregroundColor(palette.accent.opacity(0.8))
+                            .foregroundStyle(palette.accent.opacity(0.8))
                     }
 
                     Spacer()
@@ -691,7 +691,7 @@ struct SettingsPage: View {
                 "Language preferences are managed in iOS language settings."
             )
             .font(.footnote)
-            .foregroundColor(palette.text.opacity(0.45))
+            .foregroundStyle(palette.text.opacity(0.45))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 16)
         }
@@ -703,7 +703,7 @@ struct SettingsPage: View {
             VStack(spacing: 12) {
                 Text("Links you tap in other apps will open in Lumen instead of Safari when set to default.")
                     .font(.subheadline.weight(.regular))
-                    .foregroundColor(palette.text.opacity(0.55))
+                    .foregroundStyle(palette.text.opacity(0.55))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
             }
@@ -732,7 +732,7 @@ struct SettingsPage: View {
                     Text("Open Settings")
                         .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .bold))
                 }
-                .foregroundColor(.white)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(
@@ -754,12 +754,12 @@ struct SettingsPage: View {
                     .frame(width: stepCircleSize, height: stepCircleSize)
                 Text(number)
                     .font(.system(size: stepNumberFont, weight: .bold))
-                    .foregroundColor(palette.accent)
+                    .foregroundStyle(palette.accent)
             }
 
             Text(text)
                 .font(.subheadline.weight(.medium))
-                .foregroundColor(palette.text.opacity(0.75))
+                .foregroundStyle(palette.text.opacity(0.75))
 
             Spacer()
         }
@@ -778,7 +778,7 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Last updated: 2026")
                 .font(.footnote)
-                .foregroundColor(palette.text.opacity(0.45))
+                .foregroundStyle(palette.text.opacity(0.45))
                 .padding(.horizontal, 16)
 
             settingsGroup {
@@ -818,10 +818,10 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: policyTitleFont, weight: .semibold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
             Text(body)
                 .font(.system(size: policyBodyFont, weight: .regular))
-                .foregroundColor(palette.text.opacity(0.55))
+                .foregroundStyle(palette.text.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
@@ -837,7 +837,7 @@ struct SettingsPage: View {
                         Image(systemName: "chevron.left")
                             .font(.callout.weight(.bold))
                     }
-                    .foregroundColor(palette.accent)
+                    .foregroundStyle(palette.accent)
                     .frame(width: 40, height: 40)
                     .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
@@ -850,7 +850,7 @@ struct SettingsPage: View {
 
             Text(sectionTitle(for: section))
                 .font(AppTheme.Typography.display(size: displayTitleFont, weight: .bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
@@ -936,18 +936,18 @@ struct SettingsPage: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.system(size: rowIconFont, weight: .medium))
-                    .foregroundColor(destructive ? .red : palette.accent)
+                    .foregroundStyle(destructive ? .red : palette.accent)
                     .frame(width: rowIconFrame, height: rowIconFrame)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: .medium))
-                        .foregroundColor(destructive ? .red : palette.text)
+                        .foregroundStyle(destructive ? .red : palette.text)
 
                     if let subtitle {
                         Text(subtitle)
                             .font(.system(size: subtitleFont14, weight: .regular))
-                            .foregroundColor(palette.text.opacity(0.45))
+                            .foregroundStyle(palette.text.opacity(0.45))
                     }
                 }
 
@@ -958,7 +958,7 @@ struct SettingsPage: View {
                 } else if showChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: chevronFont14, weight: .semibold))
-                        .foregroundColor(palette.text.opacity(0.25))
+                        .foregroundStyle(palette.text.opacity(0.25))
                 }
             }
             .padding(.horizontal, 16)

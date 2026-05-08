@@ -51,7 +51,6 @@ struct BottomBarView: View {
     @State private var isSpinning = false
     @State private var reloadRotation: Double = 0
     @State private var toolbarDragFraction: CGFloat = 0
-    @State private var searchFieldOpacity: Double = 1.0
     @State private var magGlassOpacity: Double = 1.0
     @State private var gearIconOpacity: Double = 0.0
     @State private var folderIconOpacity: Double = 0.0
@@ -98,9 +97,11 @@ struct BottomBarView: View {
                     if state == .collapsed || state == .hidden {
                         text = ""
                         state = .search
+                        toolbarDragFraction = 1.0
                     }
                 } else {
                     state = .collapsed
+                    toolbarDragFraction = 0
                 }
             }
         )
@@ -136,6 +137,10 @@ struct BottomBarView: View {
         isExpanded ? expandedCapsuleHeight : 44
     }
 
+    private var dragRevealProgress: CGFloat {
+        min(1, toolbarDragFraction * 2.0)
+    }
+
     private var sheetTopRow: some View {
         ZStack(alignment: .top) {
             frostedBackground
@@ -148,18 +153,18 @@ struct BottomBarView: View {
                 .zIndex(0)
 
             collapsedContent
-                .opacity(isExpanded ? 0 : 1)
+                .opacity(1 - dragRevealProgress)
                 .allowsHitTesting(!isExpanded)
                 .zIndex(1)
 
             searchBarRow
-                .opacity(isExpanded ? 1 : 0)
+                .opacity(dragRevealProgress)
                 .allowsHitTesting(isExpanded)
                 .zIndex(2)
 
             Image(systemName: "magnifyingglass")
                 .font(.system(size: magGlassSize, weight: .bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
                 .frame(width: magGlassSize, height: magGlassSize)
                 .matchedGeometryEffect(
                     id: "magnifyingGlass_icon", in: animation, isSource: false
@@ -210,7 +215,7 @@ struct BottomBarView: View {
             searchSuggestionsArea
                 .allowsHitTesting(state == .search)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .opacity(isExpanded ? 1 : min(1, toolbarDragFraction * 2.0))
+                .opacity(dragRevealProgress)
         }
     }
 
@@ -229,7 +234,8 @@ struct BottomBarView: View {
         }
 
         if state == .search {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.3))
                 guard state == .search else { return }
                 isFocused = true
             }
@@ -298,15 +304,10 @@ struct BottomBarView: View {
 
     private func handleTabCountChange(_ oldCount: Int, _ newCount: Int) {
         guard newCount == 0, oldCount > 0 else { return }
-        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            state = .search
-        }
+        state = .search
     }
 
     private func handleStateChange(_ oldState: BottomBarState, _ newState: BottomBarState) {
-        let isExpandingToSearch =
-            newState == .search || newState == .browserSettings || newState == .siteSettings
-            || newState == .knowledge || newState == .submittingSearch
         let showsMag =
             newState == .collapsed || newState == .hidden
             || newState == .search || newState == .submittingSearch
@@ -314,11 +315,10 @@ struct BottomBarView: View {
         let showsFolder = newState == .knowledge
 
         withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            searchFieldOpacity = isExpandingToSearch ? 1.0 : 0.0
             magGlassOpacity = showsMag ? 1.0 : 0.0
-            if !showsGear { gearIconOpacity = 0.0 }
-            if !showsFolder { folderIconOpacity = 0.0 }
         }
+        if !showsGear { gearIconOpacity = 0.0 }
+        if !showsFolder { folderIconOpacity = 0.0 }
 
         if showsGear || showsFolder {
             withAnimation(reduceMotion ? nil : .easeIn(duration: 0.22).delay(0.12)) {
@@ -327,10 +327,18 @@ struct BottomBarView: View {
             }
         }
 
-        if newState != .search {
+        let isExpandedTarget =
+            newState == .search || newState == .browserSettings
+            || newState == .siteSettings || newState == .knowledge
+            || newState == .submittingSearch
+        let targetFraction: CGFloat = isExpandedTarget ? 1.0 : 0.0
+        if toolbarDragFraction != targetFraction {
             withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-                toolbarDragFraction = 0
+                toolbarDragFraction = targetFraction
             }
+        }
+
+        if newState != .search {
             DispatchQueue.main.async {
                 isFocused = false
             }
@@ -364,7 +372,7 @@ struct BottomBarView: View {
                     } label: {
                         Image(systemName: "link")
                             .font(.callout.weight(.bold))
-                            .foregroundColor(palette.text.opacity(0.8))
+                            .foregroundStyle(palette.text.opacity(0.8))
                             .frame(width: 28, height: 28)
                             .clipShape(Circle())
                     }
@@ -377,7 +385,7 @@ struct BottomBarView: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.subheadline.weight(.bold))
-                                .foregroundColor(
+                                .foregroundStyle(
                                     canGoBack ? palette.text : palette.text.opacity(0.2)
                                 )
                                 .frame(width: 28, height: 28)
@@ -391,7 +399,7 @@ struct BottomBarView: View {
                         } label: {
                             Image(systemName: "chevron.right")
                                 .font(.subheadline.weight(.bold))
-                                .foregroundColor(
+                                .foregroundStyle(
                                     canGoForward ? palette.text : palette.text.opacity(0.2)
                                 )
                                 .frame(width: 28, height: 28)
@@ -420,11 +428,11 @@ struct BottomBarView: View {
                             )
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: historyIconSize, weight: .medium))
-                            .foregroundColor(palette.text.opacity(0.6))
+                            .foregroundStyle(palette.text.opacity(0.6))
                             .opacity(gearIconOpacity)
                         Image(systemName: "folder.fill")
                             .font(.system(size: historyIconSize, weight: .medium))
-                            .foregroundColor(palette.text.opacity(0.6))
+                            .foregroundStyle(palette.text.opacity(0.6))
                             .opacity(folderIconOpacity)
                     }
                     .frame(width: 44, height: 44)
@@ -443,12 +451,12 @@ struct BottomBarView: View {
                     HStack(spacing: 0) {
                         Text(text)
                             .font(.system(size: urlFontSize, weight: .bold))
-                            .foregroundColor(.clear)
+                            .foregroundStyle(.clear)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                         Text(ghostCompletion)
                             .font(.system(size: urlFontSize, weight: .bold))
-                            .foregroundColor(palette.text)
+                            .foregroundStyle(palette.text)
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .background(
@@ -470,7 +478,7 @@ struct BottomBarView: View {
                 .accessibilityIdentifier("browser.urlField")
                 .font(.system(size: urlFontSize, weight: .bold))
                 .textFieldStyle(.plain)
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
                 .tint(palette.accent)
                 .focused($isFocused)
                 .submitLabel(.go)
@@ -487,7 +495,6 @@ struct BottomBarView: View {
                     (state == .siteSettings || state == .browserSettings || state == .knowledge)
                         ? .tail : .head
                 )
-                .opacity(searchFieldOpacity)
             }
             .frame(height: 44)
 
@@ -502,7 +509,7 @@ struct BottomBarView: View {
                             .antialiased(true)
                             .scaledToFit()
                             .font(.system(size: urlFontSize, weight: .bold))
-                            .foregroundColor(palette.text.opacity(0.8))
+                            .foregroundStyle(palette.text.opacity(0.8))
                             .frame(width: smallIcon, height: smallIcon)
                             .rotationEffect(.degrees(reloadRotation), anchor: .center)
                             .frame(width: 44, height: 44)
@@ -514,7 +521,7 @@ struct BottomBarView: View {
 
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(palette.text.opacity(0.6))
+                            .foregroundStyle(palette.text.opacity(0.6))
                             .frame(width: 44, height: 44)
                     }
                     .opacity(state == .search && !text.isEmpty ? 1 : 0)
@@ -566,7 +573,7 @@ struct BottomBarView: View {
                         .frame(width: magGlassSize * 1.5, height: magGlassSize)
                     }
                     .font(.system(size: magGlassSize, weight: .semibold))
-                    .foregroundColor(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
+                    .foregroundStyle(palette.text.opacity(isIncognitoActive ? 0.95 : 0.6))
                     .padding(.horizontal, isIncognitoActive ? incognitoPadding : 0)
                     .padding(.trailing, isIncognitoActive ? incognitoPadding : 0)
                     .frame(height: 44)
@@ -728,12 +735,12 @@ struct BottomBarView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: historyIconSize, weight: .medium))
-                    .foregroundColor(palette.text.opacity(0.6))
+                    .foregroundStyle(palette.text.opacity(0.6))
                     .frame(width: max(22, rowFaviconSize + 4))
 
                 Text(autofillBolded(title, matching: query))
                     .font(.system(size: urlFontSize, weight: .bold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -760,7 +767,7 @@ struct BottomBarView: View {
 
                 Text(autofillBolded(title, matching: query))
                     .font(.system(size: urlFontSize, weight: .bold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -861,7 +868,7 @@ struct BottomBarView: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "square.on.square")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(palette.text.opacity(tabCount == 0 ? 0.35 : 1.0))
+                        .foregroundStyle(palette.text.opacity(tabCount == 0 ? 0.35 : 1.0))
                         .frame(width: 44, height: 44)
                         .background(frostedBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -898,7 +905,7 @@ struct BottomBarView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .font(.system(size: urlFontSize, weight: .bold))
-                        .foregroundColor(palette.text)
+                        .foregroundStyle(palette.text)
                         .frame(width: smallIcon, height: smallIcon)
                         .rotationEffect(.degrees(0))
                         .opacity(0)
@@ -916,7 +923,7 @@ struct BottomBarView: View {
             Button(action: onSettingsPressed) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .frame(width: 44, height: 44)
                     .background(frostedBackground)
                     .clipShape(Circle())
@@ -989,25 +996,29 @@ private struct SearchSuggestionRow: View {
     let query: String
     let onTap: () -> Void
     @Environment(\.palette) private var palette
+    @ScaledMetric(relativeTo: .body) private var rowFontSize: CGFloat = 20
+    @ScaledMetric(relativeTo: .body) private var rowIconSize: CGFloat = 20
+
+    private var fontSize: CGFloat { min(rowFontSize, 24) }
+    private var iconSize: CGFloat { min(rowIconSize, 24) }
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(palette.text.opacity(0.6))
-                    .frame(width: 24)
+                    .font(.system(size: iconSize, weight: .medium))
+                    .foregroundStyle(palette.text.opacity(0.6))
+                    .frame(width: max(22, iconSize + 4))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(attributedText)
-                        .font(.system(.subheadline, weight: .semibold))
-                        .foregroundColor(palette.text)
-                        .lineLimit(1)
-                }
+                Text(attributedText)
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(palette.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer()
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
@@ -1020,7 +1031,7 @@ private struct SearchSuggestionRow: View {
             var searchRange = suggestion.text.startIndex..<suggestion.text.endIndex
             while let range = suggestion.text.range(of: query, options: .caseInsensitive, range: searchRange) {
                 if let attrRange = Range(range, in: result) {
-                    result[attrRange].font = .system(.subheadline, weight: .heavy)
+                    result[attrRange].font = .system(size: fontSize, weight: .heavy)
                 }
                 searchRange = range.upperBound..<suggestion.text.endIndex
             }

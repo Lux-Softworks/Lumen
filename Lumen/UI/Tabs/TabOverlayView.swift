@@ -307,7 +307,7 @@ private struct TabCardItemView: View {
                     palette.uiElement
                     Image(systemName: "globe")
                         .font(.system(size: placeholderIconSize, weight: .thin))
-                        .foregroundColor(palette.text.opacity(0.12))
+                        .foregroundStyle(palette.text.opacity(0.12))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

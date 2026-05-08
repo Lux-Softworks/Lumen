@@ -52,10 +52,10 @@ struct KnowledgeWebsiteView: View {
         VStack(spacing: 10) {
             Image(systemName: "book.closed")
                 .font(.title.weight(.light))
-                .foregroundColor(palette.text.opacity(0.25))
+                .foregroundStyle(palette.text.opacity(0.25))
             Text("No pages saved yet")
                 .font(.subheadline.weight(.medium))
-                .foregroundColor(palette.text.opacity(0.35))
+                .foregroundStyle(palette.text.opacity(0.35))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -65,14 +65,14 @@ struct KnowledgeWebsiteView: View {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
                     .font(.callout.weight(.bold))
-                    .foregroundColor(palette.accent)
+                    .foregroundStyle(palette.accent)
                     .frame(width: 40, height: 40)
                     .background(palette.accent.opacity(0.1))
                     .cornerRadius(20)
             }
             Text(viewModel.website.displayName)
                 .font(.body.weight(.bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
@@ -98,7 +98,7 @@ struct KnowledgeWebsiteView: View {
     private func synthesisCard(text: String) -> some View {
         Text((try? AttributedString(markdown: text)) ?? AttributedString(text))
             .font(.subheadline.weight(.regular))
-            .foregroundColor(palette.text.opacity(0.55))
+            .foregroundStyle(palette.text.opacity(0.55))
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,7 +117,7 @@ struct KnowledgeWebsiteView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(session.headerLabel)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(palette.text.opacity(0.25))
+                .foregroundStyle(palette.text.opacity(0.25))
                 .textCase(.uppercase)
                 .kerning(0.4)
                 .padding(.horizontal, 16)
@@ -141,14 +141,14 @@ struct KnowledgeWebsiteView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(page.title ?? page.domain)
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(palette.text)
+                        .foregroundStyle(palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     if let summary = page.summary, !summary.isEmpty {
                         Text(summary)
                             .font(.caption.weight(.regular))
-                            .foregroundColor(palette.text.opacity(0.35))
+                            .foregroundStyle(palette.text.opacity(0.35))
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -159,13 +159,13 @@ struct KnowledgeWebsiteView: View {
                 if let readingTime = page.readingTime, readingTime > 0 {
                     Text("\(readingTime)m")
                         .font(.caption2.weight(.medium))
-                        .foregroundColor(palette.text.opacity(0.2))
+                        .foregroundStyle(palette.text.opacity(0.2))
                 }
 
                 if onSelectPage != nil {
                     Image(systemName: "chevron.right")
                         .font(.system(size: pageChevronSize, weight: .medium))
-                        .foregroundColor(palette.text.opacity(0.15))
+                        .foregroundStyle(palette.text.opacity(0.15))
                         .padding(.leading, 8)
                 }
             }

@@ -104,7 +104,7 @@ struct ExportView: View {
                 Button(action: onDismiss) {
                     Image(systemName: "chevron.left")
                         .font(.callout.weight(.bold))
-                        .foregroundColor(palette.accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
                         .cornerRadius(20)
@@ -113,7 +113,7 @@ struct ExportView: View {
             }
             Text("Export")
                 .font(.title3.weight(.bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -124,11 +124,11 @@ struct ExportView: View {
         HStack(spacing: 14) {
             Image(systemName: fixedScopeIcon)
                 .font(.body.weight(.medium))
-                .foregroundColor(palette.accent)
+                .foregroundStyle(palette.accent)
                 .frame(width: 32, height: 32)
             Text(fixedScopeTitle)
                 .font(.callout.weight(.bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -180,12 +180,12 @@ struct ExportView: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.body.weight(.medium))
-                    .foregroundColor(scope == value ? palette.accent : palette.text.opacity(0.4))
+                    .foregroundStyle(scope == value ? palette.accent : palette.text.opacity(0.4))
                     .frame(width: 32, height: 32)
 
                 Text(title)
                     .font(.callout.weight(scope == value ? .bold : .medium))
-                    .foregroundColor(scope == value ? palette.accent : palette.text)
+                    .foregroundStyle(scope == value ? palette.accent : palette.text)
 
                 Spacer()
             }
@@ -221,12 +221,12 @@ struct ExportView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.body.weight(.medium))
-                .foregroundColor(palette.accent)
+                .foregroundStyle(palette.accent)
                 .frame(width: 32, height: 32)
 
             Text(title)
                 .font(.callout.weight(.medium))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
 
             Spacer()
 
@@ -250,7 +250,7 @@ struct ExportView: View {
         HStack {
             Text(title)
                 .font(.callout.weight(.medium))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
             Spacer()
             DatePicker("", selection: selection, displayedComponents: .date)
                 .labelsHidden()
@@ -291,10 +291,10 @@ struct ExportView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Exported \(current) / \(total)")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                 Text(progressPhase(progress))
                     .font(.caption)
-                    .foregroundColor(palette.text.opacity(0.55))
+                    .foregroundStyle(palette.text.opacity(0.55))
             }
 
             Spacer()
@@ -330,7 +330,7 @@ struct ExportView: View {
                 }
                 .opacity(isRunning ? 1 : 0)
             }
-            .foregroundColor(.white)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(

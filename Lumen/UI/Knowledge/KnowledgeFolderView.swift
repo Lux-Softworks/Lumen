@@ -215,7 +215,7 @@ struct WebsitePageButton: View {
 
                         Text(website.domain)
                             .font(.system(size: domainLabelSize, weight: .medium))
-                            .foregroundColor(palette.text.opacity(0.45))
+                            .foregroundStyle(palette.text.opacity(0.45))
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -224,7 +224,7 @@ struct WebsitePageButton: View {
 
                     Text(statsLine)
                         .font(.system(size: statsLabelSize, weight: .semibold))
-                        .foregroundColor(palette.text.opacity(0.35))
+                        .foregroundStyle(palette.text.opacity(0.35))
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -235,7 +235,7 @@ struct WebsitePageButton: View {
 
             Text(website.displayName)
                 .font(.footnote.weight(.bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
                 .lineLimit(1)
         }
     }
@@ -253,7 +253,7 @@ struct WebsitePageButton: View {
         let letter = String(website.displayName.first ?? Character("?")).uppercased()
         return Text(letter)
             .font(.system(size: monogramLabelSize, weight: .bold))
-            .foregroundColor(palette.accent)
+            .foregroundStyle(palette.accent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(palette.accent.opacity(0.15))
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
@@ -380,7 +380,7 @@ struct KnowledgeFolderView: View {
                 VStack(spacing: 16) {
                     Text("No topics yet")
                         .font(.callout.weight(.semibold))
-                        .foregroundColor(palette.text.opacity(0.35))
+                        .foregroundStyle(palette.text.opacity(0.35))
 
                     if seedKnowledge {
                         Button {
@@ -391,7 +391,7 @@ struct KnowledgeFolderView: View {
                                 Text("Seed test data")
                             }
                             .font(.subheadline.weight(.bold))
-                            .foregroundColor(palette.accent)
+                            .foregroundStyle(palette.accent)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
                             .background(palette.accent.opacity(0.1))
@@ -421,7 +421,7 @@ struct KnowledgeFolderView: View {
 
                                         Text(topic.name)
                                             .font(.footnote.weight(.bold))
-                                            .foregroundColor(palette.text)
+                                            .foregroundStyle(palette.text)
                                             .lineLimit(1)
                                     }
                                 }
@@ -459,7 +459,7 @@ struct KnowledgeFolderView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.callout.weight(.bold))
-                        .foregroundColor(palette.accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
                         .cornerRadius(20)
@@ -469,7 +469,7 @@ struct KnowledgeFolderView: View {
                 }
                 Text(viewModel.selectedTopic?.name ?? "")
                     .font(.body.weight(.bold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
@@ -558,7 +558,7 @@ private struct PageDetailView: View {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
                         .font(.callout.weight(.bold))
-                        .foregroundColor(palette.accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: 40, height: 40)
                         .background(palette.accent.opacity(0.1))
                         .cornerRadius(20)
@@ -568,7 +568,7 @@ private struct PageDetailView: View {
                 }
                 Text(page.title ?? page.domain)
                     .font(.body.weight(.bold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
@@ -581,7 +581,7 @@ private struct PageDetailView: View {
                     if let summary = page.summary, !summary.isEmpty {
                         Text((try? AttributedString(markdown: summary)) ?? AttributedString(summary))
                             .font(.subheadline.weight(.regular))
-                            .foregroundColor(palette.text.opacity(0.5))
+                            .foregroundStyle(palette.text.opacity(0.5))
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -593,7 +593,7 @@ private struct PageDetailView: View {
                     if let meta = pageMetaLine {
                         Text(meta)
                             .font(.caption2.weight(.medium))
-                            .foregroundColor(palette.text.opacity(0.25))
+                            .foregroundStyle(palette.text.opacity(0.25))
                             .padding(.horizontal, 16)
                             .padding(.bottom, 20)
                     }
@@ -614,7 +614,7 @@ private struct PageDetailView: View {
                         ForEach(Array(contentParagraphs.enumerated()), id: \.offset) { _, para in
                             Text(para)
                                 .font(.subheadline)
-                                .foregroundColor(palette.text.opacity(0.8))
+                                .foregroundStyle(palette.text.opacity(0.8))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .lineSpacing(5)
                         }
@@ -634,7 +634,7 @@ private struct PageDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Highlights")
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(palette.text.opacity(0.35))
+                .foregroundStyle(palette.text.opacity(0.35))
                 .textCase(.uppercase)
                 .kerning(0.4)
                 .padding(.horizontal, 16)
@@ -656,7 +656,7 @@ private struct PageDetailView: View {
 
             Text(annotation.text)
                 .font(.footnote)
-                .foregroundColor(palette.text.opacity(0.75))
+                .foregroundStyle(palette.text.opacity(0.75))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -666,7 +666,7 @@ private struct PageDetailView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: deleteIconSize, weight: .semibold))
-                    .foregroundColor(palette.text.opacity(0.3))
+                    .foregroundStyle(palette.text.opacity(0.3))
                     .frame(width: 22, height: 22)
                     .padding(11)
                     .contentShape(Rectangle())

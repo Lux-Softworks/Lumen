@@ -18,10 +18,10 @@ struct BookmarksListView: View {
         VStack(spacing: 10) {
             Image(systemName: "bookmark.slash")
                 .font(.largeTitle.weight(.light))
-                .foregroundColor(palette.text.opacity(0.2))
+                .foregroundStyle(palette.text.opacity(0.2))
             Text("No bookmarks yet")
                 .font(.subheadline.weight(.medium))
-                .foregroundColor(palette.text.opacity(0.3))
+                .foregroundStyle(palette.text.opacity(0.3))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -41,14 +41,14 @@ struct BookmarksListView: View {
 
                             Text(domain)
                                 .font(.callout.weight(.medium))
-                                .foregroundColor(palette.text)
+                                .foregroundStyle(palette.text)
                                 .lineLimit(1)
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundColor(palette.text.opacity(0.25))
+                                .foregroundStyle(palette.text.opacity(0.25))
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)

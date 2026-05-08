@@ -64,7 +64,7 @@ struct HomeHeroView: View {
     private var tagline: some View {
         Text(currentTagline)
             .font(AppTheme.Typography.sansBody(size: taglineSize, weight: .semibold))
-            .foregroundColor(palette.text.opacity(0.6))
+            .foregroundStyle(palette.text.opacity(0.6))
             .multilineTextAlignment(.center)
             .dynamicTypeSize(.xSmall ... .accessibility3)
             .transition(.opacity.animation(.easeOut(duration: 0.35)))

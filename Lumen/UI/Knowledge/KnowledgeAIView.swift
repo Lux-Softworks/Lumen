@@ -85,7 +85,7 @@ struct KnowledgeAIView: View {
             )
             Text("Ask about what you've read")
                 .font(.system(size: idleLabelSize, weight: .semibold))
-                .foregroundColor(palette.text.opacity(0.28))
+                .foregroundStyle(palette.text.opacity(0.28))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -142,7 +142,7 @@ struct KnowledgeAIView: View {
             ZStack(alignment: .leading) {
                 TextField("", text: $viewModel.inputText, axis: .vertical)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(palette.text)
+                    .foregroundStyle(palette.text)
                     .tint(palette.accent)
                     .lineLimit(1...5)
                     .focused($isFocused)
@@ -166,7 +166,7 @@ struct KnowledgeAIView: View {
                     } else {
                         Text("What do you want to know?")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(palette.text.opacity(0.3))
+                            .foregroundStyle(palette.text.opacity(0.3))
                             .allowsHitTesting(false)
                     }
                 }
@@ -183,7 +183,7 @@ struct KnowledgeAIView: View {
                     .overlay(
                         Image(systemName: "arrow.up")
                             .font(.system(size: sendButtonIconSize, weight: .bold))
-                            .foregroundColor(canSend ? .white : palette.text.opacity(0.25))
+                            .foregroundStyle(canSend ? .white : palette.text.opacity(0.25))
                     )
                     .animation(AppTheme.Motion.snappy, value: canSend)
                     .frame(width: 44, height: 44)
@@ -271,7 +271,7 @@ private struct ChatBubbleView: View {
     private var userBubble: some View {
         Text(message.text)
             .font(.subheadline)
-            .foregroundColor(palette.text)
+            .foregroundStyle(palette.text)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -324,7 +324,7 @@ private struct ChatBubbleView: View {
             Text(match.label)
                 .font(.system(size: matchLabelSize, weight: .medium))
         }
-        .foregroundColor(color)
+        .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(
@@ -342,12 +342,12 @@ private struct ChatBubbleView: View {
                             .frame(width: 2, height: 10)
                         Text(source.domain)
                             .font(.system(size: sourceLabelSize, weight: .medium))
-                            .foregroundColor(palette.text.opacity(0.35))
+                            .foregroundStyle(palette.text.opacity(0.35))
                             .lineLimit(1)
                         if let title = source.title, !title.isEmpty {
                             Text("· \(title)")
                                 .font(.system(size: sourceLabelSize))
-                                .foregroundColor(palette.text.opacity(0.2))
+                                .foregroundStyle(palette.text.opacity(0.2))
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 0)
@@ -424,7 +424,7 @@ private struct StreamingText: View {
                     if line.isBullet {
                         Text("•")
                             .font(.subheadline.weight(.bold))
-                            .foregroundColor(palette.accent.opacity(0.6))
+                            .foregroundStyle(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
                     WordFlowLayout(wordSpacing: 4, lineSpacing: 5) {
@@ -446,7 +446,7 @@ private struct StreamingText: View {
     private func codeView(body: String) -> some View {
         Text(body)
             .font(.system(size: codeFontSize, design: .monospaced))
-            .foregroundColor(palette.text)
+            .foregroundStyle(palette.text)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -557,7 +557,7 @@ private struct FadingWord: View {
     var body: some View {
         Text(word)
             .font(.subheadline.weight(bold ? .bold : .regular))
-            .foregroundColor(palette.text)
+            .foregroundStyle(palette.text)
             .opacity(appeared ? 1 : 0)
             .onAppear {
                 if reduceMotion {
@@ -666,7 +666,7 @@ private struct RevealText: View {
                     if item.block.isBullet {
                         Text("•")
                             .font(.subheadline.weight(.bold))
-                            .foregroundColor(palette.accent.opacity(0.6))
+                            .foregroundStyle(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
 
@@ -692,7 +692,7 @@ private struct RevealText: View {
                     if item.block.isBullet {
                         Text("•")
                             .font(.subheadline.weight(.bold))
-                            .foregroundColor(palette.accent.opacity(0.6))
+                            .foregroundStyle(palette.accent.opacity(0.6))
                             .padding(.top, 1)
                     }
 
@@ -760,7 +760,7 @@ private struct WordView: View {
     var body: some View {
         Text(word)
             .font(.subheadline.weight(bold ? .bold : .regular))
-            .foregroundColor(palette.text)
+            .foregroundStyle(palette.text)
             .opacity(appeared ? 1 : 0)
             .onAppear {
                 if reduceMotion {
@@ -782,7 +782,7 @@ private struct StaticWord: View {
     var body: some View {
         Text(word)
             .font(.subheadline.weight(bold ? .bold : .regular))
-            .foregroundColor(palette.text)
+            .foregroundStyle(palette.text)
     }
 }
 
@@ -820,7 +820,7 @@ private struct StatusLabel: View {
     var body: some View {
         Text(text ?? "")
             .font(.footnote.weight(.semibold))
-            .foregroundColor(palette.text.opacity(0.5))
+            .foregroundStyle(palette.text.opacity(0.5))
             .opacity(isHidden ? 0 : 1)
             .blur(radius: isHidden ? 2 : 0)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: text)

@@ -975,7 +975,9 @@ private struct BottomBarFocusHandlers: ViewModifier {
         content
             .onChange(of: bottomBarState) { oldState, newState in
                 if oldState != .search && newState == .search {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(0.3))
+                        guard bottomBarState == .search else { return }
                         isAddressBarFocused.wrappedValue = true
                     }
                 }

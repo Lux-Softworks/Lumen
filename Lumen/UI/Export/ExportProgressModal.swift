@@ -25,15 +25,15 @@ struct ExportProgressModal: View {
                 VStack(spacing: 4) {
                     Text("Exported \(current) / \(total)")
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(palette.text)
+                        .foregroundStyle(palette.text)
                     Text(phase)
                         .font(.footnote)
-                        .foregroundColor(palette.text.opacity(0.55))
+                        .foregroundStyle(palette.text.opacity(0.55))
                 }
                 Button(action: onCancel) {
                     Text("Cancel")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(AppTheme.Colors.danger)
+                        .foregroundStyle(AppTheme.Colors.danger)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(AppTheme.Colors.danger.opacity(0.1)))
@@ -59,7 +59,7 @@ struct ExportProgressModal: View {
                 .animation(.easeOut(duration: 0.25), value: fraction)
             Text("\(Int(fraction * 100))%")
                 .font(.system(.callout, design: .monospaced).weight(.bold))
-                .foregroundColor(palette.text)
+                .foregroundStyle(palette.text)
                 .monospacedDigit()
         }
         .frame(width: 80, height: 80)

@@ -78,7 +78,7 @@ struct TabHeaderLabel: View {
 
             Text(isIncognito ? "Incognito · \(visibleTitle)" : visibleTitle)
                 .font(.footnote.weight(.semibold))
-                .foregroundColor(textColor)
+                .foregroundStyle(textColor)
                 .lineLimit(1)
                 .opacity(textOpacity)
 
@@ -91,9 +91,7 @@ struct TabHeaderLabel: View {
     }
 
     private var textColor: Color {
-        if isIncognito { return IncognitoPalette.accent }
-        if let bg = contrastBackground { return ContrastForeground.color(for: bg) }
-        return palette.text
+        .white
     }
 }
 
