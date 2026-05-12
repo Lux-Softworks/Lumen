@@ -10,6 +10,7 @@ struct ResizableSheetContainer<Content: View>: View {
     var themeColor: UIColor?
     var backdropOpacity: CGFloat
     var hideProgressBar: Bool = false
+    var instantCollapse: Bool = false
     var onDragStart: (() -> Void)?
     var onExpand: (() -> Void)?
     var onCollapse: (() -> Void)?
@@ -36,6 +37,7 @@ struct ResizableSheetContainer<Content: View>: View {
         themeColor: UIColor? = nil,
         backdropOpacity: CGFloat = 1,
         hideProgressBar: Bool = false,
+        instantCollapse: Bool = false,
         onDragStart: (() -> Void)? = nil,
         onExpand: (() -> Void)? = nil,
         onCollapse: (() -> Void)? = nil,
@@ -51,6 +53,7 @@ struct ResizableSheetContainer<Content: View>: View {
         self.themeColor = themeColor
         self.backdropOpacity = backdropOpacity
         self.hideProgressBar = hideProgressBar
+        self.instantCollapse = instantCollapse
         self.onDragStart = onDragStart
         self.onExpand = onExpand
         self.onCollapse = onCollapse
@@ -194,9 +197,9 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                             }
                     )
-                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: isExpanded)
-                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: expandedHeightRatio)
-                    .animation(reduceMotion ? nil : AppTheme.Motion.sheet, value: isCollapsed)
+                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: isExpanded)
+                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: expandedHeightRatio)
+                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: isCollapsed)
                     .zIndex(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

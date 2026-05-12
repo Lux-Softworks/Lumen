@@ -8,7 +8,6 @@ struct VibrantBackground: View {
         ZStack {
             base
             blobs
-                .drawingGroup(opaque: false, colorMode: .extendedLinear)
             sheen
             material
         }
@@ -17,9 +16,8 @@ struct VibrantBackground: View {
         .ignoresSafeArea()
     }
 
-    @ViewBuilder
     private var base: some View {
-        if isIncognito {
+        ZStack {
             LinearGradient(
                 colors: [
                     IncognitoPalette.background,
@@ -29,7 +27,8 @@ struct VibrantBackground: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        } else {
+            .opacity(isIncognito ? 1 : 0)
+
             LinearGradient(
                 colors: [
                     AppTheme.Colors.background,
@@ -38,11 +37,22 @@ struct VibrantBackground: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .opacity(isIncognito ? 0 : 1)
         }
     }
 
-    @ViewBuilder
     private var blobs: some View {
+        ZStack {
+            blobLayer(palette: Self.incognitoBlobs)
+                .opacity(isIncognito ? 1 : 0)
+
+            blobLayer(palette: Self.lightBlobs)
+                .opacity(isIncognito ? 0 : 1)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    private func blobLayer(palette: [BlobSpec]) -> some View {
         ZStack {
             ForEach(palette.indices, id: \.self) { index in
                 let spec = palette[index]
@@ -55,6 +65,8 @@ struct VibrantBackground: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .drawingGroup(opaque: false, colorMode: .extendedLinear)
+        .compositingGroup()
     }
 
     @ViewBuilder

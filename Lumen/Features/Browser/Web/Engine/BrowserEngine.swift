@@ -116,7 +116,9 @@ enum BrowserEngine {
 
         let readingSignalHandler = ReadingSignalHandler(config: readingSignalConfig)
         readingSignalHandler.onReadingSignalTriggered = { payload, webView in
-            Task {
+            Task { [weak webView] in
+                guard let webView else { return }
+                guard webView.window != nil else { return }
                 await KnowledgeCaptureService.shared.handleSignal(payload, webView: webView)
             }
         }

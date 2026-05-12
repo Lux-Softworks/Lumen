@@ -19,9 +19,6 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published var threatEvents: [ThreatEvent] = []
     @Published var blockedTrackersCount: Int = 0
 
-    @Published var searchSuggestions: [SearchSuggestion] = []
-    private var searchCancellable: AnyCancellable?
-
     private(set) var webView: WKWebView?
     private var interceptor: NetworkInterceptor?
     private var pendingRequest: URLRequest?
@@ -83,53 +80,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
         }
 
         observeWebView(webView)
-        observeSearch()
 
         if let pending = pendingRequest {
             webView.load(pending)
             pendingRequest = nil
         }
-    }
-
-    private func observeSearch() {
-        searchCancellable =
-            $urlString
-            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .sink { [weak self] query in
-                guard let self = self else { return }
-                guard !query.isEmpty, !query.hasPrefix("http") else {
-                    self.searchSuggestions = []
-                    return
-                }
-
-                Task { [weak self] in
-                    guard let self else { return }
-                    do {
-                        async let semanticResults = KnowledgeStorage.shared.searchSemantic(query: query)
-                        let local = try await semanticResults
-
-                        let web: [SearchSuggestion]
-                        if self.isIncognito {
-                            web = []
-                        } else {
-                            web = try await SearchSuggestionService.shared.fetchSuggestions(for: query)
-                        }
-
-                        await MainActor.run { [weak self] in
-                            guard let self else { return }
-                            if !self.urlString.isEmpty {
-                                let localSuggestions = local.map { SearchSuggestion(text: $0.url) }
-                                self.searchSuggestions = localSuggestions + web
-                            }
-                        }
-                    } catch {
-                        await MainActor.run { [weak self] in
-                            self?.searchSuggestions = []
-                        }
-                    }
-                }
-            }
     }
 
     func captureSnapshot() async -> UIImage? {
@@ -283,10 +238,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         self?.updateThemeColorManually(webView)
 
                         webView.evaluateJavaScript("""
-                            requestAnimationFrame(() => {
-                                requestAnimationFrame(() => {
-                                    window.webkit.messageHandlers.firstPaint.postMessage({});
-                                });
+                            requestAnimationFrame(function() {
+                                window.webkit.messageHandlers.firstPaint.postMessage({});
                             });
                         """, completionHandler: nil)
 
@@ -401,7 +354,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 guard let newY = change.newValue?.y,
                       let oldY = change.oldValue?.y else { return }
                 let delta = newY - oldY
-                guard abs(delta) >= 0.5 else { return }
+                let absDelta = abs(delta)
+
+                let isNearTop = newY < 110
+                let isMeaningfulScroll = absDelta >= 3
+                guard isNearTop || isMeaningfulScroll else { return }
 
                 DispatchQueue.main.async {
                     guard let self = self, let webView = webView else { return }

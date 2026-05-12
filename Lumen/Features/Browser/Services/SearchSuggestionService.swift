@@ -1,9 +1,9 @@
 import Combine
 import Foundation
 
-struct SearchSuggestion: Identifiable, Equatable {
-    let id = UUID()
+struct SearchSuggestion: Identifiable, Equatable, Hashable {
     let text: String
+    var id: String { text }
 }
 
 final class SearchSuggestionService {
@@ -37,6 +37,6 @@ final class SearchSuggestionService {
             return []
         }
 
-        return suggestionsArray.prefix(8).map { SearchSuggestion(text: $0) }
+        return suggestionsArray.prefix(5).map { SearchSuggestion(text: $0) }
     }
 }

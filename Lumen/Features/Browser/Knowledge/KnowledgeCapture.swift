@@ -54,6 +54,7 @@ class KnowledgeCaptureService: ObservableObject {
     private func capture(payload: ReadingSignalPayload, webView: WKWebView?, force: Bool) async {
         guard BrowserSettings.shared.collectKnowledge else { return }
         guard let webView = webView else { return }
+        guard webView.window != nil else { return }
 
         let incognito = objc_getAssociatedObject(
             webView.configuration,
@@ -63,6 +64,7 @@ class KnowledgeCaptureService: ObservableObject {
         guard !incognito else { return }
 
         await Self.waitForDOMReady(webView: webView)
+        guard webView.window != nil else { return }
 
         let html: String?
         do {
@@ -75,6 +77,7 @@ class KnowledgeCaptureService: ObservableObject {
         }
 
         guard let html = html else { return }
+        guard webView.window != nil else { return }
 
         let url = webView.url
         let extractor = PageContentExtractor()
@@ -82,6 +85,7 @@ class KnowledgeCaptureService: ObservableObject {
         guard let extractedContent = try? await extractor.extractContent(from: html, baseURL: url) else {
             return
         }
+        guard webView.window != nil else { return }
 
         let domain = PageContent.extractDomain(from: extractedContent.url)
         let wordCount = PageContent.countWords(in: extractedContent.content)
@@ -96,11 +100,13 @@ class KnowledgeCaptureService: ObservableObject {
         )
 
         guard quality.shouldCapturePage else { return }
+        guard webView.window != nil else { return }
 
         let topicName = await SemanticTopicClassifier.shared.classify(
             title: extractedContent.title,
             content: extractedContent.content
         )
+        guard webView.window != nil else { return }
 
         var resolvedTopicID: String? = nil
         if !topicName.isEmpty {

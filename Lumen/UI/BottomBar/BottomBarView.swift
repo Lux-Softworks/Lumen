@@ -40,6 +40,10 @@ struct BottomBarView: View {
     var onNewIncognitoTab: (() -> Void)? = nil
     var isIncognitoActive: Bool = false
     var backdropOpacity: CGFloat = 1
+    var sheetInstantCollapse: Bool = false
+    var onTabsEmpty: (() -> Void)? = nil
+    var editingSuggestion: Binding<Bool>? = nil
+    var onUserTyped: ((String) -> Void)? = nil
 
     @ObservedObject private var historyStore = HistoryStore.shared
     @ObservedObject private var searchHistoryStore = SearchHistoryStore.shared
@@ -50,10 +54,14 @@ struct BottomBarView: View {
     @Namespace private var animation
     @State private var isSpinning = false
     @State private var reloadRotation: Double = 0
-    @State private var toolbarDragFraction: CGFloat = 0
+    @State private var toolbarProgress: CGFloat = 0
+    @State private var activeRowId: String? = "_typed"
+    @State private var caretActive: Bool = true
+    @State private var ghostCompletion: String = ""
     @State private var magGlassOpacity: Double = 1.0
     @State private var gearIconOpacity: Double = 0.0
     @State private var folderIconOpacity: Double = 0.0
+    @State private var urlTextOpacity: Double = 0.0
     @ScaledMetric(relativeTo: .body) private var dtFactor: CGFloat = 1.0
     @ScaledMetric(relativeTo: .body) private var smallIcon: CGFloat = 18
 
@@ -97,11 +105,9 @@ struct BottomBarView: View {
                     if state == .collapsed || state == .hidden {
                         text = ""
                         state = .search
-                        toolbarDragFraction = 1.0
                     }
                 } else {
                     state = .collapsed
-                    toolbarDragFraction = 0
                 }
             }
         )
@@ -122,23 +128,24 @@ struct BottomBarView: View {
 
     @ViewBuilder
     private var sheetContent: some View {
-        VStack(spacing: 0) {
-            sheetTopRow
+        let showsSuggestions = state == .search && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        ZStack(alignment: .top) {
             sheetBody
-            if state == .search || state == .collapsed || state == .hidden
-                || state == .browserSettings || state == .siteSettings
-            {
-                Spacer(minLength: 0)
-            }
+                .padding(.top, showsSuggestions ? 14 : 80)
+                .mask(
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: showsSuggestions ? 18 : 0)
+                        Rectangle()
+                    }
+                )
+            sheetTopRow
         }
     }
 
-    private var capsuleH: CGFloat {
-        isExpanded ? expandedCapsuleHeight : 44
-    }
+    private var capsuleH: CGFloat { 44 }
 
     private var dragRevealProgress: CGFloat {
-        min(1, toolbarDragFraction * 2.0)
+        min(1, toolbarProgress * 2.0)
     }
 
     private var sheetTopRow: some View {
@@ -153,12 +160,12 @@ struct BottomBarView: View {
                 .zIndex(0)
 
             collapsedContent
-                .opacity(1 - dragRevealProgress)
+                .opacity(isExpanded ? 0 : 1)
                 .allowsHitTesting(!isExpanded)
                 .zIndex(1)
 
             searchBarRow
-                .opacity(dragRevealProgress)
+                .opacity(isExpanded ? 1 : 0)
                 .allowsHitTesting(isExpanded)
                 .zIndex(2)
 
@@ -230,7 +237,7 @@ struct BottomBarView: View {
         }
 
         withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            toolbarDragFraction = 1.0
+            toolbarProgress = 1.0
         }
 
         if state == .search {
@@ -245,7 +252,7 @@ struct BottomBarView: View {
     private func handleSheetCollapse() {
         isFocused = false
         withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            toolbarDragFraction = 0
+            toolbarProgress = 0
         }
     }
 
@@ -256,10 +263,10 @@ struct BottomBarView: View {
     private func handleSheetDragProgress(_ fraction: CGFloat) {
         if fraction == 0 {
             withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
-                toolbarDragFraction = 0
+                toolbarProgress = 0
             }
         } else {
-            toolbarDragFraction = fraction
+            toolbarProgress = fraction
         }
     }
 
@@ -273,6 +280,7 @@ struct BottomBarView: View {
             themeColor: themeColor,
             backdropOpacity: backdropOpacity,
             hideProgressBar: isTabOverlayVisible,
+            instantCollapse: sheetInstantCollapse,
             onDragStart: handleSheetDragStart,
             onExpand: handleSheetExpand,
             onCollapse: handleSheetCollapse,
@@ -289,6 +297,29 @@ struct BottomBarView: View {
         }
         .onChange(of: state) { oldState, newState in
             handleStateChange(oldState, newState)
+            recomputeGhostCompletion()
+        }
+        .onChange(of: text) { _, _ in
+            recomputeGhostCompletion()
+        }
+        .onChange(of: isFocused) { _, _ in
+            recomputeGhostCompletion()
+        }
+        .onChange(of: searchSuggestions) { _, newSuggestions in
+            if let active = activeRowId, active != "_typed",
+                !newSuggestions.contains(where: { $0.id == active })
+            {
+                withTransaction(Transaction(animation: nil)) {
+                    activeRowId = "_typed"
+                }
+            }
+        }
+        .onChange(of: sheetInstantCollapse) { _, instant in
+            if instant {
+                withTransaction(Transaction(animation: nil)) {
+                    toolbarProgress = 0
+                }
+            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
@@ -304,7 +335,11 @@ struct BottomBarView: View {
 
     private func handleTabCountChange(_ oldCount: Int, _ newCount: Int) {
         guard newCount == 0, oldCount > 0 else { return }
-        state = .search
+        if let onTabsEmpty {
+            onTabsEmpty()
+        } else {
+            state = .search
+        }
     }
 
     private func handleStateChange(_ oldState: BottomBarState, _ newState: BottomBarState) {
@@ -331,10 +366,17 @@ struct BottomBarView: View {
             newState == .search || newState == .browserSettings
             || newState == .siteSettings || newState == .knowledge
             || newState == .submittingSearch
-        let targetFraction: CGFloat = isExpandedTarget ? 1.0 : 0.0
-        if toolbarDragFraction != targetFraction {
+        let targetProgress: CGFloat = isExpandedTarget ? 1.0 : 0.0
+        if toolbarProgress != targetProgress {
             withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-                toolbarDragFraction = targetFraction
+                toolbarProgress = targetProgress
+            }
+        }
+
+        let targetUrlOpacity: Double = isExpandedTarget ? 1.0 : 0.0
+        if urlTextOpacity != targetUrlOpacity {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.05)) {
+                urlTextOpacity = targetUrlOpacity
             }
         }
 
@@ -470,33 +512,33 @@ struct BottomBarView: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
                 }
-
-                TextField(
-                    state == .browserSettings ? "Browser Settings" : "Search...",
-                    text: displayBinding
-                )
-                .accessibilityIdentifier("browser.urlField")
-                .font(.system(size: urlFontSize, weight: .bold))
-                .textFieldStyle(.plain)
-                .foregroundStyle(palette.text)
-                .tint(palette.accent)
-                .focused($isFocused)
-                .submitLabel(.go)
-                .onSubmit {
-                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                    if isFocused && state == .search && !ghostCompletion.isEmpty {
-                        text = text + ghostCompletion
+                TextField("Search...", text: displayBinding)
+                    .accessibilityIdentifier("browser.urlField")
+                    .font(.system(size: urlFontSize, weight: .bold))
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(palette.text)
+                    .tint(caretActive ? palette.accent : .clear)
+                    .focused($isFocused)
+                    .submitLabel(.go)
+                    .onSubmit {
+                        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        Haptics.fire(.tap)
+                        onSubmit()
                     }
-                    Haptics.fire(.tap)
-                    onSubmit()
-                }
-                .disabled(state == .siteSettings || state == .browserSettings || state == .knowledge)
-                .truncationMode(
-                    (state == .siteSettings || state == .browserSettings || state == .knowledge)
-                        ? .tail : .head
-                )
+                    .lineLimit(1)
             }
+            .opacity(urlTextOpacity)
             .frame(height: 44)
+            .contentShape(Rectangle())
+            .onAppear { urlTextOpacity = isExpanded ? 1.0 : 0.0 }
+            .onTapGesture {
+                if activeRowId != "_typed" {
+                    withTransaction(Transaction(animation: nil)) {
+                        activeRowId = "_typed"
+                    }
+                }
+                isFocused = true
+            }
 
             HStack(spacing: 0) {
                 ZStack {
@@ -611,117 +653,74 @@ struct BottomBarView: View {
     private var suggestionsList: some View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasInput = !trimmed.isEmpty
-        let lowered = trimmed.lowercased()
-
-        let searchMatches: [SearchQueryEntry] = hasInput
-            ? searchHistoryStore.suggestions(matching: trimmed, limit: 4)
-            : Array(searchHistoryStore.entries.prefix(3))
-
-        let urlMatches: [HistoryEntry] = {
-            let raw: [HistoryEntry]
-            if hasInput {
-                let httpsPrefix = "https://" + lowered
-                let httpPrefix = "http://" + lowered
-                let maxTotal = 8
-                var prefixHits: [HistoryEntry] = []
-                prefixHits.reserveCapacity(maxTotal)
-                for entry in historyStore.entries {
-                    let urlLower = entry.url.lowercased()
-                    let titleLower = entry.title.lowercased()
-                    if urlLower.hasPrefix(lowered) || urlLower.hasPrefix(httpsPrefix)
-                        || urlLower.hasPrefix(httpPrefix)
-                        || titleLower.hasPrefix(lowered) {
-                        prefixHits.append(entry)
-                        if prefixHits.count >= maxTotal { break }
-                    }
-                }
-                let remaining = max(0, maxTotal - prefixHits.count)
-                var substringHits: [HistoryEntry] = []
-                if remaining > 0 {
-                    let prefixIds = Set(prefixHits.map { $0.id })
-                    substringHits.reserveCapacity(remaining)
-                    for entry in historyStore.entries {
-                        if prefixIds.contains(entry.id) { continue }
-                        let urlLower = entry.url.lowercased()
-                        let titleLower = entry.title.lowercased()
-                        if urlLower.contains(lowered) || titleLower.contains(lowered) {
-                            substringHits.append(entry)
-                            if substringHits.count >= remaining { break }
-                        }
-                    }
-                }
-                raw = prefixHits + substringHits
-            } else {
-                raw = historyStore.recentEntries
-            }
-
-            var picked: [HistoryEntry] = []
-            picked.reserveCapacity(4)
-            for entry in raw {
-                guard URL(string: entry.url) != nil else { continue }
-                picked.append(entry)
-                if picked.count >= 4 { break }
-            }
-            return picked
-        }()
-
-        var seenQueryKeys = Set<String>()
-        for q in searchMatches {
-            seenQueryKeys.insert(SearchHistoryStore.normalize(q.query))
-        }
-        for u in urlMatches {
-            seenQueryKeys.insert(SearchHistoryStore.normalize(u.url))
-            if !u.title.isEmpty {
-                seenQueryKeys.insert(SearchHistoryStore.normalize(u.title))
-            }
-        }
-
-        let dedupedSuggestions = searchSuggestions.filter { suggestion in
-            let key = SearchHistoryStore.normalize(suggestion.text)
-            return !seenQueryKeys.contains(key)
-        }
-
-        let maxRows = 4
-        let trimmedSearchMatches = Array(searchMatches.prefix(maxRows))
-        let urlSlots = max(0, maxRows - trimmedSearchMatches.count)
-        let trimmedUrlMatches = Array(urlMatches.prefix(urlSlots))
-        let suggestionSlots = max(0, maxRows - trimmedSearchMatches.count - trimmedUrlMatches.count)
-        let trimmedSuggestions = Array(dedupedSuggestions.prefix(suggestionSlots))
 
         return ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
-                ForEach(trimmedSearchMatches) { entry in
-                    autofillRow(
-                        icon: "clock.arrow.circlepath",
-                        title: entry.query,
-                        query: trimmed,
-                        onTap: { onSuggestionTap(entry.query) }
-                    )
-                }
-
-                ForEach(trimmedUrlMatches) { entry in
-                    autofillURLRow(
-                        url: URL(string: entry.url),
-                        title: entry.title.isEmpty ? entry.url : entry.title,
-                        query: trimmed,
-                        onTap: { onHistoryTap(entry.url) }
-                    )
-                }
-
-                ForEach(trimmedSuggestions, id: \.id) { suggestion in
-                    SearchSuggestionRow(
-                        suggestion: suggestion,
-                        query: trimmed,
-                        onTap: { onSuggestionTap(suggestion.text) }
-                    )
+                if hasInput {
+                    Color.clear
+                        .frame(height: 52)
+                        .id("_typed")
+                    ForEach(searchSuggestions) { suggestion in
+                        SearchSuggestionRow(
+                            suggestion: suggestion,
+                            query: trimmed,
+                            onTap: { onSuggestionTap(suggestion.text) }
+                        )
+                        .frame(height: 52)
+                        .id(suggestion.id)
+                    }
+                } else {
+                    ForEach(Array(searchHistoryStore.entries.prefix(3))) { entry in
+                        autofillRow(
+                            icon: "clock.arrow.circlepath",
+                            title: entry.query,
+                            query: "",
+                            onTap: { onSuggestionTap(entry.query) }
+                        )
+                    }
+                    ForEach(Array(historyStore.recentEntries.prefix(4))) { entry in
+                        autofillURLRow(
+                            url: URL(string: entry.url),
+                            title: entry.title.isEmpty ? entry.url : entry.title,
+                            query: "",
+                            onTap: { onHistoryTap(entry.url) }
+                        )
+                    }
                 }
             }
+            .scrollTargetLayout()
             .frame(minHeight: 10)
             .transaction { $0.animation = nil }
         }
+        .scrollTargetBehavior(RowSnapBehavior(rowHeight: 52))
+        .scrollPosition(id: $activeRowId)
+        .scrollDismissesKeyboard(.never)
+        .onScrollPhaseChange { _, newPhase in
+            caretActive = (newPhase == .idle)
+        }
+        .onChange(of: activeRowId) { oldId, newId in
+            if oldId != nil && oldId != newId {
+                Haptics.fire(.tap)
+            }
+            let isEditing = (newId != nil && newId != "_typed")
+            if editingSuggestion?.wrappedValue != isEditing {
+                editingSuggestion?.wrappedValue = isEditing
+            }
+            if let newId, newId != "_typed",
+                let suggestion = searchSuggestions.first(where: { $0.id == newId })
+            {
+                withTransaction(Transaction(animation: nil)) {
+                    text = suggestion.text
+                }
+            }
+        }
         .padding(.top, state == .search ? 0 : 12)
         .scrollContentBackground(.hidden)
-        .contentMargins(.bottom, isFocused ? keyboardHeight : 0, for: .scrollContent)
+        .contentMargins(
+            .bottom,
+            (isFocused ? keyboardHeight : 0) + (hasInput ? 500 : 0),
+            for: .scrollContent
+        )
     }
 
     @ViewBuilder
@@ -780,30 +779,41 @@ struct BottomBarView: View {
         .buttonStyle(.plain)
     }
 
-    private var ghostCompletion: String {
-        guard state == .search, isFocused else { return "" }
+    private func recomputeGhostCompletion() {
+        guard state == .search, isFocused else {
+            if !ghostCompletion.isEmpty { ghostCompletion = "" }
+            return
+        }
         let typed = text
         let typedCount = typed.count
-        guard typedCount >= 1 else { return "" }
+        guard typedCount >= 1 else {
+            if !ghostCompletion.isEmpty { ghostCompletion = "" }
+            return
+        }
 
+        var result = ""
         for entry in searchHistoryStore.entries {
             if entry.query.count > typedCount, entry.query.hasPrefix(typed) {
-                return String(entry.query.dropFirst(typedCount))
+                result = String(entry.query.dropFirst(typedCount))
+                break
+            }
+        }
+        if result.isEmpty {
+            for entry in historyStore.entries {
+                let urlStr = entry.url
+                if urlStr.count > typedCount, urlStr.hasPrefix(typed) {
+                    result = String(urlStr.dropFirst(typedCount))
+                    break
+                }
+                let stripped = stripURLChrome(urlStr, lower: urlStr.lowercased())
+                if stripped.display.count > typedCount, stripped.display.hasPrefix(typed) {
+                    result = String(stripped.display.dropFirst(typedCount))
+                    break
+                }
             }
         }
 
-        for entry in historyStore.entries {
-            let urlStr = entry.url
-            if urlStr.count > typedCount, urlStr.hasPrefix(typed) {
-                return String(urlStr.dropFirst(typedCount))
-            }
-            let stripped = stripURLChrome(urlStr, lower: urlStr.lowercased())
-            if stripped.display.count > typedCount, stripped.display.hasPrefix(typed) {
-                return String(stripped.display.dropFirst(typedCount))
-            }
-        }
-
-        return ""
+        if ghostCompletion != result { ghostCompletion = result }
     }
 
     private func stripURLChrome(_ url: String, lower: String) -> (display: String, lower: String) {
@@ -828,7 +838,7 @@ struct BottomBarView: View {
         var searchRange = text.startIndex..<text.endIndex
         while let range = text.range(of: query, options: .caseInsensitive, range: searchRange) {
             if let attrRange = Range(range, in: result) {
-                result[attrRange].font = .system(size: urlFontSize, weight: .heavy)
+                result[attrRange].foregroundColor = palette.accent
             }
             searchRange = range.upperBound..<text.endIndex
         }
@@ -838,12 +848,12 @@ struct BottomBarView: View {
     @State private var keyboardHeight: CGFloat = 0
 
     private var frostedBackground: some View {
-        ZStack {
-            Rectangle()
-                .fill(.regularMaterial)
-                .environment(\.colorScheme, palette.isIncognito ? .dark : colorScheme)
-            palette.uiElement.opacity(palette.isIncognito ? 0.45 : 0.65)
-        }
+        FrostedPillBackground(
+            isIncognito: palette.isIncognito,
+            colorScheme: colorScheme,
+            tint: palette.uiElement,
+            tintOpacity: palette.isIncognito ? 0.45 : 0.65
+        )
     }
 
     private func triggerSpin() {
@@ -969,9 +979,9 @@ struct BottomBarView: View {
                 }
             },
             set: { newValue in
-                if state == .search {
-                    text = newValue
-                }
+                guard state == .search else { return }
+                text = newValue
+                onUserTyped?(newValue)
             }
         )
     }
@@ -999,6 +1009,8 @@ private struct SearchSuggestionRow: View {
     @ScaledMetric(relativeTo: .body) private var rowFontSize: CGFloat = 20
     @ScaledMetric(relativeTo: .body) private var rowIconSize: CGFloat = 20
 
+    @State private var cachedAttr: AttributedString = AttributedString("")
+
     private var fontSize: CGFloat { min(rowFontSize, 24) }
     private var iconSize: CGFloat { min(rowIconSize, 24) }
 
@@ -1010,7 +1022,7 @@ private struct SearchSuggestionRow: View {
                     .foregroundStyle(palette.text.opacity(0.6))
                     .frame(width: max(22, iconSize + 4))
 
-                Text(attributedText)
+                Text(cachedAttr)
                     .font(.system(size: fontSize, weight: .bold))
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
@@ -1023,20 +1035,23 @@ private struct SearchSuggestionRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onAppear { recomputeAttr() }
+        .onChange(of: query) { _, _ in recomputeAttr() }
+        .onChange(of: suggestion.text) { _, _ in recomputeAttr() }
     }
 
-    private var attributedText: AttributedString {
+    private func recomputeAttr() {
         var result = AttributedString(suggestion.text)
         if !query.isEmpty {
             var searchRange = suggestion.text.startIndex..<suggestion.text.endIndex
             while let range = suggestion.text.range(of: query, options: .caseInsensitive, range: searchRange) {
                 if let attrRange = Range(range, in: result) {
-                    result[attrRange].font = .system(size: fontSize, weight: .heavy)
+                    result[attrRange].foregroundColor = palette.accent
                 }
                 searchRange = range.upperBound..<suggestion.text.endIndex
             }
         }
-        return result
+        cachedAttr = result
     }
 }
 
@@ -1081,5 +1096,34 @@ private struct ClosedEyes: View {
             .stroke(style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
             .frame(width: 24, height: 16)
             .contentShape(Rectangle())
+    }
+}
+
+private struct FrostedPillBackground: View, Equatable {
+    let isIncognito: Bool
+    let colorScheme: ColorScheme
+    let tint: Color
+    let tintOpacity: Double
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.regularMaterial)
+                .environment(\.colorScheme, isIncognito ? .dark : colorScheme)
+            tint.opacity(tintOpacity)
+        }
+    }
+}
+
+private struct RowSnapBehavior: ScrollTargetBehavior {
+    let rowHeight: CGFloat
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        let projectedY = target.rect.minY
+        let snappedY = (projectedY / rowHeight).rounded() * rowHeight
+
+        let maxY = max(0, context.contentSize.height - context.containerSize.height)
+        let maxSnap = (maxY / rowHeight).rounded(.down) * rowHeight
+        target.rect.origin.y = max(0, min(snappedY, maxSnap))
     }
 }

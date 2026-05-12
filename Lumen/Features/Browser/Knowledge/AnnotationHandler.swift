@@ -40,9 +40,8 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
             }
 
             Task { [weak webView] in
-                if let wv = webView {
-                    await KnowledgeCaptureService.shared.captureForHighlight(url: url, webView: wv)
-                }
+                guard let wv = webView, wv.window != nil else { return }
+                await KnowledgeCaptureService.shared.captureForHighlight(url: url, webView: wv)
             }
 
         case "request-delete":

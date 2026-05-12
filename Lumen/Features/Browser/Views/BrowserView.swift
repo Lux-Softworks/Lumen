@@ -14,7 +14,12 @@ struct BrowserView: View {
     @State private var urlText: String = ""
 
     @State private var bottomBarOpacity: CGFloat = 1
+    @State private var bottomBarSubmitOffset: CGFloat = 0
+    @State private var sheetInstantCollapse: Bool = false
+    @State private var editingSuggestion: Bool = false
     @State private var incognitoActive: Bool = false
+    @State private var sessionSuggestions: [SearchSuggestion] = []
+    @State private var suggestionFetchTask: Task<Void, Never>? = nil
 
     @State private var webViewReady = true
     @State private var coverFinished = false
@@ -37,6 +42,10 @@ struct BrowserView: View {
     private func syncIncognitoToActiveTab() {
         let next = activeTab?.isIncognito ?? false
         guard next != incognitoActive else { return }
+
+        if tabManager.tabs.isEmpty {
+            return
+        }
 
         Haptics.fire(.rigid)
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
@@ -83,6 +92,26 @@ struct BrowserView: View {
     private func updateState(_ action: @escaping () -> Void) {
         DispatchQueue.main.async {
             action()
+        }
+    }
+
+    private func fetchSessionSuggestions(for query: String) {
+        suggestionFetchTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty || trimmed.hasPrefix("http") {
+            sessionSuggestions = []
+            return
+        }
+        suggestionFetchTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            do {
+                let web = try await SearchSuggestionService.shared.fetchSuggestions(for: trimmed)
+                guard !Task.isCancelled else { return }
+                sessionSuggestions = web
+            } catch {
+                sessionSuggestions = []
+            }
         }
     }
 
@@ -140,6 +169,19 @@ struct BrowserView: View {
                 urlText = ""
                 activeTab?.viewModel.urlString = ""
             }
+            .onChange(of: urlText) { _, newValue in
+                if newValue.isEmpty {
+                    sessionSuggestions = []
+                }
+            }
+            .onChange(of: bottomBarState) { oldState, newState in
+                let isExpanded =
+                    newState == .search || newState == .browserSettings
+                    || newState == .siteSettings || newState == .knowledge
+                if isExpanded && sheetInstantCollapse {
+                    sheetInstantCollapse = false
+                }
+            }
             .onOpenURL { url in
                 tabManager.openExternalURL(url)
             }
@@ -193,6 +235,7 @@ struct BrowserView: View {
     @ViewBuilder
     private func tabOverlayLayer() -> some View {
         let opacity: Double = {
+            if tabManager.tabs.isEmpty { return 0 }
             switch activeTabViewState {
             case .shrinking:
                 return 1
@@ -223,6 +266,7 @@ struct BrowserView: View {
     @ViewBuilder
     private func activeTabLayer(geometry: GeometryProxy) -> some View {
         let isFullScreen = activeTabViewState == .fullScreen
+        let tabsEmpty = tabManager.tabs.isEmpty
 
         ZStack {
             if let tab = activeTab {
@@ -233,16 +277,16 @@ struct BrowserView: View {
                 liveWebView(tab: tab, geometry: geometry)
                     .opacity(showLive ? 1 : 0)
                     .dynamicTypeSize(.large)
-            } else if tabManager.tabs.isEmpty && bottomBarState == .submittingSearch {
+            } else if tabsEmpty && bottomBarState == .submittingSearch {
                 Color.black
                     .ignoresSafeArea()
-            } else if tabManager.tabs.isEmpty {
+            } else if tabsEmpty {
                 HomeHeroView()
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
         }
-        .opacity(isFullScreen ? 1 : 0)
+        .opacity(isFullScreen || tabsEmpty ? 1 : 0)
     }
 
     @ViewBuilder
@@ -273,6 +317,7 @@ struct BrowserView: View {
         bottomBar()
             .frame(maxHeight: .infinity, alignment: .bottom)
             .opacity(bottomBarState == .submittingSearch ? 0 : bottomBarOpacity)
+            .offset(y: bottomBarSubmitOffset)
             .allowsHitTesting(activeTabViewState != .expanding)
     }
 
@@ -516,6 +561,10 @@ struct BrowserView: View {
             Color.clear
             ZStack {
                 Rectangle().fill(.regularMaterial)
+                    .environment(\.colorScheme, incognitoActive ? .dark : .light)
+                if incognitoActive {
+                    palette.background.opacity(0.6)
+                }
                 Color.black.opacity(overlayOpacity)
             }
             .frame(maxWidth: .infinity)
@@ -559,7 +608,7 @@ struct BrowserView: View {
             isFocused: $isAddressBarFocused,
             isLoading: vm?.isLoading ?? false,
             progress: vm?.estimatedProgress ?? 0,
-            searchSuggestions: vm?.searchSuggestions ?? [],
+            searchSuggestions: sessionSuggestions,
             themeColor: vm?.themeColor,
             currentURL: vm?.currentURL,
             tabCount: tabManager.tabs.count,
@@ -578,7 +627,7 @@ struct BrowserView: View {
             canGoBack: vm?.canGoBack ?? false,
             canGoForward: vm?.canGoForward ?? false,
             onSuggestionTap: { suggestion in
-                handleSubmit(queryOverride: suggestion)
+                handleSubmit(queryOverride: suggestion, recordHistory: false)
             },
             trackerCount: vm?.blockedTrackersCount ?? 0,
             initialZoom: vm?.currentZoomPercent ?? 100,
@@ -612,7 +661,19 @@ struct BrowserView: View {
             isIncognitoActive: incognitoActive,
             backdropOpacity: bottomBarState == .search
                 ? 1
-                : max(0, min(1, 1 - shrinkProgress))
+                : max(0, min(1, 1 - shrinkProgress)),
+            sheetInstantCollapse: sheetInstantCollapse,
+            onTabsEmpty: {
+                DispatchQueue.main.async {
+                    withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+                        bottomBarState = .search
+                    }
+                }
+            },
+            editingSuggestion: $editingSuggestion,
+            onUserTyped: { typed in
+                fetchSessionSuggestions(for: typed)
+            }
         )
     }
 
@@ -728,7 +789,7 @@ struct BrowserView: View {
         }
     }
 
-    private func handleSubmit(queryOverride: String? = nil) {
+    private func handleSubmit(queryOverride: String? = nil, recordHistory: Bool = true) {
         let query = queryOverride ?? urlBinding.wrappedValue
         let tabsEmpty = tabManager.tabs.isEmpty
         let currentURLString = activeTab?.viewModel.currentURL?.absoluteString
@@ -738,7 +799,9 @@ struct BrowserView: View {
         isAddressBarFocused = false
         urlText = query
 
-        recordSearchQueryIfNeeded(query)
+        if recordHistory {
+            recordSearchQueryIfNeeded(query)
+        }
 
         beginNavigation()
 
@@ -769,22 +832,27 @@ struct BrowserView: View {
             shrinkProgress = 0
             let tabToLoad = activeTab
 
-            await tabToLoad?.viewModel.processUserInput(query)
-
             withTransaction(Transaction(animation: nil)) {
+                self.sheetInstantCollapse = true
                 self.bottomBarState = .collapsed
+                self.bottomBarSubmitOffset = 80
+            }
+
+            withAnimation(self.reduceMotion ? nil : .spring(duration: 0.45, bounce: 0)) {
+                self.bottomBarOpacity = 1
+                self.bottomBarSubmitOffset = 0
             }
 
             if tabsEmpty {
                 coverFinished = true
             }
 
-            try? await Task.sleep(for: .seconds(0.25))
-            updateState {
-                withAnimation(self.reduceMotion ? nil : .linear(duration: 0.15)) {
-                    self.bottomBarOpacity = 1
-                }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.5))
+                self.sheetInstantCollapse = false
             }
+
+            await tabToLoad?.viewModel.processUserInput(query)
         }
     }
 
@@ -852,7 +920,7 @@ struct BrowserView: View {
 
     private func fadeInWebView() {
         updateState {
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+            withTransaction(Transaction(animation: nil)) {
                 webViewReady = true
             }
         }
@@ -882,7 +950,7 @@ private struct NavigationCoverChangeHandlers: ViewModifier {
             }
             .onChange(of: webViewReady) { _, ready in
                 if ready && showNavigationCover && navigationCoverOpacity > 0.9 {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+                    withTransaction(Transaction(animation: nil)) {
                         navigationCoverOpacity = 0
                     }
                 }
@@ -954,9 +1022,6 @@ private struct TabManagerHandlers: ViewModifier {
             .onChange(of: tabManager.tabs.isEmpty) { _, isEmpty in
                 if isEmpty {
                     DispatchQueue.main.async {
-                        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-                            bottomBarState = .search
-                        }
                         activeTabViewState = .fullScreen
                         shrinkProgress = 0
                         webViewReady = true

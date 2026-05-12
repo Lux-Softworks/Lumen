@@ -68,8 +68,11 @@ final class HistoryStore: ObservableObject {
 
         let normalizedURL = Self.normalizeURL(url)
         let stableID = Self.stableID(for: normalizedURL)
+        let displayKey = Self.displayDedupKey(url: url, title: title)
 
-        entries.removeAll { $0.id == stableID }
+        entries.removeAll {
+            $0.id == stableID || Self.displayDedupKey(url: $0.url, title: $0.title) == displayKey
+        }
 
         let entry = HistoryEntry(url: url, title: title)
         entries.insert(entry, at: 0)
@@ -87,6 +90,14 @@ final class HistoryStore: ObservableObject {
 
     nonisolated static func normalizeURL(_ url: String) -> String {
         URLNormalizer.displayKey(url)
+    }
+
+    nonisolated static func displayDedupKey(url: String, title: String) -> String {
+        let host = URLNormalizer.extractDomain(url).lowercased()
+        let normalizedTitle = title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return host + "|" + normalizedTitle
     }
     
     nonisolated static func stableID(for normalizedURL: String) -> String {
@@ -124,16 +135,18 @@ final class HistoryStore: ObservableObject {
             return
         }
 
-        var seen = Set<String>()
+        var seenIDs = Set<String>()
+        var seenDisplay = Set<String>()
         var deduped = [HistoryEntry]()
         for entry in decoded {
             let normalizedURL = Self.normalizeURL(entry.url)
             let stableID = Self.stableID(for: normalizedURL)
+            let displayKey = Self.displayDedupKey(url: entry.url, title: entry.title)
 
-            if !seen.contains(stableID) {
-                seen.insert(stableID)
-                deduped.append(entry)
-            }
+            guard !seenIDs.contains(stableID), !seenDisplay.contains(displayKey) else { continue }
+            seenIDs.insert(stableID)
+            seenDisplay.insert(displayKey)
+            deduped.append(entry)
         }
 
         entries = deduped
