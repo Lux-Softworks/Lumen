@@ -214,7 +214,7 @@ struct WebsitePageButton: View {
                         Spacer(minLength: 4)
 
                         Text(website.domain)
-                            .font(.system(size: domainLabelSize, weight: .medium))
+                            .microText()
                             .foregroundStyle(palette.text.opacity(0.45))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -223,7 +223,7 @@ struct WebsitePageButton: View {
                     Spacer(minLength: 0)
 
                     Text(statsLine)
-                        .font(.system(size: statsLabelSize, weight: .semibold))
+                        .microText()
                         .foregroundStyle(palette.text.opacity(0.35))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -234,7 +234,7 @@ struct WebsitePageButton: View {
             .aspectRatio(3/4, contentMode: .fit)
 
             Text(website.displayName)
-                .font(.footnote.weight(.bold))
+                .displayHeading()
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
         }
@@ -420,7 +420,7 @@ struct KnowledgeFolderView: View {
                                         FolderItemButton(topic: topic)
 
                                         Text(topic.name)
-                                            .font(.footnote.weight(.bold))
+                                            .displayHeading()
                                             .foregroundStyle(palette.text)
                                             .lineLimit(1)
                                     }
@@ -633,10 +633,8 @@ private struct PageDetailView: View {
     private var highlightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Highlights")
-                .font(.caption2.weight(.semibold))
+                .displayLabel()
                 .foregroundStyle(palette.text.opacity(0.35))
-                .textCase(.uppercase)
-                .kerning(0.4)
                 .padding(.horizontal, 16)
 
             VStack(spacing: 6) {

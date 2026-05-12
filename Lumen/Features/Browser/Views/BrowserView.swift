@@ -115,9 +115,24 @@ struct BrowserView: View {
         }
     }
 
+    private var currentPageThemeColor: Color? {
+        guard !incognitoActive else { return nil }
+        return activeTab?.viewModel.themeColor.map { Color(uiColor: $0) }
+    }
+
     var body: some View {
-        content
-            .environment(\.palette, incognitoActive ? .incognito : .standard)
+        let activePalette: ActivePalette = incognitoActive ? .incognito : .standard
+        let pageColor = currentPageThemeColor
+        let ambient = AmbientPalette.make(themeColor: pageColor, palette: activePalette)
+
+        return content
+            .environment(\.palette, activePalette)
+            .environment(\.pageThemeColor, pageColor)
+            .environment(\.ambientPalette, ambient)
+            .animation(
+                reduceMotion ? nil : PremiumTokens.themeColorTween,
+                value: pageColor
+            )
             .ignoresSafeArea()
             .applyNavigationCoverChangeHandlers(
                 showNavigationCover: $showNavigationCover,

@@ -492,12 +492,12 @@ struct BottomBarView: View {
                 if isFocused && state == .search && !ghostCompletion.isEmpty {
                     HStack(spacing: 0) {
                         Text(text)
-                            .font(.system(size: urlFontSize, weight: .bold))
+                            .displayURL()
                             .foregroundStyle(.clear)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                         Text(ghostCompletion)
-                            .font(.system(size: urlFontSize, weight: .bold))
+                            .displayURL()
                             .foregroundStyle(palette.text)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -514,7 +514,7 @@ struct BottomBarView: View {
                 }
                 TextField("Search...", text: displayBinding)
                     .accessibilityIdentifier("browser.urlField")
-                    .font(.system(size: urlFontSize, weight: .bold))
+                    .font(.displayURL)
                     .textFieldStyle(.plain)
                     .foregroundStyle(palette.text)
                     .tint(caretActive ? palette.accent : .clear)

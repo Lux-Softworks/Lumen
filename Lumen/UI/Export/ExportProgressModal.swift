@@ -24,10 +24,10 @@ struct ExportProgressModal: View {
                 progressRing
                 VStack(spacing: 4) {
                     Text("Exported \(current) / \(total)")
-                        .font(.subheadline.weight(.medium))
+                        .displayHeading()
                         .foregroundStyle(palette.text)
                     Text(phase)
-                        .font(.footnote)
+                        .microText()
                         .foregroundStyle(palette.text.opacity(0.55))
                 }
                 Button(action: onCancel) {

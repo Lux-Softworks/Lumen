@@ -71,7 +71,7 @@ struct KnowledgeWebsiteView: View {
                     .cornerRadius(20)
             }
             Text(viewModel.website.displayName)
-                .font(.body.weight(.bold))
+                .displayTitle()
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -116,10 +116,8 @@ struct KnowledgeWebsiteView: View {
     private func sessionSection(_ session: ReadingSession) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(session.headerLabel)
-                .font(.caption2.weight(.semibold))
+                .displayLabel()
                 .foregroundStyle(palette.text.opacity(0.25))
-                .textCase(.uppercase)
-                .kerning(0.4)
                 .padding(.horizontal, 16)
 
             VStack(spacing: 6) {
@@ -140,14 +138,14 @@ struct KnowledgeWebsiteView: View {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(page.title ?? page.domain)
-                        .font(.subheadline.weight(.medium))
+                        .displayHeading()
                         .foregroundStyle(palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     if let summary = page.summary, !summary.isEmpty {
                         Text(summary)
-                            .font(.caption.weight(.regular))
+                            .microText()
                             .foregroundStyle(palette.text.opacity(0.35))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -158,7 +156,7 @@ struct KnowledgeWebsiteView: View {
 
                 if let readingTime = page.readingTime, readingTime > 0 {
                     Text("\(readingTime)m")
-                        .font(.caption2.weight(.medium))
+                        .microText()
                         .foregroundStyle(palette.text.opacity(0.2))
                 }
 

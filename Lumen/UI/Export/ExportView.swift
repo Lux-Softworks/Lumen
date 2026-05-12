@@ -112,7 +112,7 @@ struct ExportView: View {
                 Spacer()
             }
             Text("Export")
-                .font(.title3.weight(.bold))
+                .displayTitle()
                 .foregroundStyle(palette.text)
         }
         .padding(.horizontal, 16)
