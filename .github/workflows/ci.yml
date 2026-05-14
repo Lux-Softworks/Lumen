@@ -5,24 +5,39 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: SwiftLint
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SwiftLint version
+        run: swiftlint version
+
+      - name: Run SwiftLint
+        run: swiftlint --strict --reporter github-actions-logging
+
   build-test:
-    name: Build & Test
+    name: Build & Test (Debug)
     runs-on: macos-15
     timeout-minutes: 45
+    needs: lint
 
     env:
       SCHEME: Lumen
-      DESTINATION: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+      DESTINATION: platform=iOS Simulator,name=iPhone 16 Pro,OS=latest
+      DERIVED_DATA: build/DerivedData
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
@@ -30,13 +45,38 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
+      - name: Verify scheme
+        run: xcodebuild -project Lumen.xcodeproj -list
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ${{ env.DERIVED_DATA }}/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.DERIVED_DATA }}/Build/Intermediates.noindex
+            ${{ env.DERIVED_DATA }}/ModuleCache.noindex
+          key: ${{ runner.os }}-xcdd-${{ hashFiles('Lumen.xcodeproj/project.pbxproj') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-xcdd-${{ hashFiles('Lumen.xcodeproj/project.pbxproj') }}-
+            ${{ runner.os }}-xcdd-
+
       - name: Resolve Swift packages
         run: |
           xcodebuild -resolvePackageDependencies \
             -project Lumen.xcodeproj \
-            -scheme "$SCHEME"
+            -scheme "$SCHEME" \
+            -derivedDataPath "$DERIVED_DATA"
 
-      - name: Build
+      - name: Build for testing
         run: |
           set -o pipefail
           xcodebuild \
@@ -44,10 +84,12 @@ jobs:
             -scheme "$SCHEME" \
             -destination "$DESTINATION" \
             -configuration Debug \
+            -derivedDataPath "$DERIVED_DATA" \
+            -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
-            build | xcpretty
+            build-for-testing | xcbeautify --renderer github-actions
 
-      - name: Test
+      - name: Run tests
         run: |
           set -o pipefail
           xcodebuild \
@@ -55,15 +97,67 @@ jobs:
             -scheme "$SCHEME" \
             -destination "$DESTINATION" \
             -configuration Debug \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath build/TestResults.xcresult \
+            -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
-            test | xcpretty
+            test-without-building | xcbeautify --renderer github-actions
 
-  lint:
-    name: SwiftLint
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults-${{ github.run_id }}
+          path: build/TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 14
+
+  build-release:
+    name: Build (Release config)
     runs-on: macos-15
+    timeout-minutes: 30
+    needs: lint
+
+    env:
+      SCHEME: Lumen
+      DESTINATION: generic/platform=iOS Simulator
+      DERIVED_DATA: build/DerivedDataRelease
+
     steps:
       - uses: actions/checkout@v4
-      - name: Install SwiftLint
-        run: brew install swiftlint
-      - name: Run SwiftLint
-        run: swiftlint --strict --reporter github-actions-logging
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ${{ env.DERIVED_DATA }}/SourcePackages
+          key: ${{ runner.os }}-spm-release-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-release-
+            ${{ runner.os }}-spm-
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Lumen.xcodeproj \
+            -scheme "$SCHEME" \
+            -derivedDataPath "$DERIVED_DATA"
+
+      - name: Build Release (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Lumen.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -configuration Release \
+            -derivedDataPath "$DERIVED_DATA" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build | xcbeautify --renderer github-actions

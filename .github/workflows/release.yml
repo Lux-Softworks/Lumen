@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.3.2)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CURRENT='${{ github.event.inputs.tag }}'
+          else
+            CURRENT='${{ github.ref_name }}'
+          fi
+          if ! git rev-parse "$CURRENT" >/dev/null 2>&1; then
+            echo "::error::Tag $CURRENT does not exist"
+            exit 1
+          fi
+          PREV=$(git tag --sort=-v:refname \
+                 | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                 | grep -vx "$CURRENT" \
+                 | head -n 1 || true)
+          {
+            echo "current=$CURRENT"
+            echo "previous=$PREV"
+          } >> "$GITHUB_OUTPUT"
+          echo "Current: $CURRENT"
+          echo "Previous: $PREV"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          CURRENT='${{ steps.tag.outputs.current }}'
+          PREV='${{ steps.tag.outputs.previous }}'
+          {
+            echo "## Lumen $CURRENT"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "### Changes since $PREV"
+              echo
+              git log --no-merges --pretty='format:- %s' "$PREV..$CURRENT"
+              echo
+              echo
+              echo "**Full diff:** https://github.com/${{ github.repository }}/compare/${PREV}...${CURRENT}"
+            else
+              echo "### Initial release"
+              echo
+              git log --no-merges --pretty='format:- %s' "$CURRENT"
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.current }}
+          name: Lumen ${{ steps.tag.outputs.current }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
