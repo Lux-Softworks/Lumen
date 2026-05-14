@@ -110,7 +110,6 @@ struct ResizableSheetContainer<Content: View>: View {
                                     RoundedCorner(radius: cornerR, corners: [.topLeft, .topRight])
                                         .stroke(palette.text.opacity(0.15), lineWidth: 0.5)
                                 )
-                                .shadow(color: Color.black.opacity(0.18), radius: 6, y: -1)
                                 .opacity(backdropOpacity)
 
                             ProgressView(
@@ -197,9 +196,14 @@ struct ResizableSheetContainer<Content: View>: View {
                                 }
                             }
                     )
-                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: isExpanded)
-                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: expandedHeightRatio)
-                    .animation(instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet, value: isCollapsed)
+                    .animation(
+                        instantCollapse || reduceMotion ? nil : AppTheme.Motion.sheet,
+                        value: SheetAnimationKey(
+                            isExpanded: isExpanded,
+                            expandedHeightRatio: expandedHeightRatio,
+                            isCollapsed: isCollapsed
+                        )
+                    )
                     .zIndex(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -250,4 +254,10 @@ struct ResizableSheetContainer<Content: View>: View {
 
         return expandedRadius * fraction
     }
+}
+
+private struct SheetAnimationKey: Equatable {
+    let isExpanded: Bool
+    let expandedHeightRatio: CGFloat
+    let isCollapsed: Bool
 }

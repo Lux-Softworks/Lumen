@@ -1,4 +1,3 @@
-// Lumen/UI/Theme/Premium/ThemeColorAmbience.swift
 import SwiftUI
 import UIKit
 

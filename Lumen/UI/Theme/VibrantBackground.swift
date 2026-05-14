@@ -4,16 +4,37 @@ struct VibrantBackground: View {
     let size: CGSize
     let isIncognito: Bool
 
+    @Environment(\.ambientPalette) private var ambientPalette
+    @Environment(\.pageThemeColor) private var pageThemeColor
+
     var body: some View {
         ZStack {
             base
             blobs
             sheen
             material
+            ambientWash
         }
         .frame(width: size.width, height: size.height)
         .clipped()
         .ignoresSafeArea()
+        .drawingGroup(opaque: false, colorMode: .extendedLinear)
+    }
+
+    @ViewBuilder
+    private var ambientWash: some View {
+        if !isIncognito, pageThemeColor != nil {
+            LinearGradient(
+                colors: [
+                    ambientPalette.tint.opacity(0.10),
+                    ambientPalette.tint.opacity(0.04),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .compositingGroup()
+            .allowsHitTesting(false)
+        }
     }
 
     private var base: some View {
@@ -46,10 +67,29 @@ struct VibrantBackground: View {
             blobLayer(palette: Self.incognitoBlobs)
                 .opacity(isIncognito ? 1 : 0)
 
-            blobLayer(palette: Self.lightBlobs)
+            blobLayer(palette: lightBlobs)
                 .opacity(isIncognito ? 0 : 1)
         }
         .frame(width: size.width, height: size.height)
+    }
+
+    private var lightBlobs: [BlobSpec] {
+        let heroColor = pageThemeColor == nil ? AppTheme.Colors.accent : ambientPalette.glow
+        let secondaryColor = pageThemeColor == nil ? AppTheme.Colors.secondaryAccent : ambientPalette.tint
+        return [
+            BlobSpec(color: heroColor, opacity: 0.55, scale: 1.25,
+                     blur: 110, x: -0.25, y: -0.22, blend: .plusLighter),
+            BlobSpec(color: secondaryColor, opacity: 0.42, scale: 1.15,
+                     blur: 100, x: 0.32, y: 0.30, blend: .plusLighter),
+            BlobSpec(color: Color(red: 1.0, green: 0.45, blue: 0.55), opacity: 0.30, scale: 0.85,
+                     blur: 90, x: 0.30, y: -0.05, blend: .plusLighter),
+            BlobSpec(color: Color(red: 0.85, green: 0.30, blue: 0.85), opacity: 0.22, scale: 0.75,
+                     blur: 95, x: -0.18, y: 0.12, blend: .plusLighter),
+            BlobSpec(color: Color(red: 0.20, green: 0.78, blue: 1.00), opacity: 0.18, scale: 0.70,
+                     blur: 85, x: 0.18, y: -0.32, blend: .plusLighter),
+            BlobSpec(color: Color(red: 0.55, green: 0.40, blue: 1.00), opacity: 0.20, scale: 0.85,
+                     blur: 95, x: -0.30, y: 0.32, blend: .plusLighter),
+        ]
     }
 
     private func blobLayer(palette: [BlobSpec]) -> some View {
@@ -65,7 +105,6 @@ struct VibrantBackground: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .drawingGroup(opaque: false, colorMode: .extendedLinear)
         .compositingGroup()
     }
 
@@ -93,10 +132,6 @@ struct VibrantBackground: View {
             .opacity(isIncognito ? 0.55 : 0.62)
     }
 
-    private var palette: [BlobSpec] {
-        isIncognito ? Self.incognitoBlobs : Self.lightBlobs
-    }
-
     private struct BlobSpec {
         let color: Color
         let opacity: Double
@@ -106,21 +141,6 @@ struct VibrantBackground: View {
         let y: Double
         let blend: BlendMode
     }
-
-    private static let lightBlobs: [BlobSpec] = [
-        BlobSpec(color: AppTheme.Colors.accent, opacity: 0.55, scale: 1.25,
-                 blur: 110, x: -0.25, y: -0.22, blend: .plusLighter),
-        BlobSpec(color: AppTheme.Colors.secondaryAccent, opacity: 0.42, scale: 1.15,
-                 blur: 100, x: 0.32, y: 0.30, blend: .plusLighter),
-        BlobSpec(color: Color(red: 1.0, green: 0.45, blue: 0.55), opacity: 0.30, scale: 0.85,
-                 blur: 90, x: 0.30, y: -0.05, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.85, green: 0.30, blue: 0.85), opacity: 0.22, scale: 0.75,
-                 blur: 95, x: -0.18, y: 0.12, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.20, green: 0.78, blue: 1.00), opacity: 0.18, scale: 0.70,
-                 blur: 85, x: 0.18, y: -0.32, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.55, green: 0.40, blue: 1.00), opacity: 0.20, scale: 0.85,
-                 blur: 95, x: -0.30, y: 0.32, blend: .plusLighter),
-    ]
 
     private static let incognitoBlobs: [BlobSpec] = [
         BlobSpec(color: IncognitoPalette.accent, opacity: 0.12, scale: 1.30,

@@ -8,8 +8,17 @@ final class TabManager: ObservableObject {
         didSet { rebuildIndex() }
     }
     @Published private(set) var activeTabId: UUID
+    @Published private(set) var recentlyClosed: [ClosedTab] = []
 
     private var indexById: [UUID: Int] = [:]
+    private let maxRecentlyClosed = 5
+
+    struct ClosedTab: Identifiable {
+        let id = UUID()
+        let url: URL
+        let title: String
+        let themeColor: UIColor?
+    }
 
     var activeTab: Tab? {
         if let i = indexById[activeTabId], i < tabs.count {
@@ -120,6 +129,15 @@ final class TabManager: ObservableObject {
     func closeTab(id: UUID) {
         guard let index = indexById[id] else { return }
 
+        let tab = tabs[index]
+        if !tab.isIncognito, let url = tab.viewModel.currentURL ?? tab.url {
+            let closed = ClosedTab(url: url, title: tab.title, themeColor: tab.themeColor)
+            recentlyClosed.append(closed)
+            if recentlyClosed.count > maxRecentlyClosed {
+                recentlyClosed.removeFirst()
+            }
+        }
+
         if activeTabId == id && tabs.count > 1 {
             let newIndex = (index > 0) ? index - 1 : (index + 1 < tabs.count ? index + 1 : 0)
             if newIndex < tabs.count {
@@ -138,6 +156,18 @@ final class TabManager: ObservableObject {
             }
             observeActiveViewModel()
         }
+    }
+
+    @discardableResult
+    func reopenLastClosed() -> Bool {
+        guard let last = recentlyClosed.popLast() else { return false }
+        let tab = Tab(url: last.url, isIncognito: false)
+        wirePopupHandler(for: tab)
+        tabs.append(tab)
+        activeTabId = tab.id
+        observeActiveViewModel()
+        tab.viewModel.loadURL(last.url)
+        return true
     }
 
     func updateSnapshot(_ snapshot: UIImage, for id: UUID) {

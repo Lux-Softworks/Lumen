@@ -15,6 +15,7 @@ struct BottomBarView: View {
     var tabCount: Int = 1
     var isTabOverlayVisible: Bool = false
     var onTabsPressed: () -> Void
+    var onTabsLongPress: (() -> Void)? = nil
     var onSettingsPressed: () -> Void
     var onSubmit: () -> Void
     var onHistoryTap: (String) -> Void
@@ -50,6 +51,8 @@ struct BottomBarView: View {
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var ambientTint: Color? = nil
 
     @Namespace private var animation
     @State private var isSpinning = false
@@ -150,14 +153,16 @@ struct BottomBarView: View {
 
     private var sheetTopRow: some View {
         ZStack(alignment: .top) {
-            frostedBackground
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(palette.text.opacity(0.15), lineWidth: 1))
-                .frame(width: isExpanded ? nil : 80, height: capsuleH)
-                .padding(.top, 18)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .allowsHitTesting(false)
-                .zIndex(0)
+            URLPillChrome(
+                isIncognito: palette.isIncognito,
+                paletteUiElement: palette.uiElement,
+                paletteText: palette.text,
+                colorScheme: colorScheme,
+                ambientTint: ambientTint,
+                isExpanded: isExpanded,
+                capsuleH: capsuleH
+            )
+            .zIndex(0)
 
             collapsedContent
                 .opacity(isExpanded ? 0 : 1)
@@ -266,7 +271,10 @@ struct BottomBarView: View {
                 toolbarProgress = 0
             }
         } else {
-            toolbarProgress = fraction
+            let quantized = (fraction * 25).rounded() / 25
+            if abs(toolbarProgress - quantized) >= 0.04 {
+                toolbarProgress = quantized
+            }
         }
     }
 
@@ -299,10 +307,10 @@ struct BottomBarView: View {
             handleStateChange(oldState, newState)
             recomputeGhostCompletion()
         }
-        .onChange(of: text) { _, _ in
+        .onChange(of: text) {
             recomputeGhostCompletion()
         }
-        .onChange(of: isFocused) { _, _ in
+        .onChange(of: isFocused) {
             recomputeGhostCompletion()
         }
         .onChange(of: searchSuggestions) { _, newSuggestions in
@@ -511,6 +519,7 @@ struct BottomBarView: View {
                     .clipped()
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
+                    .transition(.opacity.animation(reduceMotion ? .linear(duration: 0) : .easeOut(duration: 0.05)))
                 }
                 TextField("Search...", text: displayBinding)
                     .accessibilityIdentifier("browser.urlField")
@@ -718,7 +727,7 @@ struct BottomBarView: View {
         .scrollContentBackground(.hidden)
         .contentMargins(
             .bottom,
-            (isFocused ? keyboardHeight : 0) + (hasInput ? 500 : 0),
+            (isFocused ? keyboardHeight + 60 : 0) + (hasInput ? 500 : 0),
             for: .scrollContent
         )
     }
@@ -893,6 +902,14 @@ struct BottomBarView: View {
             .padding(.leading, 8)
             .opacity(sideOpacity)
             .allowsHitTesting(!isTabOverlayVisible)
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.4)
+                    .onEnded { _ in
+                        guard let handler = onTabsLongPress else { return }
+                        Haptics.fire(.rigid)
+                        handler()
+                    }
+            )
 
             Spacer()
 
@@ -1036,8 +1053,8 @@ private struct SearchSuggestionRow: View {
         }
         .buttonStyle(.plain)
         .onAppear { recomputeAttr() }
-        .onChange(of: query) { _, _ in recomputeAttr() }
-        .onChange(of: suggestion.text) { _, _ in recomputeAttr() }
+        .onChange(of: query) { recomputeAttr() }
+        .onChange(of: suggestion.text) { recomputeAttr() }
     }
 
     private func recomputeAttr() {
@@ -1112,6 +1129,43 @@ private struct FrostedPillBackground: View, Equatable {
                 .environment(\.colorScheme, isIncognito ? .dark : colorScheme)
             tint.opacity(tintOpacity)
         }
+    }
+}
+
+private struct URLPillChrome: View {
+    let isIncognito: Bool
+    let paletteUiElement: Color
+    let paletteText: Color
+    let colorScheme: ColorScheme
+    let ambientTint: Color?
+    let isExpanded: Bool
+    let capsuleH: CGFloat
+
+    var body: some View {
+        FrostedPillBackground(
+            isIncognito: isIncognito,
+            colorScheme: colorScheme,
+            tint: paletteUiElement,
+            tintOpacity: isIncognito ? 0.45 : 0.65
+        )
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .fill((ambientTint ?? .clear).opacity(ambientTint == nil ? 0 : 0.10))
+        )
+        .overlay(Capsule().stroke(paletteText.opacity(0.15), lineWidth: 1))
+        .overlay(Capsule().stroke(ambientTintStroke, lineWidth: 1))
+        .frame(width: isExpanded ? nil : 80, height: capsuleH)
+        .padding(.top, 18)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+    }
+
+    private var ambientTintStroke: Color {
+        guard let tint = ambientTint, !isIncognito else {
+            return .clear
+        }
+        return tint.opacity(0.35)
     }
 }
 

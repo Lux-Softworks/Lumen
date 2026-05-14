@@ -17,6 +17,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
     @Published var estimatedProgress: Double = 0.0
     @Published var isSecure: Bool = false
     @Published var threatEvents: [ThreatEvent] = []
+    private static let maxThreatEvents = 500
     @Published var blockedTrackersCount: Int = 0
 
     private(set) var webView: WKWebView?
@@ -64,9 +65,13 @@ final class BrowserViewModel: NSObject, ObservableObject {
             self.interceptor = nav
 
             nav.onThreatDetected = { [weak self] event in
-                self?.threatEvents.append(event)
-                self?.blockedTrackersCount =
-                    self?.threatEvents.filter { $0.type == .tracker }.count ?? 0
+                guard let self else { return }
+                self.threatEvents.append(event)
+                if self.threatEvents.count > Self.maxThreatEvents {
+                    self.threatEvents.removeFirst(self.threatEvents.count - Self.maxThreatEvents)
+                }
+                self.blockedTrackersCount =
+                    self.threatEvents.filter { $0.type == .tracker }.count
             }
         }
 

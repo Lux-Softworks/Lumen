@@ -5,7 +5,7 @@ private struct HapticTriggerModifier<T: Equatable>: ViewModifier {
     let trigger: T
 
     func body(content: Content) -> some View {
-        content.onChange(of: trigger) { _, _ in
+        content.onChange(of: trigger) {
             Haptics.fire(event)
         }
     }

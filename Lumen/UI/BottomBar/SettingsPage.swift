@@ -80,8 +80,6 @@ struct SettingsPage: View {
     @ScaledMetric(relativeTo: .body) private var policyTitleFont: CGFloat = 14
     @ScaledMetric(relativeTo: .body) private var policyBodyFont: CGFloat = 14
 
-    @ScaledMetric(relativeTo: .body) private var displayTitleFont: CGFloat = 20
-
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
@@ -531,9 +529,9 @@ struct SettingsPage: View {
                 divider
                 settingsRow(icon: "terminal", title: "Enable JavaScript", isOn: $siteEnableJavaScript) {}
             }
-            .onChange(of: siteBlockTrackers) { _, _ in saveSitePolicy() }
-            .onChange(of: siteBlockPopups) { _, _ in saveSitePolicy() }
-            .onChange(of: siteEnableJavaScript) { _, _ in saveSitePolicy() }
+            .onChange(of: siteBlockTrackers) { saveSitePolicy() }
+            .onChange(of: siteBlockPopups) { saveSitePolicy() }
+            .onChange(of: siteEnableJavaScript) { saveSitePolicy() }
         }
         .padding(.horizontal, 16)
     }
@@ -849,7 +847,7 @@ struct SettingsPage: View {
             }
 
             Text(sectionTitle(for: section))
-                .font(AppTheme.Typography.display(size: displayTitleFont, weight: .bold))
+                .displayTitle()
                 .foregroundStyle(palette.text)
         }
         .padding(.horizontal, 16)

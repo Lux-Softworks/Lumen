@@ -173,7 +173,7 @@ struct BrowserView: View {
                 webViewReady: $webViewReady,
                 isAddressBarFocused: $isAddressBarFocused
             )
-            .onChange(of: tabManager.activeTabId) { _, _ in syncIncognitoToActiveTab() }
+            .onChange(of: tabManager.activeTabId) { syncIncognitoToActiveTab() }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background || newPhase == .inactive {
                     SearchHistoryStore.shared.flush()
@@ -443,7 +443,7 @@ struct BrowserView: View {
         .onDisappear {
             tab.viewModel.onScrollUpdate = nil
         }
-        .onChange(of: tab.viewModel.pageReadyToken) { _, _ in
+        .onChange(of: tab.viewModel.pageReadyToken) {
             updateState { scrollDownAccumulator = 0 }
             updateState {
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
@@ -465,8 +465,7 @@ struct BrowserView: View {
     private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
         let toolbarHeight: CGFloat = 80
         let baseTargetScale: CGFloat = 0.69
-        let multiTabBoost: CGFloat = tabManager.tabs.count > 1 ? 1.02 : 1.0
-        let targetScale: CGFloat = baseTargetScale * multiTabBoost
+        let targetScale: CGFloat = baseTargetScale
         let cornerRadius: CGFloat = 16
         let headerHeight: CGFloat = 36
 
@@ -629,6 +628,10 @@ struct BrowserView: View {
             tabCount: tabManager.tabs.count,
             isTabOverlayVisible: isOverlayVisible,
             onTabsPressed: handleTabsPressed,
+            onTabsLongPress: {
+                guard activeTabViewState == .fullScreen else { return }
+                tabManager.reopenLastClosed()
+            },
             onSettingsPressed: handleSettingsPressed,
             onSubmit: { handleSubmit() },
             onHistoryTap: { url in handleHistoryTap(url: url) },
@@ -688,7 +691,8 @@ struct BrowserView: View {
             editingSuggestion: $editingSuggestion,
             onUserTyped: { typed in
                 fetchSessionSuggestions(for: typed)
-            }
+            },
+            ambientTint: currentPageThemeColor
         )
     }
 
@@ -816,6 +820,13 @@ struct BrowserView: View {
 
         if recordHistory {
             recordSearchQueryIfNeeded(query)
+        }
+
+        if activeTabViewState != .fullScreen {
+            withTransaction(Transaction(animation: nil)) {
+                activeTabViewState = .fullScreen
+                shrinkProgress = 0
+            }
         }
 
         beginNavigation()
@@ -987,7 +998,7 @@ private struct PageLoadHandlers: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: pageReadyToken) { _, _ in
+            .onChange(of: pageReadyToken) {
                 pageCommitted = true
                 if bottomBarState == .hidden {
                     withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
@@ -998,7 +1009,7 @@ private struct PageLoadHandlers: ViewModifier {
                     onFadeIn()
                 }
             }
-            .onChange(of: firstPaintToken) { _, _ in
+            .onChange(of: firstPaintToken) {
                 guard !webViewReady else { return }
                 onFadeIn()
             }
@@ -1211,3 +1222,4 @@ extension View {
 #Preview {
     BrowserView()
 }
+

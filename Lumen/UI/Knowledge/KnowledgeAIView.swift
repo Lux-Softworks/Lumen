@@ -114,10 +114,10 @@ struct KnowledgeAIView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture { isFocused = false }
-            .onChange(of: viewModel.messages.count) { _, _ in
+            .onChange(of: viewModel.messages.count) {
                 scrollToBottom(proxy: proxy)
             }
-            .onChange(of: viewModel.messages.last?.text) { _, _ in
+            .onChange(of: viewModel.messages.last?.text) {
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: viewModel.isThinking) { _, thinking in

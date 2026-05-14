@@ -64,7 +64,7 @@ struct TabOverlayView: View {
                         }
                         lastScrolledToId = id
                     }
-                    .onChange(of: resetToken) { _, _ in
+                    .onChange(of: resetToken) {
                         let target = tabManager.tabBelowActive?.id ?? tabManager.activeTabId
                         var transaction = Transaction()
                         transaction.disablesAnimations = true
