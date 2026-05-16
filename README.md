@@ -13,7 +13,6 @@
   <img src="https://img.shields.io/badge/Swift_6.2-F05138?style=flat&logo=swift&logoColor=white" />
   <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
-  <img src="https://img.shields.io/badge/AGPL--3.0-blue?style=flat" />
   <img src="https://img.shields.io/badge/v1.3.3-E8E4DC?style=flat" />
 </p>
 
@@ -172,6 +171,8 @@ The first time you open the knowledge panel, Lumen downloads the `mlx-community/
 
 ## License and Contributing
 
-[AGPL-3.0](LICENSE) — if you build on this, share it back.
+[AGPL-3.0 with an Apple App Store distribution exception](LICENSE) — if you build on this, share it back.
+
+The exception (added as additional permission under GNU AGPL version 3 section 7) authorizes distribution of this software through Apple's App Store under Apple's terms. All other distribution remains governed by the AGPL-3.0.
 
 If you would like to contribute to the browser, please make a branch and follow all rulesets + conventions. Thanks for helping improve our community and software!

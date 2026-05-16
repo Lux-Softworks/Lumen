@@ -659,3 +659,16 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+
+                       APPLE APP STORE EXCEPTION
+
+  Additional permission under GNU AGPL version 3 section 7: As a special
+exception, the copyright holder grants permission to distribute this software,
+with or without modifications, through Apple's App Store, and to comply with
+the Apple App Store Terms of Service and Apple Developer Program License
+Agreement, notwithstanding any terms in the GNU AGPL that would otherwise
+restrict such distribution (including, without limitation, restrictions
+arising from digital rights management or device usage limits imposed by
+Apple). This additional permission applies only to distribution through
+Apple's App Store; all other distribution remains governed by the GNU AGPL
+version 3.
