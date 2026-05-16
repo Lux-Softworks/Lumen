@@ -114,14 +114,18 @@ struct KnowledgeAIView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture { isFocused = false }
-            .onChange(of: viewModel.messages.count) {
-                scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: viewModel.messages.last?.text) {
+            .onChange(of: MessageScrollSignal(
+                count: viewModel.messages.count,
+                lastText: viewModel.messages.last?.text
+            )) {
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: viewModel.isThinking) { _, thinking in
                 if thinking { scrollToBottom(proxy: proxy) }
+            }
+            .onDisappear {
+                scrollWorkItem?.cancel()
+                scrollWorkItem = nil
             }
         }
     }
@@ -1026,4 +1030,9 @@ private struct LumenSparkleMatrix: View {
         let p = 1 - t
         return 1 - p * p * p
     }
+}
+
+private struct MessageScrollSignal: Equatable {
+    let count: Int
+    let lastText: String?
 }

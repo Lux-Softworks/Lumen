@@ -13,6 +13,7 @@ struct TabOverlayView: View {
     private let toolbarHeight: CGFloat = 80
 
     @State private var lastScrolledToId: UUID? = nil
+    @State private var lastTabSwitchAt: Date = .distantPast
     @State private var scrollOffset: CGFloat = 0
     @State private var isDeletingTab: Bool = false
 
@@ -56,10 +57,21 @@ struct TabOverlayView: View {
                         lastScrolledToId = tabManager.activeTabId
                     }
                     .onChange(of: tabManager.activeTabId) { _, id in
-                        guard id != lastScrolledToId else { return }
+                        guard id != lastScrolledToId, id != hiddenTabId else { return }
+                        let now = Date()
+                        let isRapid = now.timeIntervalSince(lastTabSwitchAt) < 0.08
+                        lastTabSwitchAt = now
                         DispatchQueue.main.async {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
-                                proxy.scrollTo(id, anchor: .center)
+                            if isRapid {
+                                var txn = Transaction()
+                                txn.disablesAnimations = true
+                                withTransaction(txn) {
+                                    proxy.scrollTo(id, anchor: .center)
+                                }
+                            } else {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+                                    proxy.scrollTo(id, anchor: .center)
+                                }
                             }
                         }
                         lastScrolledToId = id
@@ -179,6 +191,12 @@ private struct TabCardWrapper: View {
 
             let headerOpacity = max(0, 1.0 - abs(normalizedDelta) * 2.5)
 
+            let nominalFrame = cardGeo.frame(in: .global)
+            let visualCenter = CGPoint(
+                x: nominalFrame.midX + xOffset,
+                y: nominalFrame.midY
+            )
+
             TabCardItemView(
                 tab: tab,
                 headerOpacity: headerOpacity,
@@ -188,13 +206,10 @@ private struct TabCardWrapper: View {
                     }
                 },
                 onTap: {
-                    let nominalFrame = cardGeo.frame(in: .global)
-                    let visualCenter = CGPoint(
-                        x: nominalFrame.midX + xOffset,
-                        y: nominalFrame.midY
-                    )
                     lastScrolledToId = tab.id
-                    onSelectTab(tab.id, visualCenter)
+                    DispatchQueue.main.async {
+                        onSelectTab(tab.id, visualCenter)
+                    }
                 },
                 isDeletingTab: $isDeletingTab,
                 reduceMotion: reduceMotion

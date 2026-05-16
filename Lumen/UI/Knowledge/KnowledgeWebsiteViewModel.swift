@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 nonisolated private let KnowledgeWebsiteSessionGapThreshold: TimeInterval = 7200
 
@@ -123,7 +124,9 @@ final class KnowledgeWebsiteViewModel {
             website.summary = result
             website.pageCountAtSynthesis = website.pageCount
             website.synthesisUpdatedAt = Date()
-        } catch {}
+        } catch {
+            KnowledgeLogger.storage.error("website synthesis save failed: \(String(describing: error), privacy: .public)")
+        }
 
         synthesisState = .ready(result)
     }

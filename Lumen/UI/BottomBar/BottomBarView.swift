@@ -55,16 +55,20 @@ struct BottomBarView: View {
     var ambientTint: Color? = nil
 
     @Namespace private var animation
+
     @State private var isSpinning = false
     @State private var reloadRotation: Double = 0
+
     @State private var toolbarProgress: CGFloat = 0
-    @State private var activeRowId: String? = "_typed"
-    @State private var caretActive: Bool = true
-    @State private var ghostCompletion: String = ""
     @State private var magGlassOpacity: Double = 1.0
     @State private var gearIconOpacity: Double = 0.0
     @State private var folderIconOpacity: Double = 0.0
     @State private var urlTextOpacity: Double = 0.0
+
+    @State private var activeRowId: String? = "_typed"
+    @State private var caretActive: Bool = true
+    @State private var ghostCompletion: String = ""
+
     @ScaledMetric(relativeTo: .body) private var dtFactor: CGFloat = 1.0
     @ScaledMetric(relativeTo: .body) private var smallIcon: CGFloat = 18
 
@@ -236,28 +240,33 @@ struct BottomBarView: View {
     }
 
     private func handleSheetExpand() {
-        if state == .collapsed || state == .hidden {
+        let stateWillChange = state == .collapsed || state == .hidden
+        if stateWillChange {
             text = ""
             state = .search
-        }
-
-        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            toolbarProgress = 1.0
+        } else if toolbarProgress != 1.0 {
+            withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+                toolbarProgress = 1.0
+            }
         }
 
         if state == .search {
             Task { @MainActor in
-                try? await Task.sleep(for: .seconds(0.3))
+                try? await Task.sleep(for: .seconds(0.05))
                 guard state == .search else { return }
-                isFocused = true
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                    isFocused = true
+                }
             }
         }
     }
 
     private func handleSheetCollapse() {
         isFocused = false
-        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
-            toolbarProgress = 0
+        if toolbarProgress != 0 && state == .collapsed {
+            withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
+                toolbarProgress = 0
+            }
         }
     }
 
@@ -396,17 +405,18 @@ struct BottomBarView: View {
     }
 
     private func handleKeyboardWillShow(_ notification: Notification) {
-        if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey]
-            as? CGRect
-        {
-            withTransaction(Transaction(animation: nil)) {
-                keyboardHeight = frame.height
-            }
+        guard let info = notification.userInfo,
+              let frame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        else { return }
+        let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: duration)) {
+            keyboardHeight = frame.height
         }
     }
 
     private func handleKeyboardWillHide(_ notification: Notification) {
-        withTransaction(Transaction(animation: nil)) {
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: duration)) {
             keyboardHeight = 0
         }
     }
@@ -679,7 +689,7 @@ struct BottomBarView: View {
                         .id(suggestion.id)
                     }
                 } else {
-                    ForEach(Array(searchHistoryStore.entries.prefix(3))) { entry in
+                    ForEach(searchHistoryStore.entries.prefix(3)) { entry in
                         autofillRow(
                             icon: "clock.arrow.circlepath",
                             title: entry.query,
@@ -687,7 +697,7 @@ struct BottomBarView: View {
                             onTap: { onSuggestionTap(entry.query) }
                         )
                     }
-                    ForEach(Array(historyStore.recentEntries.prefix(4))) { entry in
+                    ForEach(historyStore.entries.prefix(4)) { entry in
                         autofillURLRow(
                             url: URL(string: entry.url),
                             title: entry.title.isEmpty ? entry.url : entry.title,
@@ -1141,23 +1151,32 @@ private struct URLPillChrome: View {
     let isExpanded: Bool
     let capsuleH: CGFloat
 
+    private let collapsedWidth: CGFloat = 80
+    private let topPad: CGFloat = 18
+
     var body: some View {
-        FrostedPillBackground(
-            isIncognito: isIncognito,
-            colorScheme: colorScheme,
-            tint: paletteUiElement,
-            tintOpacity: isIncognito ? 0.45 : 0.65
-        )
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .fill((ambientTint ?? .clear).opacity(ambientTint == nil ? 0 : 0.10))
-        )
-        .overlay(Capsule().stroke(paletteText.opacity(0.15), lineWidth: 1))
-        .overlay(Capsule().stroke(ambientTintStroke, lineWidth: 1))
-        .frame(width: isExpanded ? nil : 80, height: capsuleH)
-        .padding(.top, 18)
-        .frame(maxWidth: .infinity, alignment: .top)
+        GeometryReader { geo in
+            FrostedPillBackground(
+                isIncognito: isIncognito,
+                colorScheme: colorScheme,
+                tint: paletteUiElement,
+                tintOpacity: isIncognito ? 0.45 : 0.65
+            )
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .fill((ambientTint ?? .clear).opacity(ambientTint == nil ? 0 : 0.10))
+            )
+            .overlay(Capsule().stroke(paletteText.opacity(0.15), lineWidth: 1))
+            .overlay(Capsule().stroke(ambientTintStroke, lineWidth: 1))
+            .frame(
+                width: isExpanded ? geo.size.width : collapsedWidth,
+                height: capsuleH
+            )
+            .padding(.top, topPad)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .frame(height: capsuleH + topPad)
         .allowsHitTesting(false)
     }
 
@@ -1165,7 +1184,8 @@ private struct URLPillChrome: View {
         guard let tint = ambientTint, !isIncognito else {
             return .clear
         }
-        return tint.opacity(0.35)
+        let opacity = ContrastForeground.isLight(UIColor(tint)) ? 0.18 : 0.35
+        return tint.opacity(opacity)
     }
 }
 

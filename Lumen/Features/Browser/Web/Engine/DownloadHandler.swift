@@ -1,4 +1,3 @@
-import UIKit
 import WebKit
 import os.log
 

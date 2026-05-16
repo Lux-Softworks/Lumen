@@ -79,9 +79,6 @@ nonisolated final class EmbeddingService: @unchecked Sendable {
         #endif
     }
 
-
-
-
     private func embedSync(_ text: String) -> [Double]? {
         guard let clean = Self.sanitize(text) else { return nil }
 

@@ -47,6 +47,7 @@ struct SettingsPage: View {
 
     @State private var pageZoom: Int = 100
     @State private var requestDesktopSite: Bool = false
+
     @State private var sitePinned: Bool = false
     @State private var sitePinnedReady: Bool = false
     @State private var siteBlockTrackers: Bool = false

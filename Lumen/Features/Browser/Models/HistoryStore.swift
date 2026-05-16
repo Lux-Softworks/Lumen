@@ -15,10 +15,10 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
         self.title = title
         self.timestamp = Date()
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         if let stringId = try? container.decode(String.self, forKey: .id) {
             self.id = stringId
         } else if let uuidId = try? container.decode(UUID.self, forKey: .id) {
@@ -28,12 +28,12 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
             let normalizedURL = HistoryStore.normalizeURL(url)
             self.id = HistoryStore.stableID(for: normalizedURL)
         }
-        
+
         self.url = try container.decode(String.self, forKey: .url)
         self.title = try container.decode(String.self, forKey: .title)
         self.timestamp = try container.decode(Date.self, forKey: .timestamp)
     }
-    
+
     static func == (lhs: HistoryEntry, rhs: HistoryEntry) -> Bool {
         lhs.id == rhs.id
     }
@@ -47,14 +47,61 @@ final class HistoryStore: ObservableObject {
     private let maxEntries = 10
     private var saveCancellable: AnyCancellable?
     private let saveSubject = PassthroughSubject<Void, Never>()
+    private var didLoad = false
 
     static let shared = HistoryStore()
 
     private init() {
-        load()
         setupPersistenceThrottle()
     }
-    
+
+    func loadIfNeeded() {
+        guard !didLoad else { return }
+        didLoad = true
+        let key = self.key
+        
+        Task.detached(priority: .userInitiated) {
+            guard let data = UserDefaults.standard.data(forKey: key) else { return }
+            guard let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data) else {
+                UserDefaults.standard.removeObject(forKey: key)
+                return
+            }
+            let deduped = HistoryStore.dedupe(decoded)
+            await MainActor.run {
+                HistoryStore.shared.applyLoaded(deduped)
+            }
+        }
+    }
+
+    private func applyLoaded(_ loaded: [HistoryEntry]) {
+        let inMemory = entries
+        let merged = Self.dedupe(inMemory + loaded)
+        entries = merged.count > maxEntries ? Array(merged.prefix(maxEntries)) : merged
+
+        for entry in entries {
+            if let parsed = URL(string: entry.url) {
+                FaviconService.prefetchFavicon(for: parsed)
+            }
+        }
+    }
+
+    nonisolated private static func dedupe(_ list: [HistoryEntry]) -> [HistoryEntry] {
+        var seenIDs = Set<String>()
+        var seenDisplay = Set<String>()
+        var deduped = [HistoryEntry]()
+        deduped.reserveCapacity(list.count)
+        for entry in list {
+            let normalizedURL = normalizeURL(entry.url)
+            let id = stableID(for: normalizedURL)
+            let displayKey = displayDedupKey(url: entry.url, title: entry.title)
+            guard !seenIDs.contains(id), !seenDisplay.contains(displayKey) else { continue }
+            seenIDs.insert(id)
+            seenDisplay.insert(displayKey)
+            deduped.append(entry)
+        }
+        return deduped
+    }
+
     private func setupPersistenceThrottle() {
         saveCancellable = saveSubject
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
@@ -99,7 +146,7 @@ final class HistoryStore: ObservableObject {
             .lowercased()
         return host + "|" + normalizedTitle
     }
-    
+
     nonisolated static func stableID(for normalizedURL: String) -> String {
         let hash = SHA256.hash(data: Data(normalizedURL.utf8))
         let hexChars: [UInt8] = Array("0123456789abcdef".utf8)
@@ -127,34 +174,4 @@ final class HistoryStore: ObservableObject {
         }
     }
 
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return }
-
-        guard let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data) else {
-            UserDefaults.standard.removeObject(forKey: key)
-            return
-        }
-
-        var seenIDs = Set<String>()
-        var seenDisplay = Set<String>()
-        var deduped = [HistoryEntry]()
-        for entry in decoded {
-            let normalizedURL = Self.normalizeURL(entry.url)
-            let stableID = Self.stableID(for: normalizedURL)
-            let displayKey = Self.displayDedupKey(url: entry.url, title: entry.title)
-
-            guard !seenIDs.contains(stableID), !seenDisplay.contains(displayKey) else { continue }
-            seenIDs.insert(stableID)
-            seenDisplay.insert(displayKey)
-            deduped.append(entry)
-        }
-
-        entries = deduped
-
-        for entry in deduped {
-            if let parsed = URL(string: entry.url) {
-                FaviconService.prefetchFavicon(for: parsed)
-            }
-        }
-    }
 }

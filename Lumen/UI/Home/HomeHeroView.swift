@@ -38,6 +38,10 @@ struct HomeHeroView: View {
             guard !reduceMotion else { return }
             isBreathing = true
         }
+        .onDisappear {
+            isBreathing = false
+            isTranslating = false
+        }
     }
 
     private var sparkleIcon: some View {

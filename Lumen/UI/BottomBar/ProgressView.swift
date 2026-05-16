@@ -79,6 +79,7 @@ struct ProgressView: View {
                 .fill(barGradient)
                 .frame(height: 1)
         }
+        .compositingGroup()
         .scaleEffect(x: displayedProgress, anchor: .leading)
         .frame(maxWidth: width - cornerRadius * 2, maxHeight: .infinity, alignment: .topLeading)
         .opacity(visible ? 1 : 0)

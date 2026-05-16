@@ -1540,9 +1540,11 @@ actor KnowledgeStorage {
             "DELETE FROM topics WHERE id = ?",
         ]
 
+        let idCString = (id as NSString).utf8String
+
         for sql in steps {
             try execute(sql) { stmt in
-                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, self.SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 1, idCString, -1, self.SQLITE_TRANSIENT)
             }
         }
     }

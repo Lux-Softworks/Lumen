@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct KnowledgeButton: View {
     var action: () -> Void

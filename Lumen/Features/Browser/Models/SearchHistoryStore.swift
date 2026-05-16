@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 
 struct SearchQueryEntry: Codable, Identifiable, Equatable {
     let id: String
@@ -20,23 +21,65 @@ final class SearchHistoryStore: ObservableObject {
 
     private var indexById: [String: Int] = [:]
 
-    private static let legacyKey = "com.lumen.search.queries"
-    private static let fileName = "search_history.json"
-    private static let maxEntries = 200
-    private static let maxQueryLength = 256
-    private static let maxFileBytes = 1 * 1024 * 1024
+    nonisolated private static let legacyKey = "com.lumen.search.queries"
+    nonisolated private static let fileName = "search_history.json"
+    nonisolated private static let maxEntries = 200
+    nonisolated private static let maxQueryLength = 256
+    nonisolated private static let maxFileBytes = 1 * 1024 * 1024
 
     private var saveCancellable: AnyCancellable?
     private let saveSubject = PassthroughSubject<Void, Never>()
     private let storeURL: URL
+    private var didLoad = false
 
     static let shared = SearchHistoryStore()
 
     private init() {
         self.storeURL = Self.resolveStoreURL()
-        load()
-        migrateLegacyIfNeeded()
         setupPersistenceThrottle()
+    }
+
+    func loadIfNeeded() {
+        guard !didLoad else { return }
+        didLoad = true
+        let storeURL = self.storeURL
+        Task.detached(priority: .userInitiated) {
+            let loaded = SearchHistoryStore.loadFromDisk(storeURL: storeURL)
+            await MainActor.run {
+                SearchHistoryStore.shared.applyLoaded(loaded)
+                SearchHistoryStore.shared.migrateLegacyIfNeeded()
+            }
+        }
+    }
+
+    private func applyLoaded(_ loaded: [SearchQueryEntry]) {
+        var seen = Set<String>()
+        var merged: [SearchQueryEntry] = []
+        merged.reserveCapacity(entries.count + loaded.count)
+        for entry in entries + loaded where seen.insert(entry.id).inserted {
+            merged.append(entry)
+        }
+        entries = Array(merged.prefix(Self.maxEntries))
+        rebuildIndex()
+    }
+
+    nonisolated private static func loadFromDisk(storeURL: URL) -> [SearchQueryEntry] {
+        guard FileManager.default.fileExists(atPath: storeURL.path) else { return [] }
+        do {
+            let data = try Data(contentsOf: storeURL)
+            let decoded = try JSONDecoder().decode([SearchQueryEntry].self, from: data)
+            var seen = Set<String>()
+            var deduped: [SearchQueryEntry] = []
+            deduped.reserveCapacity(decoded.count)
+            for entry in decoded where seen.insert(entry.id).inserted {
+                deduped.append(entry)
+            }
+            return Array(deduped.prefix(Self.maxEntries))
+        } catch {
+            let quarantine = storeURL.appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970))")
+            try? FileManager.default.moveItem(at: storeURL, to: quarantine)
+            return []
+        }
     }
 
     func record(query: String, isIncognito: Bool) {
@@ -135,42 +178,27 @@ final class SearchHistoryStore: ObservableObject {
                 data = try JSONEncoder().encode(entries)
             }
             try data.write(to: storeURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        } catch {}
-    }
-
-    private func load() {
-        guard FileManager.default.fileExists(atPath: storeURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: storeURL)
-            let decoded = try JSONDecoder().decode([SearchQueryEntry].self, from: data)
-            var seen = Set<String>()
-            var deduped: [SearchQueryEntry] = []
-            deduped.reserveCapacity(decoded.count)
-            for entry in decoded where seen.insert(entry.id).inserted {
-                deduped.append(entry)
-            }
-            entries = Array(deduped.prefix(Self.maxEntries))
-            rebuildIndex()
         } catch {
-            let quarantine = storeURL.appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970))")
-            try? FileManager.default.moveItem(at: storeURL, to: quarantine)
+            Self.logger.error("save failed: \(String(describing: error), privacy: .public)")
         }
     }
+
+    private static let logger = AppLogger.make("search.history")
 
     private func migrateLegacyIfNeeded() {
         let defaults = UserDefaults.standard
         guard let data = defaults.data(forKey: Self.legacyKey) else { return }
         defer { defaults.removeObject(forKey: Self.legacyKey) }
-        guard entries.isEmpty,
-              let decoded = try? JSONDecoder().decode([SearchQueryEntry].self, from: data)
-        else { return }
-        var seen = Set<String>()
-        var deduped: [SearchQueryEntry] = []
-        deduped.reserveCapacity(decoded.count)
-        for entry in decoded where seen.insert(entry.id).inserted {
-            deduped.append(entry)
+        guard let decoded = try? JSONDecoder().decode([SearchQueryEntry].self, from: data) else {
+            return
         }
-        entries = Array(deduped.prefix(Self.maxEntries))
+        var seen = Set<String>()
+        var merged: [SearchQueryEntry] = []
+        merged.reserveCapacity(entries.count + decoded.count)
+        for entry in entries + decoded where seen.insert(entry.id).inserted {
+            merged.append(entry)
+        }
+        entries = Array(merged.prefix(Self.maxEntries))
         rebuildIndex()
         saveSubject.send()
     }

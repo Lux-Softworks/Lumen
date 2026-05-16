@@ -3,36 +3,40 @@ import UIKit
 
 @MainActor
 struct BrowserView: View {
-    @Environment(\.palette) private var palette
     @StateObject private var tabManager = TabManager(createDefaultTab: false)
-    @State private var bottomBarState: BottomBarState = .collapsed
-    @State private var isReady = false
-    @State private var activeTabViewState: TabViewState = .fullScreen
-    @State private var shrinkProgress: CGFloat = 0
-    @State private var scrollDownAccumulator: CGFloat = 0
-    @State private var topBarOffset: CGFloat = 47
-    @State private var urlText: String = ""
 
+    @State private var isReady = false
+    @State private var incognitoActive: Bool = false
+
+    @State private var bottomBarState: BottomBarState = .collapsed
     @State private var bottomBarOpacity: CGFloat = 1
     @State private var bottomBarSubmitOffset: CGFloat = 0
     @State private var sheetInstantCollapse: Bool = false
-    @State private var editingSuggestion: Bool = false
-    @State private var incognitoActive: Bool = false
-    @State private var sessionSuggestions: [SearchSuggestion] = []
-    @State private var suggestionFetchTask: Task<Void, Never>? = nil
+
+    @State private var activeTabViewState: TabViewState = .fullScreen
+    @State private var shrinkProgress: CGFloat = 0
+    @State private var tabSelectionOrigin: CGPoint? = nil
+    @State private var tabOverlayResetToken: Int = 0
+    @State private var pendingShrinkBelowId: UUID? = nil
 
     @State private var webViewReady = true
     @State private var coverFinished = false
     @State private var pageCommitted = false
-
     @State private var showNavigationCover = false
-    @State private var navigationCoverProgress: CGFloat = 0
-    @State private var tabSelectionOrigin: CGPoint? = nil
-    @State private var tabOverlayResetToken: Int = 0
-    @State private var pendingShrinkBelowId: UUID? = nil
     @State private var navigationCoverOpacity: CGFloat = 1
+    @State private var navigationCoverProgress: CGFloat = 0
+
+    @State private var topBarOffset: CGFloat = 47
+    @State private var scrollDownAccumulator: CGFloat = 0
+
+    @State private var urlText: String = ""
+    @State private var editingSuggestion: Bool = false
+    @State private var sessionSuggestions: [SearchSuggestion] = []
+    @State private var suggestionFetchTask: Task<Void, Never>? = nil
 
     @FocusState private var isAddressBarFocused: Bool
+
+    @Environment(\.palette) private var palette
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -95,6 +99,30 @@ struct BrowserView: View {
         }
     }
 
+    private func commitScrollUpdate(
+        newTopBarOffset: CGFloat,
+        newBottomBarState: BottomBarState,
+        newAccumulator: CGFloat
+    ) {
+        let topChanged = newTopBarOffset != topBarOffset
+        let barChanged = newBottomBarState != bottomBarState
+        let accChanged = newAccumulator != scrollDownAccumulator
+
+        guard topChanged || barChanged || accChanged else { return }
+
+        DispatchQueue.main.async {
+            if accChanged {
+                scrollDownAccumulator = newAccumulator
+            }
+            if topChanged || barChanged {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+                    if topChanged { topBarOffset = newTopBarOffset }
+                    if barChanged { bottomBarState = newBottomBarState }
+                }
+            }
+        }
+    }
+
     private func fetchSessionSuggestions(for query: String) {
         suggestionFetchTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespaces)
@@ -129,10 +157,11 @@ struct BrowserView: View {
             .environment(\.palette, activePalette)
             .environment(\.pageThemeColor, pageColor)
             .environment(\.ambientPalette, ambient)
-            .animation(
-                reduceMotion ? nil : PremiumTokens.themeColorTween,
-                value: pageColor
-            )
+            .transaction(value: pageColor) { txn in
+                if !reduceMotion {
+                    txn.animation = PremiumTokens.themeColorTween
+                }
+            }
             .ignoresSafeArea()
             .applyNavigationCoverChangeHandlers(
                 showNavigationCover: $showNavigationCover,
@@ -202,6 +231,8 @@ struct BrowserView: View {
             }
             .onAppear {
                 wireDownloadHandler()
+                HistoryStore.shared.loadIfNeeded()
+                SearchHistoryStore.shared.loadIfNeeded()
                 DispatchQueue.main.async {
                     withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
                         isReady = true
@@ -387,57 +418,59 @@ struct BrowserView: View {
                 let maxScroll = contentHeight - frameHeight
                 let statusBarHeight = getStatusBarHeight(geometry)
 
+                var newTopBarOffset = topBarOffset
+                var newBottomBarState = bottomBarState
+                var newAccumulator = scrollDownAccumulator
+
                 if offset < 100 {
-                    updateState { scrollDownAccumulator = 0 }
+                    newAccumulator = 0
                     if topBarOffset != statusBarHeight || bottomBarState == .hidden {
-                        updateState {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                                topBarOffset = statusBarHeight
-                                bottomBarState = .collapsed
-                            }
-                        }
+                        newTopBarOffset = statusBarHeight
+                        newBottomBarState = .collapsed
                     }
-                    if offset <= 0 { return }
+                    if offset <= 0 {
+                        commitScrollUpdate(
+                            newTopBarOffset: newTopBarOffset,
+                            newBottomBarState: newBottomBarState,
+                            newAccumulator: newAccumulator
+                        )
+                        return
+                    }
                 }
 
                 if contentHeight > 0 && offset >= maxScroll - 5 {
-                    updateState { scrollDownAccumulator = 0 }
+                    newAccumulator = 0
+                    commitScrollUpdate(
+                        newTopBarOffset: newTopBarOffset,
+                        newBottomBarState: newBottomBarState,
+                        newAccumulator: newAccumulator
+                    )
                     return
                 }
 
                 if delta > 3 && offset > 30 && topBarOffset != 0 {
-                    updateState {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                            topBarOffset = 0
-                        }
-                    }
+                    newTopBarOffset = 0
                 } else if delta < -5 && topBarOffset == 0 {
-                    updateState {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                            topBarOffset = statusBarHeight
-                        }
-                    }
+                    newTopBarOffset = statusBarHeight
                 }
 
                 if delta > 3 {
-                    updateState { scrollDownAccumulator = min(scrollDownAccumulator + delta, 300) }
-                    if scrollDownAccumulator > 120 && bottomBarState == .collapsed {
-                        updateState {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                                bottomBarState = .hidden
-                            }
-                        }
+                    newAccumulator = min(scrollDownAccumulator + delta, 300)
+                    if newAccumulator > 120 && bottomBarState == .collapsed {
+                        newBottomBarState = .hidden
                     }
                 } else if delta < -10 {
-                    updateState { scrollDownAccumulator = 0 }
+                    newAccumulator = 0
                     if bottomBarState == .hidden {
-                        updateState {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-                                bottomBarState = .collapsed
-                            }
-                        }
+                        newBottomBarState = .collapsed
                     }
                 }
+
+                commitScrollUpdate(
+                    newTopBarOffset: newTopBarOffset,
+                    newBottomBarState: newBottomBarState,
+                    newAccumulator: newAccumulator
+                )
             }
         }
         .onDisappear {
@@ -465,7 +498,8 @@ struct BrowserView: View {
     private func transitionOverlay(geometry: GeometryProxy, progress: CGFloat) -> some View {
         let toolbarHeight: CGFloat = 80
         let baseTargetScale: CGFloat = 0.69
-        let targetScale: CGFloat = baseTargetScale
+        let isMultiTab = tabManager.tabs.count > 1
+        let targetScale: CGFloat = isMultiTab ? baseTargetScale * 1.02 : baseTargetScale
         let cornerRadius: CGFloat = 16
         let headerHeight: CGFloat = 36
 
@@ -491,7 +525,6 @@ struct BrowserView: View {
         let headerSlotHeight = lerp(
             getStatusBarHeight(geometry), headerHeight / baseTargetScale, progress)
 
-        let isMultiTab = tabManager.tabs.count > 1
         let titleOpacity: CGFloat = {
             switch activeTabViewState {
             case .shrinking:
@@ -729,21 +762,28 @@ struct BrowserView: View {
                 activeTab.snapshot = image
             }
 
-            if tabManager.tabs.count > 1, let below = tabManager.tabBelowActive {
-                pendingShrinkBelowId = below.id
-                tabSelectionOrigin = computeRightLandingPoint()
-            } else {
-                pendingShrinkBelowId = nil
-                tabSelectionOrigin = nil
+            var setup = Transaction(animation: nil)
+            setup.disablesAnimations = true
+            withTransaction(setup) {
+                if tabManager.tabs.count > 1, let below = tabManager.tabBelowActive {
+                    pendingShrinkBelowId = below.id
+                    tabSelectionOrigin = computeRightLandingPoint()
+                } else {
+                    pendingShrinkBelowId = nil
+                    tabSelectionOrigin = nil
+                }
+                activeTabViewState = .shrinking
             }
-
-            activeTabViewState = .shrinking
 
             withAnimation(reduceMotion ? nil : .timingCurve(0.32, 0.72, 0, 1, duration: 0.35)) {
                 self.shrinkProgress = 1.0
             } completion: {
-                self.activeTabViewState = .shrunk
-                self.pendingShrinkBelowId = nil
+                var done = Transaction(animation: nil)
+                done.disablesAnimations = true
+                withTransaction(done) {
+                    self.activeTabViewState = .shrunk
+                    self.pendingShrinkBelowId = nil
+                }
             }
         }
     }
@@ -767,30 +807,38 @@ struct BrowserView: View {
         guard activeTabViewState == .shrunk else { return }
         guard tabManager.tabs.contains(where: { $0.id == id }) else { return }
 
-        tabSelectionOrigin = origin
-        tabManager.switchTab(id: id)
-        activeTabViewState = .expanding
+        var setup = Transaction(animation: nil)
+        setup.disablesAnimations = true
+        withTransaction(setup) {
+            tabSelectionOrigin = origin
+            tabManager.switchTab(id: id)
+            activeTabViewState = .expanding
+        }
 
         withAnimation(reduceMotion ? nil : .timingCurve(0.32, 0.72, 0, 1, duration: 0.35)) {
             self.shrinkProgress = 0.0
         } completion: {
-            self.tabManager.moveActiveTabToTop()
-            self.activeTabViewState = .fullScreen
-            self.webViewReady = true
-            self.tabSelectionOrigin = nil
-            self.tabOverlayResetToken &+= 1
+            var done = Transaction(animation: nil)
+            done.disablesAnimations = true
+            withTransaction(done) {
+                self.tabManager.moveActiveTabToTop()
+                self.activeTabViewState = .fullScreen
+                self.webViewReady = true
+                self.tabSelectionOrigin = nil
+                self.tabOverlayResetToken &+= 1
+            }
         }
     }
 
     private func handleSearchFromCarousel() {
         guard !isTransitioning else { return }
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
             bottomBarState = .search
         }
     }
 
     private func handleSettingsPressed() {
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+        withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) {
             if bottomBarState == .browserSettings || bottomBarState == .siteSettings {
                 bottomBarState = .collapsed
             } else {
@@ -864,9 +912,11 @@ struct BrowserView: View {
                 self.bottomBarSubmitOffset = 80
             }
 
-            withAnimation(self.reduceMotion ? nil : .spring(duration: 0.45, bounce: 0)) {
-                self.bottomBarOpacity = 1
-                self.bottomBarSubmitOffset = 0
+            DispatchQueue.main.async {
+                withAnimation(self.reduceMotion ? nil : .spring(duration: 0.45, bounce: 0)) {
+                    self.bottomBarOpacity = 1
+                    self.bottomBarSubmitOffset = 0
+                }
             }
 
             if tabsEmpty {
@@ -1102,7 +1152,7 @@ private struct ActiveTabChangedHandlers: ViewModifier {
                 guard let newTab = tabManager.tabs.first(where: { $0.id == newId }) else {
                     if !tabManager.tabs.isEmpty {
                         DispatchQueue.main.async {
-                            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { bottomBarState = .search }
+                            withAnimation(reduceMotion ? nil : AppTheme.Motion.sheet) { bottomBarState = .search }
                         }
                     }
                     return

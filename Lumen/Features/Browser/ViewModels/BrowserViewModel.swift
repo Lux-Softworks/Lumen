@@ -304,38 +304,45 @@ final class BrowserViewModel: NSObject, ObservableObject {
     }
 
     private func updateThemeColorManually(_ webView: WKWebView) {
+        let cacheKey = Self.themeColorCacheKey(for: webView.url)
+        if let cacheKey, let cached = themeColorCache[cacheKey] {
+            self.themeColor = cached
+            return
+        }
+
         let script = """
                 (function() {
-                    var meta = document.querySelector('meta[name="theme-color"]');
-                    if (meta) {
-                        return meta.content;
-                    }
+                    try {
+                        var t0 = performance.now();
+                        var meta = document.querySelector('meta[name="theme-color"]');
+                        if (meta) { return meta.content; }
 
-                    function getBackgroundColor(element) {
-                        if (!element) return null;
-                        var style = window.getComputedStyle(element);
-                        var color = style.backgroundColor;
-
-                        if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
-                            return null;
+                        function getBg(element) {
+                            if (!element) return null;
+                            var style = window.getComputedStyle(element);
+                            var color = style.backgroundColor;
+                            if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') return null;
+                            return color;
                         }
-                        return color;
+
+                        var elements = document.elementsFromPoint(window.innerWidth / 2, 5);
+                        var limit = Math.min(elements.length, 8);
+                        for (var i = 0; i < limit; i++) {
+                            if (performance.now() - t0 > 250) break;
+                            var bg = getBg(elements[i]);
+                            if (bg) return bg;
+                        }
+
+                        var bodyColor = getBg(document.body);
+                        if (bodyColor) return bodyColor;
+
+                        var htmlColor = getBg(document.documentElement);
+                        if (htmlColor) return htmlColor;
+
+                        return "white";
+                    } catch (e) {
+                        return "white";
                     }
-
-                    var elements = document.elementsFromPoint(window.innerWidth / 2, 5);
-                    for (var i = 0; i < elements.length; i++) {
-                        var el = elements[i];
-                        var bg = getBackgroundColor(el);
-                        if (bg) return bg;
-                    }
-
-                    var bodyColor = getBackgroundColor(document.body);
-                    if (bodyColor) return bodyColor;
-
-                    var htmlColor = getBackgroundColor(document.documentElement);
-                    if (htmlColor) return htmlColor;
-
-                    return "white";
                 })();
             """
 
@@ -345,9 +352,19 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 guard let self = self else { return }
                 let color = UIColor.fromAnyString(colorString)
                 self.themeColor = color
+                if let cacheKey {
+                    self.themeColorCache[cacheKey] = color
+                }
             }
         }
     }
+
+    private static func themeColorCacheKey(for url: URL?) -> String? {
+        guard let url, let host = url.host?.lowercased() else { return nil }
+        return host + url.path
+    }
+
+    private var themeColorCache: [String: UIColor] = [:]
 
     @Published var themeColor: UIColor? = nil
 

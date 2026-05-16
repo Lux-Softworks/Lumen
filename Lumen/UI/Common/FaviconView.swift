@@ -109,14 +109,14 @@ enum ContrastForeground {
     private static let darkUIColor = UIColor(white: 0.18, alpha: 1.0)
     private static let darkColor = Color(white: 0.18)
 
-    private static func isLight(_ ui: UIColor) -> Bool {
+    static func isLight(_ ui: UIColor) -> Bool {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return false }
         let luminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
         return luminance > 0.55
     }
 
-    private static func channel(_ v: CGFloat) -> CGFloat {
+    static func channel(_ v: CGFloat) -> CGFloat {
         let s = max(0, min(1, v))
         return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
     }

@@ -37,7 +37,7 @@ enum HapticsMode: String, CaseIterable, Identifiable {
 }
 
 @MainActor
-class BrowserSettings: ObservableObject {
+final class BrowserSettings: ObservableObject {
     static let shared = BrowserSettings()
 
     private let defaults = UserDefaults.standard

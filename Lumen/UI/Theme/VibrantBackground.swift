@@ -11,6 +11,7 @@ struct VibrantBackground: View {
         ZStack {
             base
             blobs
+                .drawingGroup(opaque: false, colorMode: .extendedLinear)
             sheen
             material
             ambientWash
@@ -18,7 +19,6 @@ struct VibrantBackground: View {
         .frame(width: size.width, height: size.height)
         .clipped()
         .ignoresSafeArea()
-        .drawingGroup(opaque: false, colorMode: .extendedLinear)
     }
 
     @ViewBuilder

@@ -167,7 +167,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                 )
 
                 appendRequest(request)
-                let _ = detector.analyze(request)
+                _ = detector.analyze(request)
             }
         }
 

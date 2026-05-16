@@ -11,7 +11,7 @@ extension Notification.Name {
 }
 
 @MainActor
-class KnowledgeCaptureService: ObservableObject {
+final class KnowledgeCaptureService: ObservableObject {
     static let shared = KnowledgeCaptureService()
 
     @Published private(set) var captureToken: Int = 0

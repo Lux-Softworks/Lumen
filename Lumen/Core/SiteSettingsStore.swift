@@ -1,8 +1,9 @@
 import Foundation
 import Combine
+import os
 
 @MainActor
-class SiteSettingsStore: ObservableObject {
+final class SiteSettingsStore: ObservableObject {
     static let shared = SiteSettingsStore()
     
     @Published var hostSettings: [String: PrivacyPolicy] = [:]
@@ -39,14 +40,20 @@ class SiteSettingsStore: ObservableObject {
         do {
             let data = try JSONEncoder().encode(hostSettings)
             try data.write(to: fileURL)
-        } catch { }
+        } catch {
+            Self.logger.error("save failed: \(String(describing: error), privacy: .public)")
+        }
     }
-    
+
     private func load() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
         do {
             let data = try Data(contentsOf: fileURL)
             hostSettings = try JSONDecoder().decode([String: PrivacyPolicy].self, from: data)
-        } catch { }
+        } catch {
+            Self.logger.error("load failed: \(String(describing: error), privacy: .public)")
+        }
     }
+
+    private static let logger = AppLogger.make("settings.site")
 }
