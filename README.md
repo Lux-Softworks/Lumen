@@ -26,7 +26,7 @@
 
 ---
 
-An iOS browser built from scratch in SwiftUI. Lumen reads along with you — extracting, summarizing, and organizing every page you actually engage with into a personal knowledge base. Then you can ask questions about it, answered by a local LLM that never leaves your device.
+An iOS browser built from scratch in SwiftUI. Lumen reads along with you. It extracts, summarizes, and organizes every page you engage with into a personal knowledge base. After, you can ask questions about it, answered by a local LLM that never leaves your device.
 
 <br/>
 
@@ -56,7 +56,7 @@ An iOS browser built from scratch in SwiftUI. Lumen reads along with you — ext
  Pages       closures?"
 ```
 
-All you have to do is browse. Lumen does the rest.
+All you have to do is browse and Lumen does the rest.
 
 <br/>
 
@@ -115,8 +115,8 @@ Lumen has no server, meaning there's nothing to send.
 | **Cookies**        | Third-party cookies blocked by default                                |
 | **Tracking**       | Built-in tracker database with threat classification                  |
 | **Fingerprinting** | Fingerprint resistance via content security policies                  |
-| **Data**           | All knowledge stays in local SQLite — no sync, no cloud, no API calls |
-| **AI**             | LLM runs on-device via MLX — prompts never leave your phone           |
+| **Data**           | All knowledge stays in local SQLite                                   |
+| **AI**             | LLM runs on-device via MLX                                            |
 
 <br/>
 
@@ -141,7 +141,7 @@ Swift 6.2 · SwiftUI · iOS 18+ · Xcode 26.2+
 ### Requirements
 
 - macOS with **Xcode 26.2** or newer
-- **iOS 18** or newer device or simulator (Apple Silicon Mac required for the simulator — MLX needs an ARM GPU)
+- **iOS 18** or newer device or simulator (Apple Silicon Mac required for the simulator)
 - Apple Developer account for code signing
 - Network access on first launch (the LLM weights are pulled from Hugging Face)
 
@@ -160,7 +160,7 @@ In Xcode:
 
 1. Select the **Lumen** target → **Signing & Capabilities**.
 2. Replace the bundled team (`XF6K537DNY`) with your own, and change the bundle identifier from `com.luxsoftworks.Lumen` to something unique to you (e.g. `com.yourname.Lumen`). Do the same for the `LumenTests` and `LumenUITests` targets.
-3. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open — wait for it to finish.
+3. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open.
 4. Pick a destination (iOS 18+ device or iOS 18+ simulator on Apple Silicon) and hit **⌘R**.
 
 ### First launch
@@ -176,3 +176,7 @@ The first time you open the knowledge panel, Lumen downloads the `mlx-community/
 The exception (added as additional permission under GNU AGPL version 3 section 7) authorizes distribution of this software through Apple's App Store under Apple's terms. All other distribution remains governed by the AGPL-3.0.
 
 If you would like to contribute to the browser, please make a branch and follow all rulesets + conventions. Thanks for helping improve our community and software!
+
+## AI Declaration
+
+Lumen was built entirely by me as a solo developer. I used AI tools (primarily Claude) throughout development for brainstorming architecture decisions, debugging, generating boilerplate, and writing code. All design decisions, system architecture, and feature direction are my own. I reviewed and understand every line of code in the project.
