@@ -138,7 +138,7 @@ struct KnowledgeWebsiteView: View {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(page.title ?? page.domain)
-                        .displayHeading()
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(palette.text)
                         .lineLimit(1)
                         .truncationMode(.tail)

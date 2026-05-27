@@ -355,66 +355,6 @@ actor LocalKnowledgeProvider {
         return cleanSummary(output)
     }
 
-    func classifyTopicWithLLM(content: String, title: String?) async throws -> String {
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
-
-        beginInference()
-        defer { endInference() }
-
-        let prompt = await KnowledgePrompts.topicClassification(content: content, title: title)
-
-        let parameters = GenerateParameters(maxTokens: 14, temperature: 0.0)
-        let tokens = await container.encode(prompt)
-        let input = LMInput(tokens: MLXArray(tokens))
-
-        let stream = try await container.generate(input: input, parameters: parameters)
-
-        var output = ""
-        for await event in stream {
-            if Task.isCancelled { break }
-            if case .chunk(let text) = event { output += text }
-        }
-
-        clearGPUCache()
-        touch()
-        return await Self.sanitizeTopic(output)
-    }
-
-    private static let topicStopwords: Set<String> = [
-        "just", "the", "a", "an", "this", "that", "it", "here", "there",
-        "sure", "okay", "ok", "yes", "no", "well", "so",
-        "article", "topic", "content", "page", "website", "site",
-        "news", "story", "post", "blog", "other", "unknown", "none", "n/a", "na",
-        "is", "about", "regarding", "general", "misc", "miscellaneous"
-    ]
-
-    @MainActor private static func sanitizeTopic(_ raw: String) -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-
-        let firstLine = trimmed.split(whereSeparator: { $0.isNewline }).first.map(String.init) ?? trimmed
-        let firstToken = firstLine
-            .components(separatedBy: .whitespacesAndNewlines)
-            .first ?? ""
-
-        let allowed = CharacterSet.letters.union(CharacterSet(charactersIn: "&-/."))
-        let cleaned = String(firstToken.unicodeScalars.filter { allowed.contains($0) })
-        guard cleaned.count >= 2 else { return "" }
-
-        let lower = cleaned.lowercased()
-        if topicStopwords.contains(lower) { return "" }
-
-        return TopicCanonicalizer.canonical(for: cleaned)
-    }
-
     func classifyConversationalIntent(
         query: String,
         history: [(role: String, text: String)]
@@ -521,7 +461,8 @@ actor LocalKnowledgeProvider {
         highlights: [String] = [],
         history: [(role: String, text: String)] = [],
         conversationSummary: String? = nil,
-        dateScopePhrase: String? = nil
+        dateScopePhrase: String? = nil,
+        substance: [String: [String]] = [:]
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task<Void, Never> {
@@ -556,7 +497,8 @@ actor LocalKnowledgeProvider {
                         highlights: highlights,
                         history: history,
                         conversationSummary: conversationSummary,
-                        includeReadDates: dateScopePhrase != nil
+                        includeReadDates: dateScopePhrase != nil,
+                        substance: substance
                     )
 
                     let prompt: String

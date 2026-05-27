@@ -1,5 +1,6 @@
 import Foundation
 import NaturalLanguage
+import os
 
 actor SemanticTopicClassifier {
     static let shared = SemanticTopicClassifier()
@@ -9,10 +10,10 @@ actor SemanticTopicClassifier {
         let vector: [Double]
     }
 
-    private let embedding: NLEmbedding?
-    private let prototypes: [TopicPrototype]
+    private var prototypes: [TopicPrototype]?
 
-    private static let minConfidence: Double = 0.15
+    private static let minConfidence: Double = 0.20
+    private static let relativeMargin: Double = 0.03
 
     private static let topicSeeds: [(String, [String])] = [
         ("AI", [
@@ -113,11 +114,18 @@ actor SemanticTopicClassifier {
             "concert festival live performance venue",
         ]),
         ("Film", [
-            "movie film director actor cinema",
-            "box office release trailer review",
-            "tv show streaming netflix hbo episode season",
-            "screenplay script production studio",
-            "oscar award festival premiere",
+            "movie film cinema director screenplay actor",
+            "tv series show episode season streaming netflix hbo",
+            "plot character protagonist storyline narrative arc",
+            "science fiction fantasy thriller drama franchise sequel",
+            "box office premiere trailer review studio cast",
+        ]),
+        ("Anime", [
+            "anime manga japanese animation studio",
+            "mecha shonen shojo seinen isekai slice of life",
+            "anime series episode character arc adaptation",
+            "otaku light novel cosplay franchise subtitled dubbed",
+            "naruto one piece evangelion gundam studio ghibli",
         ]),
         ("Food", [
             "recipe cooking ingredient dish meal",
@@ -210,24 +218,39 @@ actor SemanticTopicClassifier {
         ]),
     ]
 
-    private init() {
-        self.embedding = NLEmbedding.sentenceEmbedding(for: .english)
-        guard let embedding = self.embedding else {
-            self.prototypes = []
-            return
+    private init() {}
+
+    private func loadedPrototypes() async -> [TopicPrototype] {
+        if let prototypes { return prototypes }
+
+        var flatSeeds: [String] = []
+        var owners: [Int] = []
+        for (index, entry) in Self.topicSeeds.enumerated() {
+            for seed in entry.1 {
+                flatSeeds.append(seed)
+                owners.append(index)
+            }
         }
 
-        self.prototypes = Self.topicSeeds.compactMap { (name, seeds) -> TopicPrototype? in
-            let vectors = seeds.compactMap { embedding.vector(for: $0) }
-            guard !vectors.isEmpty else { return nil }
-            let averaged = Self.average(vectors)
-            return TopicPrototype(name: name, vector: averaged)
+        let vectors = await EmbeddingService.shared.generateEmbeddings(for: flatSeeds)
+
+        var byTopic: [Int: [[Double]]] = [:]
+        for (slot, vector) in vectors.enumerated() {
+            guard let vector else { continue }
+            byTopic[owners[slot], default: []].append(vector)
         }
+
+        var built: [TopicPrototype] = []
+        for (index, entry) in Self.topicSeeds.enumerated() {
+            guard let vecs = byTopic[index], !vecs.isEmpty else { continue }
+            built.append(TopicPrototype(name: entry.0, vector: Self.average(vecs)))
+        }
+
+        prototypes = built
+        return built
     }
 
-    func classify(title: String?, content: String) -> String {
-        guard let embedding = embedding, !prototypes.isEmpty else { return "" }
-
+    func classify(title: String?, content: String) async -> String {
         let probe = Self.buildProbe(title: title, content: content)
         guard !probe.isEmpty else { return "" }
 
@@ -235,13 +258,22 @@ actor SemanticTopicClassifier {
         recognizer.processString(probe)
         if let lang = recognizer.dominantLanguage, lang != .english { return "" }
 
-        guard let vector = embedding.vector(for: probe) else { return "" }
+        let prototypes = await loadedPrototypes()
+        guard !prototypes.isEmpty else { return "" }
+        guard let vector = await EmbeddingService.shared.generateEmbedding(for: probe) else { return "" }
 
-        let scored = prototypes.map { ($0.name, VectorMath.cosineSimilarity(vector, $0.vector)) }
-        let ranked = scored.sorted { $0.1 > $1.1 }
+        let ranked = prototypes
+            .map { (name: $0.name, score: VectorMath.cosineSimilarity(vector, $0.vector)) }
+            .sorted { $0.score > $1.score }
 
-        guard let best = ranked.first, best.1 >= Self.minConfidence else { return "" }
-        return best.0
+        guard let best = ranked.first, best.score >= Self.minConfidence else { return "" }
+
+        if ranked.count >= 2 {
+            let gap = best.score - ranked[1].score
+            if gap < best.score * Self.relativeMargin { return "" }
+        }
+
+        return best.name
     }
 
     private static func buildProbe(title: String?, content: String) -> String {

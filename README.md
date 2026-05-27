@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Swift_6.2-F05138?style=flat&logo=swift&logoColor=white" />
   <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
-  <img src="https://img.shields.io/badge/v1.3.3-E8E4DC?style=flat" />
+  <img src="https://img.shields.io/badge/v1.4.0-E8E4DC?style=flat" />
 </p>
 
 <p align="center">

@@ -234,7 +234,7 @@ struct WebsitePageButton: View {
             .aspectRatio(3/4, contentMode: .fit)
 
             Text(website.displayName)
-                .displayHeading()
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
         }
@@ -420,7 +420,7 @@ struct KnowledgeFolderView: View {
                                         FolderItemButton(topic: topic)
 
                                         Text(topic.name)
-                                            .displayHeading()
+                                            .font(.system(size: 15, weight: .semibold))
                                             .foregroundStyle(palette.text)
                                             .lineLimit(1)
                                     }

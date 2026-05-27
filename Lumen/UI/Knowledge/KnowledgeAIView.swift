@@ -10,8 +10,8 @@ struct KnowledgeAIView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var idleLabelSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .body) private var sendButtonIconSize: CGFloat = 12
-    @ScaledMetric(relativeTo: .body) private var sendButtonSize: CGFloat = 30
+    @ScaledMetric(relativeTo: .body) private var sendButtonIconSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var sendButtonSize: CGFloat = 36
     @ScaledMetric(relativeTo: .body) private var inputCornerRadius: CGFloat = 22
 
     private var clampedSendButtonSize: CGFloat { min(sendButtonSize, 44) }
@@ -39,19 +39,6 @@ struct KnowledgeAIView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(AppTheme.Motion.standard, value: viewModel.messages.isEmpty)
             .animation(AppTheme.Motion.standard, value: viewModel.isThinking)
-
-            if showThinkingIndicator {
-                HStack(spacing: 8) {
-                    LumenSparkleMatrix(size: 18, phase: .spinning)
-                    StatusLabel(text: viewModel.statusMessage)
-                }
-                .padding(.leading, 16)
-                .padding(.vertical, 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .transition(.opacity)
-                .allowsHitTesting(false)
-                .dynamicTypeSize(.xSmall ... .accessibility2)
-            }
 
             inputBar
                 .dynamicTypeSize(.xSmall ... .accessibility2)
@@ -142,7 +129,19 @@ struct KnowledgeAIView: View {
     }
 
     private var inputBar: some View {
-        HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            if showThinkingIndicator {
+                HStack(spacing: 8) {
+                    LumenSparkleMatrix(size: 18, phase: .spinning)
+                    StatusLabel(text: viewModel.statusMessage)
+                }
+                .padding(.leading, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .allowsHitTesting(false)
+                .transition(.thinkingInsert.animation(AppTheme.Motion.snappy))
+            }
+
+            HStack(alignment: .center, spacing: 10) {
             ZStack(alignment: .leading) {
                 TextField("", text: $viewModel.inputText, axis: .vertical)
                     .font(.subheadline.weight(.semibold))
@@ -154,6 +153,7 @@ struct KnowledgeAIView: View {
                     .disabled(viewModel.isModelLoading)
                     .onSubmit {
                         guard canSend else { return }
+                        isFocused = false
                         Haptics.fire(.tap)
                         Task { await viewModel.send() }
                     }
@@ -190,15 +190,14 @@ struct KnowledgeAIView: View {
                             .foregroundStyle(canSend ? .white : palette.text.opacity(0.25))
                     )
                     .animation(AppTheme.Motion.snappy, value: canSend)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
             .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 14)
+        .padding(.vertical, 8)
         .background(inputBackground)
         .overlay(
             RoundedRectangle(cornerRadius: clampedCornerRadius, style: .continuous)
@@ -207,10 +206,12 @@ struct KnowledgeAIView: View {
                     lineWidth: 0.75
                 )
         )
+        }
         .padding(.horizontal, 16)
         .padding(.top, isFocused ? 12 : 10)
         .padding(.bottom, isFocused ? 6 : 10)
         .animation(AppTheme.Motion.snappy, value: isFocused)
+        .animation(AppTheme.Motion.snappy, value: showThinkingIndicator)
     }
 
     private var inputBackground: some View {
@@ -238,7 +239,7 @@ struct KnowledgeAIView: View {
     }
 
     private static func keyboardAnimation(from notification: Notification) -> Animation {
-        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let duration = max(0.25, (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25)
         let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 7
 
         switch UIView.AnimationCurve(rawValue: curveRaw) {
@@ -291,6 +292,17 @@ private struct ChatBubbleView: View {
 
     private var assistantView: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let note = message.correctionNote {
+                HStack(spacing: 5) {
+                    Image(systemName: "text.magnifyingglass")
+                        .font(.system(size: matchIconSize, weight: .semibold))
+                    Text(note)
+                        .font(.system(size: matchLabelSize))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(palette.text.opacity(0.4))
+            }
+
             if !message.text.isEmpty {
                 StreamingText(text: message.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -424,12 +436,10 @@ private struct StreamingText: View {
     private func proseView(lines: [Line]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(lines) { line in
-                HStack(alignment: .top, spacing: 6) {
+                HStack(alignment: .top, spacing: 8) {
                     if line.isBullet {
-                        Text("•")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(palette.accent.opacity(0.6))
-                            .padding(.top, 1)
+                        PixelSparkleMarker(color: palette.accent.opacity(0.8))
+                            .padding(.top, 3)
                     }
                     WordFlowLayout(wordSpacing: 4, lineSpacing: 5) {
                         ForEach(Array(line.tokens.enumerated()), id: \.offset) { i, token in
@@ -790,6 +800,42 @@ private struct StaticWord: View {
     }
 }
 
+private struct PixelSparkleMarker: View {
+    var size: CGFloat = 12
+    let color: Color
+
+    private static let layout: [[Int]] = [
+        [3],
+        [3],
+        [2, 3, 4],
+        [0, 1, 2, 3, 4, 5, 6],
+        [2, 3, 4],
+        [3],
+        [3],
+    ]
+
+    var body: some View {
+        Canvas { ctx, canvasSize in
+            let cell = canvasSize.width / 7
+            let dot = cell * 0.82
+            let inset = (cell - dot) / 2
+            for (row, columns) in Self.layout.enumerated() {
+                for col in columns {
+                    let rect = CGRect(
+                        x: CGFloat(col) * cell + inset,
+                        y: CGFloat(row) * cell + inset,
+                        width: dot,
+                        height: dot
+                    )
+                    ctx.fill(Path(roundedRect: rect, cornerRadius: dot * 0.3), with: .color(color))
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ThreeDotsView: View {
     @State private var phase: Int = 0
     @Environment(\.palette) private var palette
@@ -811,6 +857,22 @@ private struct ThreeDotsView: View {
                 phase = (phase + 1) % 3
             }
         }
+    }
+}
+
+private struct ThinkingInsertModifier: ViewModifier {
+    let visible: Bool
+    func body(content: Content) -> some View {
+        content.opacity(visible ? 1 : 0)
+    }
+}
+
+extension AnyTransition {
+    static var thinkingInsert: AnyTransition {
+        .modifier(
+            active: ThinkingInsertModifier(visible: false),
+            identity: ThinkingInsertModifier(visible: true)
+        )
     }
 }
 

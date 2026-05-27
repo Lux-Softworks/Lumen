@@ -33,13 +33,15 @@ struct ChatMessage: Identifiable, Equatable, Hashable, Sendable {
     var sources: [PageContent]
     var sourceMatch: SourceMatch?
     var isStreaming: Bool
+    var correctionNote: String?
 
     init(
         role: Role,
         text: String,
         sources: [PageContent] = [],
         sourceMatch: SourceMatch? = nil,
-        isStreaming: Bool = false
+        isStreaming: Bool = false,
+        correctionNote: String? = nil
     ) {
         self.id = UUID()
         self.role = role
@@ -47,5 +49,6 @@ struct ChatMessage: Identifiable, Equatable, Hashable, Sendable {
         self.sources = sources
         self.sourceMatch = sourceMatch
         self.isStreaming = isStreaming
+        self.correctionNote = correctionNote
     }
 }

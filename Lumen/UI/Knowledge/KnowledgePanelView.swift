@@ -133,7 +133,7 @@ struct KnowledgePanelView: View {
     }
 
     private static func keyboardAnimation(from notification: Notification) -> Animation {
-        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let duration = max(0.25, (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25)
         let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 7
 
         switch UIView.AnimationCurve(rawValue: curveRaw) {

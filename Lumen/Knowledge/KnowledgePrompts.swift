@@ -66,46 +66,6 @@ enum KnowledgePrompts {
         """
     }
 
-    static func topicClassification(content: String, title: String?) async -> String {
-        let title = title.map(sanitize)
-        let content = sanitize(content)
-        return """
-        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        Assign ONE topic label from this exact list: AI, Technology, Programming, Finance, Business, Sports, Health, Science, Travel, Politics, Design, Gaming, Music, Film, Food, Education, Law, History, Art, Photography, Books, Fashion, Automotive, Climate, Productivity, Psychology, Philosophy, Culture.
-
-        Rules:
-        - Output the word EXACTLY as spelled in the list. Never abbreviate a list word (do not write "Artifical" for AI, do not write "Tech" for Technology).
-        - Prefer "AI" for anything about machine learning, LLMs, neural networks, artificial intelligence.
-        - Prefer "Programming" for coding, software development, languages, frameworks.
-        - Prefer "Technology" for gadgets, consumer tech, tech industry news.
-        - Output ONE word, nothing else. No punctuation. No "Other", "News", "Article", "Topic", "Unknown".<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        Introducing GPT-5: OpenAI announces a new large language model with multimodal reasoning.<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-        AI<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        Rust 1.80 released: improvements to async traits and lazy static initialization.<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-        Programming<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        Apple unveils new iPhone with titanium chassis and redesigned camera system.<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-        Technology<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        Fed holds rates steady as inflation cools; markets rally on dovish tone from chair.<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-        Finance<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        A beginner's guide to sourdough starter: maintaining a healthy culture at home.<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-        Food<|eot_id|>\
-        <|start_header_id|>user<|end_header_id|>
-        \(title ?? "N/A"): \(content.prefix(1500))<|eot_id|>\
-        <|start_header_id|>assistant<|end_header_id|>
-
-        """
-    }
-
     static func conversationSummary(turns: [(role: String, text: String)], priorSummary: String?) -> String {
         let transcript = turns.map { turn in
             "\(turn.role == "user" ? "User" : "Assistant"): \(sanitize(turn.text))"
@@ -184,7 +144,7 @@ enum KnowledgePrompts {
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         You are Lumen, a knowledge assistant on the user's phone. You help them explore things they've saved and read.
         - Never refer to yourself as "Lumen" — use "I".
-        - Don't invent personal experiences or stories.
+        - Don't invent personal experiences or stories, and never claim you told, taught, or shared information with the user — you only help them explore what they've saved and read.
         - Keep replies short — one to three sentences.
         - Pay close attention to conversation history and reply in context. If the user follows up, continue the thread naturally.
         - Be warm and natural, like texting a smart friend.\(summaryBlock)\(libraryBlock)<|eot_id|>\
@@ -224,19 +184,16 @@ enum KnowledgePrompts {
         let historyBlock = sanitize(historyBlock)
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        You are Lumen, a friendly reading companion. You help the user explore their saved pages by answering naturally, the way a thoughtful friend would. Never refer to yourself by name — just say "I".
+        Answer using only the notes below. Reply with at most 3 bullets, each on its own line starting with "- ". Each bullet is ONE short sentence — a single key fact, under 14 words. This is a quick scan, not an essay: no intro, no wrap-up, no second clause, no elaboration. Stop after the last point.
 
-        How to answer:
-        - Talk like a person, not a textbook. Warm, direct, conversational.
-        - Use the sources below as your only knowledge of what the user has read. Draw your answer from them.
-        - If the sources clearly don't address the question, say so honestly in one sentence and suggest what they could ask about instead based on the titles you can see. Do not invent facts.
-        - If the question is vague, ask one short clarifying question instead of guessing.
-        - Match the length to the question. A short question gets a short answer. A meaty question gets a real explanation. Never pad.
-        - Do NOT narrate yourself ("based on the sources", "I looked", "here is what I found"). Just answer.
-        - Do NOT cite URLs, titles, or [1] markers — the source pills below your reply already show those.
-        - Bold **key terms** sparingly when it genuinely helps.\(highlightsGuideline)
+        Rules:
+        - Every line is a "- " bullet. Lead with the most important; give at most three, then stop.
+        - Keep each bullet under 14 words. Cut filler, background, and hedging — just the fact.
+        - Use only what the notes contain; treat it as true. If they don't cover it, reply with one short bullet saying so.
+        - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes", "sources", "the text", or whether anyone read anything.
+        - Don't blend separate subjects. Never quote verbatim. Bold **key terms** sparingly.\(highlightsGuideline)
 
-        Sources:
+        Notes:
         \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
         \(query)<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
@@ -259,22 +216,21 @@ enum KnowledgePrompts {
         let scopePhrase = sanitize(scopePhrase)
         return """
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        You are Lumen, a friendly reading companion. Never refer to yourself by name — just say "I". The user is asking about what they read \(scopePhrase). Each source below is a page from their reading history, labeled with its title and read date (e.g. "Page Title (read [Date])").
+        List what the user saved \(scopePhrase), using only the notes below. Each note is one page; its read date is in parentheses after the title.
 
-        How to answer:
-        - Talk like a person — warm, direct, conversational.
-        - If the user asks what they read, walk them through each specific page by its **title**, summarizing the actual contents of the page. Do not just state the general topic; provide specific details from the page. Be a guide, not a list dump.
-        - Otherwise, synthesize the facts and weave in read dates when timing matters ("you read about X on that date"). Do not make up dates; only use the exact dates provided in the sources.
-        - If the sources don't actually cover what they asked, say so honestly in one sentence and point at what is there.
-        - Match length to the question. Short ask, short answer.
-        - Do NOT narrate yourself or describe your process. Just answer.
-        - Do NOT cite URLs or use [1] markers. Titles and read dates are fine when relevant.
-        - Bold **key terms** sparingly when it helps.\(highlightsGuideline)
+        Reply as a short bulleted list, one bullet per page, each on its own line starting with "- ". Format each bullet as: **Page title** — one short phrase on what it covered, under 16 words. At most 5 bullets, most recent first.
 
-        Sources:
+        Rules:
+        - Every line is a "- " bullet. No intro, no wrap-up.
+        - Use only the notes; treat them as true. Add a date only when it helps, and only the one given after the title — never invent a date.
+        - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes" or "sources".
+        - Don't blend pages together. Never quote verbatim. Bold only the **title**.\(highlightsGuideline)
+
+        Notes:
         \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
         \(query)<|eot_id|>\
         <|start_header_id|>assistant<|end_header_id|>
+
         """
     }
 }

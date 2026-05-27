@@ -210,6 +210,11 @@ enum VectorMath: Sendable {
     }
 }
 
+nonisolated struct QueryCorrection: Sendable {
+    let corrected: String
+    let changed: Bool
+}
+
 actor KnowledgeStorage {
     static let shared = KnowledgeStorage()
 
@@ -1051,6 +1056,78 @@ actor KnowledgeStorage {
         return try await rankPagesByVector(queryVector, limit: limit, pageIDFilter: nil)
     }
 
+    func rerankByRelevance(
+        query: String,
+        pages: [PageContent]
+    ) async throws -> [(page: PageContent, score: Double)] {
+        try initialize()
+        guard !pages.isEmpty else { return [] }
+
+        guard let queryVector = await EmbeddingService.shared.generateEmbedding(for: query) else {
+            return pages.map { (page: $0, score: 0.0) }
+        }
+
+        let ids = Set(pages.map { $0.id })
+        let chunkScores = try scoreChunks(queryVector: queryVector, pageIDFilter: ids)
+        let pageScores = try scorePages(queryVector: queryVector, pageIDFilter: ids)
+
+        var bestByPage: [String: Double] = [:]
+        for (pageID, score) in chunkScores {
+            let boosted = score + 0.02
+            if boosted > (bestByPage[pageID] ?? -1) { bestByPage[pageID] = boosted }
+        }
+        for (pageID, score) in pageScores {
+            if score > (bestByPage[pageID] ?? -1) { bestByPage[pageID] = score }
+        }
+
+        return pages
+            .map { (page: $0, score: bestByPage[$0.id] ?? 0.0) }
+            .sorted { $0.score > $1.score }
+    }
+
+    func topMatchingChunks(
+        query: String,
+        pageIDs: [String],
+        perPage: Int = 1,
+        maxCharsPerChunk: Int = 800
+    ) async throws -> [String: [String]] {
+        try initialize()
+        guard !pageIDs.isEmpty, perPage > 0 else { return [:] }
+        guard let queryVector = await EmbeddingService.shared.generateEmbedding(for: query) else { return [:] }
+
+        let placeholders = Array(repeating: "?", count: pageIDs.count).joined(separator: ",")
+        let sql = "SELECT page_id, text, vector FROM page_chunks WHERE page_id IN (\(placeholders))"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        for (index, pid) in pageIDs.enumerated() {
+            sqlite3_bind_text(statement, Int32(index + 1), pid, -1, SQLITE_TRANSIENT)
+        }
+
+        var scoredByPage: [String: [(text: String, score: Double)]] = [:]
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let pid = String(cString: sqlite3_column_text(statement, 0))
+            guard let textPtr = sqlite3_column_text(statement, 1) else { continue }
+            let text = String(cString: textPtr)
+            guard let raw = sqlite3_column_blob(statement, 2) else { continue }
+            let size = Int(sqlite3_column_bytes(statement, 2))
+            let count = size / MemoryLayout<Double>.size
+            guard count > 0 else { continue }
+            let vector = Array(UnsafeBufferPointer(start: raw.assumingMemoryBound(to: Double.self), count: count))
+            let score = VectorMath.cosineSimilarity(queryVector, vector)
+            scoredByPage[pid, default: []].append((text: text, score: score))
+        }
+
+        var result: [String: [String]] = [:]
+        for (pid, chunks) in scoredByPage {
+            let top = chunks.sorted { $0.score > $1.score }.prefix(perPage)
+            result[pid] = top.map { String($0.text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxCharsPerChunk)) }
+        }
+        return result
+    }
+
     func searchSemanticScoredInDateRange(
         query: String,
         range: DateInterval,
@@ -1455,13 +1532,26 @@ actor KnowledgeStorage {
         if trimmed.contains("\"") || trimmed.contains("*") || trimmed.range(of: #"\b(AND|OR|NOT|NEAR)\b"#, options: .regularExpression) != nil {
             let tokens = trimmed
                 .components(separatedBy: CharacterSet.alphanumerics.inverted)
-                .filter { !$0.isEmpty }
+                .filter { !$0.isEmpty && !["and", "or", "not", "near"].contains($0.lowercased()) }
                 .prefix(12)
                 .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }
-            return tokens.joined(separator: " OR ")
+            return tokens.joined(separator: " AND ")
         }
         let escaped = trimmed.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""
+    }
+
+    func corpusContains(_ term: String) -> Bool {
+        try? initialize()
+        let cleaned = term.replacingOccurrences(of: "\"", with: "")
+        guard !cleaned.isEmpty else { return false }
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, "SELECT 1 FROM pages_fts WHERE pages_fts MATCH ? LIMIT 1", -1, &statement, nil) == SQLITE_OK else {
+            return false
+        }
+        sqlite3_bind_text(statement, 1, "\"\(cleaned)\"", -1, SQLITE_TRANSIENT)
+        return sqlite3_step(statement) == SQLITE_ROW
     }
 
     func deletePage(pageID: String) async throws {

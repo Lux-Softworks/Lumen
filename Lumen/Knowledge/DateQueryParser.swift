@@ -116,13 +116,6 @@ enum DateQueryParser {
             }
         }
 
-        if let r = text.range(of: #"\b(?:in\s+)?(?:19\d{2}|20\d{2}|21\d{2})\b"#, options: .regularExpression) {
-            let phrase = String(text[r])
-            if let interval = yearInterval(phrase: phrase, calendar: calendar) {
-                return (phrase, interval)
-            }
-        }
-
         let candidates: [(pattern: String, build: () -> DateInterval?)] = [
             (#"\byesterday\b"#, {
                 guard let y = calendar.date(byAdding: .day, value: -1, to: now) else { return nil }
@@ -153,6 +146,13 @@ enum DateQueryParser {
             if let r = text.range(of: pattern, options: .regularExpression),
                let interval = build() {
                 return (String(text[r]), interval)
+            }
+        }
+
+        if let r = text.range(of: #"\b(?:in\s+)?(?:19\d{2}|20\d{2}|21\d{2})\b"#, options: .regularExpression) {
+            let phrase = String(text[r])
+            if let interval = yearInterval(phrase: phrase, now: now, calendar: calendar) {
+                return (phrase, interval)
             }
         }
 
@@ -280,7 +280,7 @@ enum DateQueryParser {
         return interval
     }
 
-    private static func yearInterval(phrase: String, calendar: Calendar) -> DateInterval? {
+    private static func yearInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
         guard let yR = phrase.range(of: #"(?:19\d{2}|20\d{2}|21\d{2})"#, options: .regularExpression),
               let y = Int(phrase[yR]) else { return nil }
         var comps = DateComponents()
@@ -290,6 +290,7 @@ enum DateQueryParser {
 
         guard let start = calendar.date(from: comps),
               let interval = calendar.dateInterval(of: .year, for: start) else { return nil }
+        guard interval.start <= now else { return nil }
         return interval
     }
 

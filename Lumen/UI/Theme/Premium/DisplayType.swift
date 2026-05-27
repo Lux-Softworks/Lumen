@@ -2,7 +2,7 @@ import SwiftUI
 
 extension Font {
     static let displayHero = Font.system(size: 40, weight: .black, design: .default)
-    static let displayTitle = Font.system(size: 28, weight: .black, design: .default)
+    static let displayTitle = Font.system(size: 28, weight: .bold, design: .default)
     static let displayHeading = Font.system(size: 22, weight: .bold, design: .default)
     static let displayURL = Font.system(size: 20, weight: .bold, design: .default)
     static let displayLabel = Font.system(size: 13, weight: .semibold, design: .default)

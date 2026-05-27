@@ -232,6 +232,7 @@ struct BottomBarView: View {
                 .allowsHitTesting(state == .search)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .opacity(dragRevealProgress)
+                .background(GeometryReader { _ in Color.clear })
         }
     }
 
@@ -767,6 +768,7 @@ struct BottomBarView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .contentShape(Rectangle())
+            .background(GeometryReader { _ in Color.clear })
         }
         .buttonStyle(.plain)
     }
@@ -794,6 +796,7 @@ struct BottomBarView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .contentShape(Rectangle())
+            .background(GeometryReader { _ in Color.clear })
         }
         .buttonStyle(.plain)
     }

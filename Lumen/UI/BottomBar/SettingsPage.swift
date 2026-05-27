@@ -848,7 +848,7 @@ struct SettingsPage: View {
             }
 
             Text(sectionTitle(for: section))
-                .displayTitle()
+                .font(.title3.weight(.bold))
                 .foregroundStyle(palette.text)
         }
         .padding(.horizontal, 16)
