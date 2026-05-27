@@ -153,7 +153,8 @@ struct BrowserView: View {
         let pageColor = currentPageThemeColor
         let ambient = AmbientPalette.make(themeColor: pageColor, palette: activePalette)
 
-        return content
+        return
+            content
             .environment(\.palette, activePalette)
             .environment(\.pageThemeColor, pageColor)
             .environment(\.ambientPalette, ambient)
@@ -946,7 +947,8 @@ struct BrowserView: View {
     private func looksLikeURL(_ s: String) -> Bool {
         guard !s.contains(" ") else { return false }
         if let parsed = URL(string: s), parsed.scheme != nil,
-           parsed.host != nil || parsed.scheme == "about" {
+            parsed.host != nil || parsed.scheme == "about"
+        {
             return true
         }
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-/_~"))
@@ -1272,4 +1274,3 @@ extension View {
 #Preview {
     BrowserView()
 }
-

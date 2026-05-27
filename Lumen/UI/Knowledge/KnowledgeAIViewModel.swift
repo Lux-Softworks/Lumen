@@ -50,14 +50,17 @@ final class KnowledgeAIViewModel {
 
     func preloadModel() async {
         guard !isModelLoading else { return }
+
         isModelLoading = true
         sparklePhase = .spinning
         setStatus("Loading model…")
+
         do {
             try await LocalKnowledgeProvider.shared.loadModel()
         } catch {
             KnowledgeLogger.rag.error("model load failed: \(String(describing: error), privacy: .public)")
         }
+
         sparklePhase = .idle
         isModelLoading = false
         setStatus(nil)
@@ -66,6 +69,7 @@ final class KnowledgeAIViewModel {
     func send() async {
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !isThinking, !isModelLoading else { return }
+
         inputText = ""
         let priorMessages = messages
         messages.append(ChatMessage(role: .user, text: trimmed))
@@ -84,7 +88,8 @@ final class KnowledgeAIViewModel {
         }
 
         let forcedKnowledge = Self.looksLikeKnowledgeQuery(query)
-        let isConversational = forcedKnowledge
+        let isConversational =
+            forcedKnowledge
             ? false
             : await LocalKnowledgeProvider.shared.classifyConversationalIntent(query: query, history: chatHistory)
 
@@ -100,7 +105,8 @@ final class KnowledgeAIViewModel {
         var searchResults: [PageContent] = []
         let weakMinScore = 0.30
 
-        let priorSources = parsedDate == nil
+        let priorSources =
+            parsedDate == nil
             ? (priorMessages.last { $0.role == .assistant }?.sources ?? [])
             : []
 
@@ -122,7 +128,6 @@ final class KnowledgeAIViewModel {
             } catch {
                 finishThinking()
                 messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
-
                 return
             }
 
@@ -130,7 +135,6 @@ final class KnowledgeAIViewModel {
                 finishThinking()
                 let fallback = await emptyResultMessage(scopePhrase: parsedDate.phrase)
                 messages.append(ChatMessage(role: .assistant, text: fallback))
-
                 return
             }
         } else {
@@ -140,7 +144,6 @@ final class KnowledgeAIViewModel {
             } catch {
                 finishThinking()
                 messages.append(ChatMessage(role: .assistant, text: "Knowledge search failed."))
-
                 return
             }
 
@@ -152,16 +155,18 @@ final class KnowledgeAIViewModel {
 
             for entry in scored { addCandidate(entry.page) }
 
-            let keywordHits = (try? await KnowledgeStorage.shared.searchPages(
-                query: ftsQuery(from: query), limit: 4
-            )) ?? []
+            let keywordHits =
+                (try? await KnowledgeStorage.shared.searchPages(
+                    query: ftsQuery(from: query), limit: 4
+                )) ?? []
             for page in keywordHits { addCandidate(page) }
 
             for src in priorSources { addCandidate(src) }
 
-            let reranked = (try? await KnowledgeStorage.shared.rerankByRelevance(
-                query: query, pages: candidates
-            )) ?? []
+            let reranked =
+                (try? await KnowledgeStorage.shared.rerankByRelevance(
+                    query: query, pages: candidates
+                )) ?? []
             searchResults = Self.relevanceGated(reranked, query: query, floor: weakMinScore)
         }
 
@@ -184,18 +189,24 @@ final class KnowledgeAIViewModel {
                 let anns = try await KnowledgeStorage.shared.fetchAnnotations(pageID: page.id)
                 highlights.append(contentsOf: anns.map { $0.text })
             } catch {
-                KnowledgeLogger.query.error("annotation fetch failed pageID=\(page.id, privacy: .public): \(String(describing: error), privacy: .public)")
+                KnowledgeLogger.query.error(
+                    "annotation fetch failed pageID=\(page.id, privacy: .public): \(String(describing: error), privacy: .public)"
+                )
             }
         }
 
-        let streamMessage = ChatMessage(role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true, correctionNote: correctionNote)
+        let streamMessage = ChatMessage(
+            role: .assistant, text: "", sources: sources, sourceMatch: nil, isStreaming: true,
+            correctionNote: correctionNote)
         let streamMessageID = streamMessage.id
         messages.append(streamMessage)
         setStatus(Self.thinkingMessages.randomElement()!)
+
         let summary = conversationSummary
         let dateScopePhrase = parsedDate?.phrase
 
-        let substance: [String: [String]] = parsedDate == nil
+        let substance: [String: [String]] =
+            parsedDate == nil
             ? ((try? await KnowledgeStorage.shared.topMatchingChunks(
                 query: query, pageIDs: sources.map { $0.id }, perPage: 1, maxCharsPerChunk: 500
             )) ?? [:])
@@ -224,7 +235,8 @@ final class KnowledgeAIViewModel {
 
             do {
                 let stream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
-                    query: modelQuery, sources: sources, highlights: highlights, history: history, conversationSummary: summary, dateScopePhrase: dateScopePhrase, substance: substance)
+                    query: modelQuery, sources: sources, highlights: highlights, history: history,
+                    conversationSummary: summary, dateScopePhrase: dateScopePhrase, substance: substance)
                 for try await chunk in stream {
                     if Task.isCancelled { break }
                     raw += chunk
@@ -242,7 +254,8 @@ final class KnowledgeAIViewModel {
                 KnowledgeLogger.rag.error("empty stream output — retrying stream")
                 do {
                     let retryStream = await LocalKnowledgeProvider.shared.answerStreamFromKnowledge(
-                        query: modelQuery, sources: sources, highlights: highlights, history: history, conversationSummary: summary, dateScopePhrase: dateScopePhrase, substance: substance)
+                        query: modelQuery, sources: sources, highlights: highlights, history: history,
+                        conversationSummary: summary, dateScopePhrase: dateScopePhrase, substance: substance)
                     for try await chunk in retryStream {
                         if Task.isCancelled { break }
                         raw += chunk
@@ -308,12 +321,14 @@ final class KnowledgeAIViewModel {
     func stopGeneration() {
         activeTask?.cancel()
         activeTask = nil
+
         if let idx = messages.lastIndex(where: { $0.isStreaming }) {
             messages[idx].isStreaming = false
             if messages[idx].text.isEmpty {
                 messages.remove(at: idx)
             }
         }
+
         finishThinking()
     }
 
@@ -381,18 +396,24 @@ final class KnowledgeAIViewModel {
         let byMargin = ranked.filter { $0.score >= floor && $0.score >= topScore - relativeMargin }
 
         let terms = distinctiveTerms(query)
-        let lexical = terms.isEmpty ? byMargin : byMargin.filter { entry in
-            let haystack = ((entry.page.title ?? "") + " " + (entry.page.summary ?? "") + " " + entry.page.content.prefix(50_000)).lowercased()
-            let words = Set(haystack.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-            return terms.allSatisfy { words.contains($0) }
-        }
+        let lexical =
+            terms.isEmpty
+            ? byMargin
+            : byMargin.filter { entry in
+                let haystack =
+                    ((entry.page.title ?? "") + " " + (entry.page.summary ?? "") + " "
+                    + entry.page.content.prefix(50_000)).lowercased()
+                let words = Set(haystack.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
+                return terms.allSatisfy { words.contains($0) }
+            }
 
         let kept = lexical.isEmpty ? Array(byMargin.prefix(1)) : lexical
         return kept.map { $0.page }
     }
 
     private func isListAllQuery(_ residual: String) -> Bool {
-        let tokens = residual
+        let tokens =
+            residual
             .lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { $0.count >= 2 && !Self.listAllStopwords.contains($0) }
@@ -408,7 +429,8 @@ final class KnowledgeAIViewModel {
             "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
             "my", "your", "his", "her", "its", "our", "their", "about", "with", "from",
         ]
-        let tokens = raw
+        let tokens =
+            raw
             .lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty && $0.count > 1 && !stopwords.contains($0) }
@@ -463,7 +485,8 @@ final class KnowledgeAIViewModel {
 
             if streamIndex < messages.count {
                 if raw.isEmpty {
-                    messages[streamIndex].text = streamError != nil
+                    messages[streamIndex].text =
+                        streamError != nil
                         ? "Couldn't generate a reply."
                         : "…"
                 } else {
@@ -501,7 +524,8 @@ final class KnowledgeAIViewModel {
         let total = (try? await KnowledgeStorage.shared.pageCount()) ?? 0
 
         if total == 0 {
-            return "Your library is empty right now — there's nothing for me to dig through yet. Open an article in the browser and I will start remembering what you read, then ask me anything about it."
+            return
+                "Your library is empty right now — there's nothing for me to dig through yet. Open an article in the browser and I will start remembering what you read, then ask me anything about it."
         }
 
         let topics = ((try? await KnowledgeStorage.shared.fetchAllTopics()) ?? [])
@@ -512,18 +536,22 @@ final class KnowledgeAIViewModel {
 
         if let scopePhrase {
             if topics.isEmpty {
-                return "Nothing saved from \(scopePhrase). You've got \(total) \(pageWord) saved overall — try a different time window, or ask what's in your library."
+                return
+                    "Nothing saved from \(scopePhrase). You've got \(total) \(pageWord) saved overall — try a different time window, or ask what's in your library."
             }
             let list = topics.prefix(3).joined(separator: ", ")
-            return "Nothing saved from \(scopePhrase). The topics in your library right now are \(list) — want to look at one of those instead?"
+            return
+                "Nothing saved from \(scopePhrase). The topics in your library right now are \(list) — want to look at one of those instead?"
         }
 
         if topics.isEmpty {
-            return "Nothing in your saved pages matched that. You've got \(total) \(pageWord) saved — try asking about a title or topic from your library."
+            return
+                "Nothing in your saved pages matched that. You've got \(total) \(pageWord) saved — try asking about a title or topic from your library."
         }
 
         let list = topics.prefix(3).joined(separator: ", ")
-        return "Nothing in your saved pages matched that. You could try asking about \(list) — those are what you've been reading."
+        return
+            "Nothing in your saved pages matched that. You could try asking about \(list) — those are what you've been reading."
     }
 
     private func finishThinking() {
@@ -557,11 +585,13 @@ final class KnowledgeAIViewModel {
         } catch {
             KnowledgeLogger.rag.error("conversation compaction failed: \(String(describing: error), privacy: .public)")
         }
+
         setStatus(Self.searchingMessages.randomElement()!)
     }
 
     func clearMessages() {
         stopGeneration()
+
         messages = []
         inputText = ""
         conversationSummary = nil
@@ -595,6 +625,7 @@ enum QueryCorrector {
                 out.append(word)
             }
         }
+
         return QueryCorrection(corrected: out.joined(separator: " "), changed: changed)
     }
 
@@ -630,7 +661,8 @@ enum QueryCorrector {
 
     private static func isMisspelled(_ word: String) -> Bool {
         let range = NSRange(location: 0, length: (word as NSString).length)
-        let result = textChecker.rangeOfMisspelledWord(in: word, range: range, startingAt: 0, wrap: false, language: "en")
+        let result = textChecker.rangeOfMisspelledWord(
+            in: word, range: range, startingAt: 0, wrap: false, language: "en")
         return result.location != NSNotFound
     }
 }

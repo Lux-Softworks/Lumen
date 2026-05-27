@@ -58,14 +58,16 @@ final class HistoryStore: ObservableObject {
     func loadIfNeeded() {
         guard !didLoad else { return }
         didLoad = true
+
         let key = self.key
-        
+
         Task.detached(priority: .userInitiated) {
             guard let data = UserDefaults.standard.data(forKey: key) else { return }
             guard let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data) else {
                 UserDefaults.standard.removeObject(forKey: key)
                 return
             }
+
             let deduped = HistoryStore.dedupe(decoded)
             await MainActor.run {
                 HistoryStore.shared.applyLoaded(deduped)
@@ -90,20 +92,24 @@ final class HistoryStore: ObservableObject {
         var seenDisplay = Set<String>()
         var deduped = [HistoryEntry]()
         deduped.reserveCapacity(list.count)
+
         for entry in list {
             let normalizedURL = normalizeURL(entry.url)
             let id = stableID(for: normalizedURL)
             let displayKey = displayDedupKey(url: entry.url, title: entry.title)
             guard !seenIDs.contains(id), !seenDisplay.contains(displayKey) else { continue }
+
             seenIDs.insert(id)
             seenDisplay.insert(displayKey)
             deduped.append(entry)
         }
+
         return deduped
     }
 
     private func setupPersistenceThrottle() {
-        saveCancellable = saveSubject
+        saveCancellable =
+            saveSubject
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.performSave()
@@ -141,7 +147,8 @@ final class HistoryStore: ObservableObject {
 
     nonisolated static func displayDedupKey(url: String, title: String) -> String {
         let host = URLNormalizer.extractDomain(url).lowercased()
-        let normalizedTitle = title
+        let normalizedTitle =
+            title
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return host + "|" + normalizedTitle
@@ -152,10 +159,12 @@ final class HistoryStore: ObservableObject {
         let hexChars: [UInt8] = Array("0123456789abcdef".utf8)
         var bytes = [UInt8]()
         bytes.reserveCapacity(16)
+
         for byte in hash.prefix(8) {
             bytes.append(hexChars[Int(byte >> 4)])
             bytes.append(hexChars[Int(byte & 0x0F)])
         }
+
         return String(decoding: bytes, as: UTF8.self)
     }
 

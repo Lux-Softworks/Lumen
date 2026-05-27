@@ -163,11 +163,10 @@ private struct TabCardWrapper: View {
             let safeCardWidth = max(1.0, config.cardWidth)
             let normalizedDelta = displacement / safeCardWidth
 
-            let cardScale: CGFloat = (
-                normalizedDelta >= 0
-                ? min(1.04, 1.0 + (normalizedDelta * 0.02))
-                : max(0.90, 1.0 + (normalizedDelta * 0.03))
-            )
+            let cardScale: CGFloat =
+                (normalizedDelta >= 0
+                    ? min(1.04, 1.0 + (normalizedDelta * 0.02))
+                    : max(0.90, 1.0 + (normalizedDelta * 0.03)))
 
             let targetVisualDisplacement: CGFloat = {
                 if normalizedDelta >= 0 {
@@ -312,7 +311,7 @@ private struct TabCardItemView: View {
             .padding(.horizontal, 10)
             .frame(height: 36)
 
-        ZStack {
+            ZStack {
                 if let snapshot = tab.snapshot {
                     Image(uiImage: snapshot)
                         .resizable()

@@ -5,9 +5,9 @@ enum SearchEngine: String, CaseIterable, Identifiable {
     case duckDuckGo = "DuckDuckGo"
     case bing = "Bing"
     case brave = "Brave"
-    
+
     var id: String { rawValue }
-    
+
     var templateURL: String {
         switch self {
         case .google:
@@ -20,7 +20,7 @@ enum SearchEngine: String, CaseIterable, Identifiable {
             return "https://search.brave.com/search?q=%@"
         }
     }
-    
+
     var homePage: URL {
         switch self {
         case .google:

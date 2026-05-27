@@ -77,18 +77,24 @@ struct VibrantBackground: View {
         let heroColor = pageThemeColor == nil ? AppTheme.Colors.accent : ambientPalette.glow
         let secondaryColor = pageThemeColor == nil ? AppTheme.Colors.secondaryAccent : ambientPalette.tint
         return [
-            BlobSpec(color: heroColor, opacity: 0.55, scale: 1.25,
-                     blur: 110, x: -0.25, y: -0.22, blend: .plusLighter),
-            BlobSpec(color: secondaryColor, opacity: 0.42, scale: 1.15,
-                     blur: 100, x: 0.32, y: 0.30, blend: .plusLighter),
-            BlobSpec(color: Color(red: 1.0, green: 0.45, blue: 0.55), opacity: 0.30, scale: 0.85,
-                     blur: 90, x: 0.30, y: -0.05, blend: .plusLighter),
-            BlobSpec(color: Color(red: 0.85, green: 0.30, blue: 0.85), opacity: 0.22, scale: 0.75,
-                     blur: 95, x: -0.18, y: 0.12, blend: .plusLighter),
-            BlobSpec(color: Color(red: 0.20, green: 0.78, blue: 1.00), opacity: 0.18, scale: 0.70,
-                     blur: 85, x: 0.18, y: -0.32, blend: .plusLighter),
-            BlobSpec(color: Color(red: 0.55, green: 0.40, blue: 1.00), opacity: 0.20, scale: 0.85,
-                     blur: 95, x: -0.30, y: 0.32, blend: .plusLighter),
+            BlobSpec(
+                color: heroColor, opacity: 0.55, scale: 1.25,
+                blur: 110, x: -0.25, y: -0.22, blend: .plusLighter),
+            BlobSpec(
+                color: secondaryColor, opacity: 0.42, scale: 1.15,
+                blur: 100, x: 0.32, y: 0.30, blend: .plusLighter),
+            BlobSpec(
+                color: Color(red: 1.0, green: 0.45, blue: 0.55), opacity: 0.30, scale: 0.85,
+                blur: 90, x: 0.30, y: -0.05, blend: .plusLighter),
+            BlobSpec(
+                color: Color(red: 0.85, green: 0.30, blue: 0.85), opacity: 0.22, scale: 0.75,
+                blur: 95, x: -0.18, y: 0.12, blend: .plusLighter),
+            BlobSpec(
+                color: Color(red: 0.20, green: 0.78, blue: 1.00), opacity: 0.18, scale: 0.70,
+                blur: 85, x: 0.18, y: -0.32, blend: .plusLighter),
+            BlobSpec(
+                color: Color(red: 0.55, green: 0.40, blue: 1.00), opacity: 0.20, scale: 0.85,
+                blur: 95, x: -0.30, y: 0.32, blend: .plusLighter),
         ]
     }
 
@@ -143,15 +149,20 @@ struct VibrantBackground: View {
     }
 
     private static let incognitoBlobs: [BlobSpec] = [
-        BlobSpec(color: IncognitoPalette.accent, opacity: 0.12, scale: 1.30,
-                 blur: 120, x: -0.28, y: -0.25, blend: .plusLighter),
-        BlobSpec(color: IncognitoPalette.secondaryAccent, opacity: 0.09, scale: 1.20,
-                 blur: 110, x: 0.32, y: 0.30, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.30, green: 0.30, blue: 0.55), opacity: 0.20, scale: 0.95,
-                 blur: 110, x: 0.05, y: 0.05, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.40, green: 0.30, blue: 0.55), opacity: 0.16, scale: 0.85,
-                 blur: 100, x: -0.30, y: 0.30, blend: .plusLighter),
-        BlobSpec(color: Color(red: 0.50, green: 0.62, blue: 0.78), opacity: 0.10, scale: 0.75,
-                 blur: 90, x: 0.22, y: -0.30, blend: .plusLighter),
+        BlobSpec(
+            color: IncognitoPalette.accent, opacity: 0.12, scale: 1.30,
+            blur: 120, x: -0.28, y: -0.25, blend: .plusLighter),
+        BlobSpec(
+            color: IncognitoPalette.secondaryAccent, opacity: 0.09, scale: 1.20,
+            blur: 110, x: 0.32, y: 0.30, blend: .plusLighter),
+        BlobSpec(
+            color: Color(red: 0.30, green: 0.30, blue: 0.55), opacity: 0.20, scale: 0.95,
+            blur: 110, x: 0.05, y: 0.05, blend: .plusLighter),
+        BlobSpec(
+            color: Color(red: 0.40, green: 0.30, blue: 0.55), opacity: 0.16, scale: 0.85,
+            blur: 100, x: -0.30, y: 0.30, blend: .plusLighter),
+        BlobSpec(
+            color: Color(red: 0.50, green: 0.62, blue: 0.78), opacity: 0.10, scale: 0.75,
+            blur: 90, x: 0.22, y: -0.30, blend: .plusLighter),
     ]
 }

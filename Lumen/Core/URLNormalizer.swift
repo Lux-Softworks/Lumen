@@ -34,11 +34,11 @@ nonisolated enum URLNormalizer {
 
         var host = (comps.host ?? "").lowercased()
         if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
+
         var path = comps.path
-
         if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        var result = host + path
 
+        var result = host + path
         if let query = comps.query, !query.isEmpty {
             result += "?" + query
         }
@@ -58,6 +58,6 @@ nonisolated enum URLNormalizer {
         "mc_cid", "mc_eid", "igshid", "s_cid", "ref", "ref_", "ref_src",
         "referrer", "source", "src", "campaign", "_hsenc", "_hsmi",
         "_ga", "_gac", "aff", "affiliate", "trk", "pk_campaign", "pk_kwd",
-        "spm", "share", "shared", "shareid", "share_source"
+        "spm", "share", "shared", "shareid", "share_source",
     ]
 }

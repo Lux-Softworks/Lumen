@@ -39,11 +39,13 @@ final class Tab: Identifiable, ObservableObject {
             .sink { [weak self] newTitle in
                 self?.title = newTitle.isEmpty ? "New Tab" : newTitle
             }
+
         themeColorCancellable = viewModel.$themeColor
             .receive(on: DispatchQueue.main)
             .sink { [weak self] color in
                 self?.themeColor = color
             }
+
         faviconPrefetchCancellable = viewModel.$currentURL
             .receive(on: DispatchQueue.main)
             .sink { [weak self] url in

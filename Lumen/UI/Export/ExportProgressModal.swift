@@ -36,14 +36,19 @@ struct ExportProgressModal: View {
                         .foregroundStyle(AppTheme.Colors.danger)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(AppTheme.Colors.danger.opacity(0.1)))
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(
+                                AppTheme.Colors.danger.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
             }
             .padding(24)
             .frame(maxWidth: 280)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(
+                    palette.text.opacity(0.08), lineWidth: 0.5)
+            )
             .shadow(color: .black.opacity(0.2), radius: 30)
         }
     }

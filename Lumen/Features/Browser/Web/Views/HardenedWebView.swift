@@ -36,7 +36,8 @@ struct HardenedWebView: UIViewControllerRepresentable {
 
         func startSpinning() {
             guard let starView = starView else { return }
-            let currentAngle = (starView.layer.presentation()?.value(forKeyPath: "transform.rotation.z") as? CGFloat) ?? 0
+            let currentAngle =
+                (starView.layer.presentation()?.value(forKeyPath: "transform.rotation.z") as? CGFloat) ?? 0
             starView.transform = .identity
             let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
             rotation.fromValue = currentAngle
@@ -126,7 +127,8 @@ struct HardenedWebView: UIViewControllerRepresentable {
         ])
         context.coordinator.starView = starImageView
 
-        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.handleRefresh(_:)), for: .valueChanged)
+        refreshControl.addTarget(
+            context.coordinator, action: #selector(Coordinator.handleRefresh(_:)), for: .valueChanged)
         webView.scrollView.refreshControl = refreshControl
         webView.scrollView.backgroundColor = viewModel.themeColor ?? .black
         context.coordinator.refreshControl = refreshControl

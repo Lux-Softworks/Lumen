@@ -83,8 +83,9 @@ nonisolated final class EmbeddingService: @unchecked Sendable {
         guard let clean = Self.sanitize(text) else { return nil }
 
         if let ctx = ensureLoaded(),
-           Self.looksEnglish(clean),
-           let vector = contextualVector(ctx, text: clean) {
+            Self.looksEnglish(clean),
+            let vector = contextualVector(ctx, text: clean)
+        {
             return vector
         }
 
@@ -115,6 +116,7 @@ nonisolated final class EmbeddingService: @unchecked Sendable {
 
     private static func looksEnglish(_ text: String) -> Bool {
         guard text.utf16.count >= 16 else { return true }
+
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)
         guard let lang = recognizer.dominantLanguage else { return false }

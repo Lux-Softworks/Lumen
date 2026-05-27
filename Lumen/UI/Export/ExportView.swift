@@ -57,18 +57,24 @@ struct ExportView: View {
                 .padding(.vertical, 12)
         }
         .onAppear { scope = initialScope }
-        .sheet(item: $shareItem, onDismiss: {
-            exportProgress = nil
-            progressGateVisible = false
-            gateTask?.cancel()
-            gateTask = nil
-        }) { item in
+        .sheet(
+            item: $shareItem,
+            onDismiss: {
+                exportProgress = nil
+                progressGateVisible = false
+                gateTask?.cancel()
+                gateTask = nil
+            }
+        ) { item in
             ShareSheet(url: item.url)
         }
-        .alert("Export Failed", isPresented: Binding(
-            get: { failureMessage != nil },
-            set: { if !$0 { exportProgress = nil } }
-        )) {
+        .alert(
+            "Export Failed",
+            isPresented: Binding(
+                get: { failureMessage != nil },
+                set: { if !$0 { exportProgress = nil } }
+            )
+        ) {
             Button("OK", role: .cancel) { exportProgress = nil }
         } message: {
             Text(failureMessage ?? "")
@@ -134,7 +140,8 @@ struct ExportView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
     }
 
     private var fixedScopeIcon: String {
@@ -170,7 +177,8 @@ struct ExportView: View {
             scopeRow(.dateRange, icon: "calendar", title: "Date Range")
         }
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
     }
 
     private func scopeRow(_ value: Scope, icon: String, title: String) -> some View {
@@ -214,7 +222,8 @@ struct ExportView: View {
             toggleRow(icon: "clock", title: "Include Timestamps", isOn: $includeTimestamps)
         }
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
     }
 
     private func toggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
@@ -243,7 +252,8 @@ struct ExportView: View {
             datePickerRow(title: "To", selection: $endDate)
         }
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
     }
 
     private func datePickerRow(title: String, selection: Binding<Date>) -> some View {
@@ -302,7 +312,8 @@ struct ExportView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.uiElement))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(palette.text.opacity(0.08), lineWidth: 0.5))
     }
 
     private var actionButton: some View {

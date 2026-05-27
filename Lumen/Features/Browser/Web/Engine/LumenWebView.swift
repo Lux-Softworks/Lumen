@@ -42,7 +42,9 @@ final class LumenWebView: WKWebView {
     @MainActor
     func showRemoveHighlightMenu(rect: CGRect, annotationID: String) {
         guard #available(iOS 16.0, *) else { return }
+
         pendingRemoveAnnotationID = annotationID
+
         let point = CGPoint(x: rect.midX, y: rect.maxY)
         let config = UIEditMenuConfiguration(
             identifier: "lumen-remove-highlight" as NSString,
@@ -60,20 +62,26 @@ extension LumenWebView: UIEditMenuInteractionDelegate {
         suggestedActions: [UIMenuElement]
     ) -> UIMenu? {
         guard (configuration.identifier as? String) == "lumen-remove-highlight",
-              let id = pendingRemoveAnnotationID else { return nil }
+            let id = pendingRemoveAnnotationID
+        else { return nil }
+
         let remove = UIAction(
             title: "Remove Highlight",
             image: UIImage(systemName: "trash"),
             attributes: .destructive
         ) { [weak self] _ in
             guard let self else { return }
+
             self.pendingRemoveAnnotationID = nil
             Task { [weak self] in
                 try? await KnowledgeStorage.shared.deleteAnnotation(id: id)
+
                 guard let self else { return }
+
                 await MainActor.run { AnnotationHandler.applyAll(webView: self) }
             }
         }
+
         return UIMenu(children: [remove])
     }
 }

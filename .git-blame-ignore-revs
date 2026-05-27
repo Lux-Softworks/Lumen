@@ -1,0 +1,9 @@
+# Revisions to ignore in `git blame` (whitespace/formatting-only commits).
+# GitHub honors this file automatically. Locally it is wired up via:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# After committing the swift-format + grouping pass as ONE commit, append its
+# full 40-char SHA below (one per line). Comment lines like these are ignored.
+#
+# e.g.
+# 0123456789abcdef0123456789abcdef01234567  Lumen: repo-wide swift-format + logical-block spacing

@@ -33,6 +33,7 @@ final class KnowledgeMenuViewModel {
         let wasEmpty = topics.isEmpty
         if wasEmpty { isLoading = true }
         defer { if wasEmpty { isLoading = false } }
+
         do {
             var loaded = try await KnowledgeStorage.shared.fetchAllTopics()
             let uncategorizedCount = try await KnowledgeStorage.shared.uncategorizedWebsiteCount()
@@ -47,6 +48,7 @@ final class KnowledgeMenuViewModel {
                     )
                 )
             }
+
             topics = loaded
         } catch {
             self.error = error
@@ -59,6 +61,7 @@ final class KnowledgeMenuViewModel {
         selectedPage = nil
         isLoading = true
         defer { isLoading = false }
+
         do {
             if let topic = topic {
                 if topic.isUncategorized {
@@ -69,6 +72,7 @@ final class KnowledgeMenuViewModel {
             } else {
                 websites = try await KnowledgeStorage.shared.fetchAllWebsites()
             }
+
             navigationPath.append(.websites(topic: topic))
         } catch {
             self.error = error
@@ -97,10 +101,12 @@ final class KnowledgeMenuViewModel {
 
     func navigateBack() {
         guard !navigationPath.isEmpty else { return }
+
         let removed = navigationPath.removeLast()
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(320))
             guard let self else { return }
+
             switch removed {
             case .detail:
                 self.selectedPage = nil

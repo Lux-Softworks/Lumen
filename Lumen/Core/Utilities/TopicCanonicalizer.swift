@@ -182,14 +182,15 @@ enum TopicCanonicalizer {
         "religion": "Religion",
         "parenting": "Parenting",
         "family": "Family",
-        "relationships": "Relationships"
+        "relationships": "Relationships",
     ]
 
     static func canonical(for raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
-        let key = trimmed
+        let key =
+            trimmed
             .lowercased()
             .unicodeScalars
             .filter { CharacterSet.alphanumerics.contains($0) }

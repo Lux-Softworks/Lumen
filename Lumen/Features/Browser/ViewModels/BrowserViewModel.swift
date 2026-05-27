@@ -56,6 +56,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     func attachWebView(_ webView: WKWebView) {
         observations.removeAll()
+
         self.webView = webView
 
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "firstPaint")
@@ -94,9 +95,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     func captureSnapshot() async -> UIImage? {
         guard let webView = webView else { return nil }
+
         let config = WKSnapshotConfiguration()
         config.rect = webView.bounds
         config.snapshotWidth = NSNumber(value: Double(min(webView.bounds.width, 480)))
+
         return try? await webView.takeSnapshot(configuration: config)
     }
 
@@ -106,6 +109,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
         let url = self.classifyInput(trimmed)
         pendingHistoryRecord = true
+
         loadURL(url)
     }
 
@@ -122,6 +126,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         urlString = url.absoluteString
 
         let request = BrowserEngine.makeRequest(url: url)
+
         if let webView = webView {
             webView.load(request)
         } else {
@@ -157,8 +162,11 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     func setDesktopMode(_ on: Bool) {
         isDesktopMode = on
-        let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+
+        let ua =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
         webView?.customUserAgent = on ? ua : nil
+
         webView?.reload()
     }
 
@@ -183,6 +191,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         let miners = threatEvents.filter { $0.type == .cryptominer }.count
 
         var parts: [String] = []
+
         if trackers > 0 { parts.append("\(trackers) tracker\(trackers == 1 ? "" : "s")") }
 
         if fingerprinters > 0 {
@@ -242,11 +251,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
                         self?.pageReadyToken += 1
                         self?.updateThemeColorManually(webView)
 
-                        webView.evaluateJavaScript("""
-                            requestAnimationFrame(function() {
-                                window.webkit.messageHandlers.firstPaint.postMessage({});
-                            });
-                        """, completionHandler: nil)
+                        webView.evaluateJavaScript(
+                            """
+                                requestAnimationFrame(function() {
+                                    window.webkit.messageHandlers.firstPaint.postMessage({});
+                                });
+                            """, completionHandler: nil)
 
                         if let self,
                             self.pendingHistoryRecord,
@@ -374,7 +384,9 @@ final class BrowserViewModel: NSObject, ObservableObject {
         observations.append(
             webView.scrollView.observe(\.contentOffset, options: [.old, .new]) { [weak self, weak webView] _, change in
                 guard let newY = change.newValue?.y,
-                      let oldY = change.oldValue?.y else { return }
+                    let oldY = change.oldValue?.y
+                else { return }
+
                 let delta = newY - oldY
                 let absDelta = abs(delta)
 
@@ -384,7 +396,8 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
                 DispatchQueue.main.async {
                     guard let self = self, let webView = webView else { return }
-                    self.onScrollUpdate?(newY, delta, webView.scrollView.contentSize.height, webView.scrollView.bounds.height)
+                    self.onScrollUpdate?(
+                        newY, delta, webView.scrollView.contentSize.height, webView.scrollView.bounds.height)
                 }
             }
         )

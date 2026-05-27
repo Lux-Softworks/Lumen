@@ -23,7 +23,6 @@ actor TrackerDatabase {
         }
 
         let parts = domain.split(separator: ".")
-
         if parts.count > 2 {
             let parent = parts.suffix(2).joined(separator: ".")
             return trackers[parent]
@@ -66,7 +65,8 @@ actor TrackerDatabase {
 
     func parseDisconnectJSON(_ data: Data) {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let categories = root["categories"] as? [String: Any] else {
+            let categories = root["categories"] as? [String: Any]
+        else {
             return
         }
 
@@ -78,7 +78,7 @@ actor TrackerDatabase {
             "Fingerprinting": .fingerprinting,
             "Content": .unknown,
             "Disconnect": .advertising,
-            "Anti-fraud": .unknown
+            "Anti-fraud": .unknown,
         ]
 
         var newTrackers: [String: ThreatDetector.TrackerInfo] = [:]
@@ -118,7 +118,8 @@ actor TrackerDatabase {
                     )
 
                     for domain in allDomains {
-                        let cleaned = domain
+                        let cleaned =
+                            domain
                             .replacingOccurrences(of: "http://", with: "")
                             .replacingOccurrences(of: "https://", with: "")
                             .components(separatedBy: "/").first ?? domain

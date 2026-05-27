@@ -56,11 +56,11 @@ final class KnowledgeCaptureService: ObservableObject {
         guard let webView = webView else { return }
         guard webView.window != nil else { return }
 
-        let incognito = objc_getAssociatedObject(
-            webView.configuration,
-            &_WKWebViewAssociatedKeys.incognitoFlagKey
-        ) as? Bool ?? false
-
+        let incognito =
+            objc_getAssociatedObject(
+                webView.configuration,
+                &_WKWebViewAssociatedKeys.incognitoFlagKey
+            ) as? Bool ?? false
         guard !incognito else { return }
 
         await Self.waitForDOMReady(webView: webView)
@@ -135,7 +135,8 @@ final class KnowledgeCaptureService: ObservableObject {
                 website.totalWords += wordCount
 
                 if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !meta.isEmpty {
+                    !meta.isEmpty
+                {
                     website.displayName = meta
                 } else if website.displayName.isEmpty || website.displayName == domain {
                     website.displayName = DomainNameFormatter.format(host: domain)
@@ -147,7 +148,8 @@ final class KnowledgeCaptureService: ObservableObject {
 
                 try await KnowledgeStorage.shared.updateWebsite(website)
             } else if quality.shouldCreateWebsite || force {
-                let displayName = Self.resolveSiteName(extracted: extractedContent, domain: domain)
+                let displayName =
+                    Self.resolveSiteName(extracted: extractedContent, domain: domain)
                     ?? DomainNameFormatter.format(host: domain)
 
                 let newWebsite = Website(
@@ -300,7 +302,8 @@ final class KnowledgeCaptureService: ObservableObject {
 
     private static func resolveSiteName(extracted: ExtractedContent, domain: String) -> String? {
         if let meta = extracted.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !meta.isEmpty {
+            !meta.isEmpty
+        {
             return meta
         }
 

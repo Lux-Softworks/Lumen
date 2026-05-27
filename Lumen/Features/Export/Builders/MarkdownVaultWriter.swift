@@ -14,7 +14,6 @@ nonisolated enum MarkdownVaultWriter {
         try FileManager.default.createDirectory(at: topicsDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: sitesDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: pagesDir, withIntermediateDirectories: true)
-
         let filenamesByPageID = precomputeFilenames(pages: payload.pages)
 
         try writeReadme(into: vaultDir, payload: payload)
@@ -33,6 +32,7 @@ nonisolated enum MarkdownVaultWriter {
     private static func precomputeFilenames(pages: [PageContent]) -> [String: String] {
         var result: [String: String] = [:]
         var usedPerDomain: [String: Set<String>] = [:]
+
         for page in pages {
             let domain = page.domain.isEmpty ? "unknown" : page.domain
             var set = usedPerDomain[domain] ?? []
@@ -40,6 +40,7 @@ nonisolated enum MarkdownVaultWriter {
             usedPerDomain[domain] = set
             result[page.id] = name
         }
+
         return result
     }
 
@@ -47,6 +48,7 @@ nonisolated enum MarkdownVaultWriter {
         let date = DateFormatters.ymd.string(from: page.timestamp)
         let titleSeed = page.displayTitle
         let base = "\(date)-\(slug(titleSeed))"
+
         var candidate = base
         var suffix = 2
         while existing.contains(candidate) {
@@ -179,7 +181,8 @@ nonisolated enum MarkdownVaultWriter {
         let total = payload.pages.count
         let topicByID = Dictionary(uniqueKeysWithValues: payload.topics.map { ($0.id, $0) })
         let siteByID = Dictionary(uniqueKeysWithValues: payload.websites.map { ($0.id, $0) })
-        let annotationsByPageID: [String: [Annotation]] = Dictionary(grouping: payload.annotations, by: { $0.pageID ?? "" })
+        let annotationsByPageID: [String: [Annotation]] = Dictionary(
+            grouping: payload.annotations, by: { $0.pageID ?? "" })
 
         for (index, page) in payload.pages.enumerated() {
             if shouldCancel() { throw CancellationError() }
@@ -261,11 +264,13 @@ nonisolated enum MarkdownVaultWriter {
     private static let illegal: Set<Character> = ["/", "\\", ":", "?", "*", "\"", "<", ">", "|"]
 
     private static func slug(_ raw: String) -> String {
-        var cleaned = String(raw.unicodeScalars.map { scalar -> Character in
-            let char = Character(scalar)
-            return illegal.contains(char) ? "-" : char
-        })
-        cleaned = cleaned
+        var cleaned = String(
+            raw.unicodeScalars.map { scalar -> Character in
+                let char = Character(scalar)
+                return illegal.contains(char) ? "-" : char
+            })
+        cleaned =
+            cleaned
             .replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)
             .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "- "))
@@ -275,7 +280,8 @@ nonisolated enum MarkdownVaultWriter {
     }
 
     private static func yamlEscape(_ raw: String) -> String {
-        let needsQuote = raw.contains(":") || raw.contains("#") || raw.contains("\"") || raw.hasPrefix("-") || raw.contains("\n")
+        let needsQuote =
+            raw.contains(":") || raw.contains("#") || raw.contains("\"") || raw.hasPrefix("-") || raw.contains("\n")
         if !needsQuote { return raw }
         let escaped = raw.replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: " ")
         return "\"\(escaped)\""

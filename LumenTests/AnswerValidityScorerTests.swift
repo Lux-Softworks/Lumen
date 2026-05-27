@@ -37,7 +37,8 @@ struct AnswerValidityScorerTests {
     }
 
     @Test func substantiveAnswerKeepsHigh() {
-        let answer = "Real Madrid signed a new midfielder this week, with the transfer fee reportedly exceeding sixty million euros, and Barcelona offered a counter bid before withdrawing late yesterday."
+        let answer =
+            "Real Madrid signed a new midfielder this week, with the transfer fee reportedly exceeding sixty million euros, and Barcelona offered a counter bid before withdrawing late yesterday."
         #expect(AnswerValidityScorer.match(answer: answer, validity: 0.7) == .high)
     }
 }

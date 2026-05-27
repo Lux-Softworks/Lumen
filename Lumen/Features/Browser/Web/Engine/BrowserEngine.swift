@@ -163,6 +163,7 @@ enum BrowserEngine {
         let config = makeConfiguration(policy: policy, isIncognito: isIncognito)
         let webView = LumenWebView(frame: .zero, configuration: config)
         attachDelegates(to: webView, policy: policy, isIncognito: isIncognito)
+
         return webView
     }
 
@@ -174,6 +175,7 @@ enum BrowserEngine {
     ) -> WKWebView {
         let webView = LumenWebView(frame: .zero, configuration: parentConfig)
         attachDelegates(to: webView, policy: policy, isIncognito: isIncognito)
+
         return webView
     }
 
@@ -241,6 +243,7 @@ enum BrowserEngine {
     static func makeRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy)
         request.timeoutInterval = 30
+
         return request
     }
 }
@@ -296,4 +299,3 @@ extension WKWebView {
         }
     }
 }
-

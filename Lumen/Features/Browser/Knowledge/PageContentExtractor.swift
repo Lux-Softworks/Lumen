@@ -92,11 +92,10 @@ private extension PageContentExtractor {
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
             "yyyy-MM-dd'T'HH:mmXXXXX",
             "EEE, dd MMM yyyy HH:mm:ss ZZZZZ",
-            "yyyy-MM-dd"
+            "yyyy-MM-dd",
         ]
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-
         for format in formats {
             formatter.dateFormat = format
             if let date = formatter.date(from: string) {
@@ -150,13 +149,14 @@ private extension PageContentExtractor {
             "meta[name=og:site_name]",
             "meta[name=application-name]",
             "meta[name=apple-mobile-web-app-title]",
-            "meta[property=twitter:site]"
+            "meta[property=twitter:site]",
         ]
 
         for query in metaQueries {
             if let element = try doc.select(query).first(),
-               let raw = try? element.attr("content"),
-               let cleaned = sanitizeSiteName(raw) {
+                let raw = try? element.attr("content"),
+                let cleaned = sanitizeSiteName(raw)
+            {
                 return cleaned
             }
         }
@@ -174,7 +174,7 @@ private extension PageContentExtractor {
         let lower = value.lowercased()
         let rejected: Set<String> = [
             "website", "site", "home", "homepage", "page", "untitled",
-            "document", "index", "default", "n/a", "none", "unknown"
+            "document", "index", "default", "n/a", "none", "unknown",
         ]
         if rejected.contains(lower) { return nil }
 

@@ -56,9 +56,11 @@ final class SearchHistoryStore: ObservableObject {
         var seen = Set<String>()
         var merged: [SearchQueryEntry] = []
         merged.reserveCapacity(entries.count + loaded.count)
+
         for entry in entries + loaded where seen.insert(entry.id).inserted {
             merged.append(entry)
         }
+
         entries = Array(merged.prefix(Self.maxEntries))
         rebuildIndex()
     }
@@ -68,16 +70,19 @@ final class SearchHistoryStore: ObservableObject {
         do {
             let data = try Data(contentsOf: storeURL)
             let decoded = try JSONDecoder().decode([SearchQueryEntry].self, from: data)
+
             var seen = Set<String>()
             var deduped: [SearchQueryEntry] = []
             deduped.reserveCapacity(decoded.count)
             for entry in decoded where seen.insert(entry.id).inserted {
                 deduped.append(entry)
             }
+
             return Array(deduped.prefix(Self.maxEntries))
         } catch {
             let quarantine = storeURL.appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970))")
             try? FileManager.default.moveItem(at: storeURL, to: quarantine)
+
             return []
         }
     }
@@ -95,9 +100,11 @@ final class SearchHistoryStore: ObservableObject {
             entries.remove(at: existing)
         }
         entries.insert(SearchQueryEntry(query: trimmed), at: 0)
+
         if entries.count > Self.maxEntries {
             entries = Array(entries.prefix(Self.maxEntries))
         }
+
         rebuildIndex()
         saveSubject.send()
     }
@@ -111,9 +118,11 @@ final class SearchHistoryStore: ObservableObject {
         var substringMatches: [SearchQueryEntry] = []
         prefixMatches.reserveCapacity(limit)
         substringMatches.reserveCapacity(limit)
+
         for entry in entries {
             let id = entry.id
             if id == normalizedPrefix { continue }
+
             if id.hasPrefix(normalizedPrefix) {
                 prefixMatches.append(entry)
                 if prefixMatches.count >= limit { break }
@@ -121,6 +130,7 @@ final class SearchHistoryStore: ObservableObject {
                 substringMatches.append(entry)
             }
         }
+
         return Array((prefixMatches + substringMatches).prefix(limit))
     }
 
@@ -145,25 +155,32 @@ final class SearchHistoryStore: ObservableObject {
 
     private func looksSensitive(_ s: String) -> Bool {
         if let url = URL(string: s), url.scheme != nil, url.host != nil { return true }
+
         if s.range(of: #"\b(?:\d[ -]*?){13,19}\b"#, options: .regularExpression) != nil {
             return true
         }
+
         if s.count >= 32,
-           s.range(of: #"^[a-fA-F0-9]+$"#, options: .regularExpression) != nil {
+            s.range(of: #"^[a-fA-F0-9]+$"#, options: .regularExpression) != nil
+        {
             return true
         }
+
         if s.count >= 40, !s.contains("."), !s.contains(" "),
-           s.range(of: #"^[A-Za-z0-9+/=_\-]+$"#, options: .regularExpression) != nil,
-           s.range(of: #"[A-Z]"#, options: .regularExpression) != nil,
-           s.range(of: #"[a-z]"#, options: .regularExpression) != nil,
-           s.range(of: #"\d"#, options: .regularExpression) != nil {
+            s.range(of: #"^[A-Za-z0-9+/=_\-]+$"#, options: .regularExpression) != nil,
+            s.range(of: #"[A-Z]"#, options: .regularExpression) != nil,
+            s.range(of: #"[a-z]"#, options: .regularExpression) != nil,
+            s.range(of: #"\d"#, options: .regularExpression) != nil
+        {
             return true
         }
+
         return false
     }
 
     private func setupPersistenceThrottle() {
-        saveCancellable = saveSubject
+        saveCancellable =
+            saveSubject
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.performSave() }
     }
@@ -171,12 +188,14 @@ final class SearchHistoryStore: ObservableObject {
     private func performSave() {
         do {
             var data = try JSONEncoder().encode(entries)
+
             if data.count > Self.maxFileBytes {
                 let half = max(10, entries.count / 2)
                 entries = Array(entries.prefix(half))
                 rebuildIndex()
                 data = try JSONEncoder().encode(entries)
             }
+
             try data.write(to: storeURL, options: [.atomic, .completeFileProtectionUnlessOpen])
         } catch {
             Self.logger.error("save failed: \(String(describing: error), privacy: .public)")
@@ -192,12 +211,15 @@ final class SearchHistoryStore: ObservableObject {
         guard let decoded = try? JSONDecoder().decode([SearchQueryEntry].self, from: data) else {
             return
         }
+
         var seen = Set<String>()
         var merged: [SearchQueryEntry] = []
         merged.reserveCapacity(entries.count + decoded.count)
+
         for entry in entries + decoded where seen.insert(entry.id).inserted {
             merged.append(entry)
         }
+
         entries = Array(merged.prefix(Self.maxEntries))
         rebuildIndex()
         saveSubject.send()
@@ -205,14 +227,17 @@ final class SearchHistoryStore: ObservableObject {
 
     private static func resolveStoreURL() -> URL {
         let fm = FileManager.default
-        let base = (try? fm.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )) ?? fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let base =
+            (try? fm.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )) ?? fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+
         let dir = base.appendingPathComponent("Lumen", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+
         return dir.appendingPathComponent(fileName)
     }
 }

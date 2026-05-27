@@ -109,7 +109,9 @@ struct SettingsPage: View {
             Button("Delete", role: .destructive) { deleteAllKnowledge() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently removes every page, website, topic, summary, embedding, and annotation Lumen has stored. Your reading history in the knowledge base will be gone. This cannot be undone.")
+            Text(
+                "This permanently removes every page, website, topic, summary, embedding, and annotation Lumen has stored. Your reading history in the knowledge base will be gone. This cannot be undone."
+            )
         }
     }
 
@@ -143,7 +145,8 @@ struct SettingsPage: View {
         }
         .onAppear {
             if type == .site {
-                let policy = SiteSettingsStore.shared.policy(for: currentURL)
+                let policy =
+                    SiteSettingsStore.shared.policy(for: currentURL)
                     ?? settings.globalPrivacyPolicy
                 siteBlockTrackers = policy.blocksThirdPartyCookies
                 siteBlockPopups = !policy.javaScriptCanOpenWindowsAutomatically
@@ -167,30 +170,30 @@ struct SettingsPage: View {
                 detailHeader(for: section)
 
                 switch section {
-                    case .main:
-                        EmptyView()
-                    case .globalSiteSettings:
-                        globalSiteSettingsList
-                    case .searchEngine:
-                        searchEngineList
-                    case .nativeApps:
-                        nativeAppsList
-                    case .defaultBrowser:
-                        defaultBrowserContent
-                    case .languages:
-                        languagesContent
-                    case .privacyPolicy:
-                        privacyPolicyContent
-                    case .displayOptions:
-                        displayOptionsContent
-                    case .siteSectionSettings:
-                        siteSectionSettingsList
-                    case .bookmarks:
-                        BookmarksListView(onNavigate: onNavigate, onDismiss: onDismiss)
-                    case .exportKnowledge:
-                        ExportView(initialScope: .wholeBase, onDismiss: onDismiss)
-                    case .haptics:
-                        hapticsList
+                case .main:
+                    EmptyView()
+                case .globalSiteSettings:
+                    globalSiteSettingsList
+                case .searchEngine:
+                    searchEngineList
+                case .nativeApps:
+                    nativeAppsList
+                case .defaultBrowser:
+                    defaultBrowserContent
+                case .languages:
+                    languagesContent
+                case .privacyPolicy:
+                    privacyPolicyContent
+                case .displayOptions:
+                    displayOptionsContent
+                case .siteSectionSettings:
+                    siteSectionSettingsList
+                case .bookmarks:
+                    BookmarksListView(onNavigate: onNavigate, onDismiss: onDismiss)
+                case .exportKnowledge:
+                    ExportView(initialScope: .wholeBase, onDismiss: onDismiss)
+                case .haptics:
+                    hapticsList
                 }
             }
             .padding(.top, 12)
@@ -243,7 +246,9 @@ struct SettingsPage: View {
             }
 
             settingsGroup {
-                settingsRow(icon: "clock.arrow.circlepath", title: "Clear History on Close", isOn: $settings.clearHistoryOnClose) {}
+                settingsRow(
+                    icon: "clock.arrow.circlepath", title: "Clear History on Close", isOn: $settings.clearHistoryOnClose
+                ) {}
             }
 
             settingsGroup {
@@ -304,12 +309,16 @@ struct SettingsPage: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(mode.label)
-                                    .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
+                                    .font(
+                                        AppTheme.Typography.sansBody(
+                                            size: bodyFont16, weight: isSelected ? .bold : .medium)
+                                    )
                                     .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                                 Text(mode.caption)
                                     .font(.footnote.weight(.regular))
-                                    .foregroundStyle(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
+                                    .foregroundStyle(
+                                        isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
                             Spacer()
@@ -538,7 +547,8 @@ struct SettingsPage: View {
     }
 
     private func saveSitePolicy() {
-        var policy = SiteSettingsStore.shared.policy(for: currentURL)
+        var policy =
+            SiteSettingsStore.shared.policy(for: currentURL)
             ?? settings.globalPrivacyPolicy
         policy.blocksThirdPartyCookies = siteBlockTrackers
         policy.javaScriptCanOpenWindowsAutomatically = !siteBlockPopups
@@ -579,7 +589,9 @@ struct SettingsPage: View {
                                 .frame(width: listIconGutter)
 
                             Text(engine.rawValue)
-                                .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
+                                .font(
+                                    AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium)
+                                )
                                 .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                             Spacer()
@@ -617,12 +629,16 @@ struct SettingsPage: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(policy.rawValue)
-                                    .font(AppTheme.Typography.sansBody(size: bodyFont16, weight: isSelected ? .bold : .medium))
+                                    .font(
+                                        AppTheme.Typography.sansBody(
+                                            size: bodyFont16, weight: isSelected ? .bold : .medium)
+                                    )
                                     .foregroundStyle(isSelected ? palette.accent : palette.text)
 
                                 Text(policyDescription(policy))
                                     .font(.footnote.weight(.regular))
-                                    .foregroundStyle(isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
+                                    .foregroundStyle(
+                                        isSelected ? palette.accent.opacity(0.8) : palette.text.opacity(0.45))
                             }
 
                             Spacer()
@@ -719,7 +735,8 @@ struct SettingsPage: View {
 
             Button {
                 if #available(iOS 18.3, *),
-                   let url = URL(string: UIApplication.openDefaultApplicationsSettingsURLString) {
+                    let url = URL(string: UIApplication.openDefaultApplicationsSettingsURLString)
+                {
                     UIApplication.shared.open(url)
                 } else if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -784,22 +801,26 @@ struct SettingsPage: View {
                 VStack(spacing: 0) {
                     policySection(
                         title: "What We Collect",
-                        body: "Lumen does not collect, transmit, or sell your browsing data. All history and preferences are stored locally on your device."
+                        body:
+                            "Lumen does not collect, transmit, or sell your browsing data. All history and preferences are stored locally on your device."
                     )
                     divider
                     policySection(
                         title: "Tracking Protection",
-                        body: "Lumen blocks third-party trackers, fingerprinting scripts, and crypto miners to protect your privacy as you browse."
+                        body:
+                            "Lumen blocks third-party trackers, fingerprinting scripts, and crypto miners to protect your privacy as you browse."
                     )
                     divider
                     policySection(
                         title: "Search Queries",
-                        body: "When you search, your query is sent directly to your chosen search engine. Lumen does not intercept or log search terms."
+                        body:
+                            "When you search, your query is sent directly to your chosen search engine. Lumen does not intercept or log search terms."
                     )
                     divider
                     policySection(
                         title: "Data Storage",
-                        body: "Browsing history, settings, and website data are stored only on your device and never leave it."
+                        body:
+                            "Browsing history, settings, and website data are stored only on your device and never leave it."
                     )
                     divider
                     policySection(
@@ -897,13 +918,13 @@ struct SettingsPage: View {
             WKWebsiteDataTypeLocalStorage,
             WKWebsiteDataTypeSessionStorage,
             WKWebsiteDataTypeIndexedDBDatabases,
-            WKWebsiteDataTypeWebSQLDatabases
+            WKWebsiteDataTypeWebSQLDatabases,
         ]
 
         WKWebsiteDataStore.default().removeData(
             ofTypes: dataTypes,
             modifiedSince: .distantPast
-        ) { }
+        ) {}
 
         Task { @MainActor in
             HistoryStore.shared.clearAll()

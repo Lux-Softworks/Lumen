@@ -28,6 +28,7 @@ nonisolated enum ZipArchiver {
         guard FileManager.default.fileExists(atPath: destURL.path) else {
             throw ArchiverError.movedFileMissing
         }
+
         return destURL
     }
 }

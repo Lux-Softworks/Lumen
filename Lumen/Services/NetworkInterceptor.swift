@@ -62,9 +62,9 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         let scheme = url.scheme?.lowercased()
-
         if scheme == "marketplace-kit" {
-            let isUserInitiated = navigationAction.navigationType == .linkActivated
+            let isUserInitiated =
+                navigationAction.navigationType == .linkActivated
                 || navigationAction.navigationType == .formSubmitted
             let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? false
 
@@ -90,7 +90,8 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         if navigationAction.navigationType == .backForward,
-           navigationAction.targetFrame?.isMainFrame == true {
+            navigationAction.targetFrame?.isMainFrame == true
+        {
             Task { @MainActor in Haptics.fire(.soft) }
         }
 
@@ -98,7 +99,9 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         switch action {
         case .upgrade(let httpsURL):
-            logger.info("HTTPS upgrade: \(url.absoluteString, privacy: .private) → \(httpsURL.absoluteString, privacy: .private)")
+            logger.info(
+                "HTTPS upgrade: \(url.absoluteString, privacy: .private) → \(httpsURL.absoluteString, privacy: .private)"
+            )
             webView.load(URLRequest(url: httpsURL))
             decisionHandler(.cancel)
             return
@@ -132,7 +135,8 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             let threats = detector.analyze(request)
 
             if !threats.isEmpty {
-                logger.warning("\(threats.count, privacy: .public) threat(s) on \(url.host ?? "unknown", privacy: .private)")
+                logger.warning(
+                    "\(threats.count, privacy: .public) threat(s) on \(url.host ?? "unknown", privacy: .private)")
             }
 
             decisionHandler(.allow)
@@ -172,7 +176,8 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
 
         if #available(iOS 14.5, *) {
-            let shouldDownload = !navigationResponse.canShowMIMEType
+            let shouldDownload =
+                !navigationResponse.canShowMIMEType
                 || DownloadHandler.shouldDownload(response: navigationResponse.response)
             if shouldDownload {
                 decisionHandler(.download)
@@ -243,31 +248,36 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                 $0.placeholder = "Password"
                 $0.isSecureTextEntry = true
             }
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
-                continuation.resume(returning: nil)
-            })
-            alert.addAction(UIAlertAction(title: "Sign In", style: .default) { _ in
-                let fields = alert.textFields ?? []
-                let user = fields.count > 0 ? fields[0].text ?? "" : ""
-                let password = fields.count > 1 ? fields[1].text ?? "" : ""
-                let credential = URLCredential(user: user, password: password, persistence: .forSession)
-                continuation.resume(returning: credential)
-            })
+            alert.addAction(
+                UIAlertAction(title: "Cancel", style: .cancel) { _ in
+                    continuation.resume(returning: nil)
+                })
+            alert.addAction(
+                UIAlertAction(title: "Sign In", style: .default) { _ in
+                    let fields = alert.textFields ?? []
+                    let user = fields.count > 0 ? fields[0].text ?? "" : ""
+                    let password = fields.count > 1 ? fields[1].text ?? "" : ""
+                    let credential = URLCredential(user: user, password: password, persistence: .forSession)
+                    continuation.resume(returning: credential)
+                })
             top.present(alert, animated: true)
         }
     }
 
     @MainActor
     private static func topViewController() -> UIViewController? {
-        guard let scene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first
+        guard
+            let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first
         else { return nil }
 
-        guard let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
-            ?? scene.windows.first?.rootViewController
+        guard
+            let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                ?? scene.windows.first?.rootViewController
         else { return nil }
 
         var top = root
@@ -319,7 +329,6 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         guard let url = action.request.url else { return .other }
 
         let ext = url.pathExtension.lowercased()
-
         switch ext {
         case "js":
             return .script
@@ -407,25 +416,25 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
     private func neutralizeFingerprinting(in webView: WKWebView?) {
         guard let webView else { return }
         let js = """
-            (function() {
-                try { HTMLCanvasElement.prototype.toDataURL = function() { return 'data:,'; }; } catch(_) {}
-                try {
-                    CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {
-                        var width = (w | 0) || 1;
-                        var height = (h | 0) || 1;
-                        try { return new ImageData(width, height); } catch(_) {
-                            return { data: new Uint8ClampedArray(width * height * 4), width: width, height: height };
+                (function() {
+                    try { HTMLCanvasElement.prototype.toDataURL = function() { return 'data:,'; }; } catch(_) {}
+                    try {
+                        CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {
+                            var width = (w | 0) || 1;
+                            var height = (h | 0) || 1;
+                            try { return new ImageData(width, height); } catch(_) {
+                                return { data: new Uint8ClampedArray(width * height * 4), width: width, height: height };
+                            }
+                        };
+                    } catch(_) {}
+                    try { WebGLRenderingContext.prototype.getParameter = function() { return null; }; } catch(_) {}
+                    try {
+                        if (window.AudioContext && AudioContext.prototype.createOscillator) {
+                            AudioContext.prototype.createOscillator = function() { throw new Error('blocked'); };
                         }
-                    };
-                } catch(_) {}
-                try { WebGLRenderingContext.prototype.getParameter = function() { return null; }; } catch(_) {}
-                try {
-                    if (window.AudioContext && AudioContext.prototype.createOscillator) {
-                        AudioContext.prototype.createOscillator = function() { throw new Error('blocked'); };
-                    }
-                } catch(_) {}
-            })();
-        """
+                    } catch(_) {}
+                })();
+            """
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 }

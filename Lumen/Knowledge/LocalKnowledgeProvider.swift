@@ -65,7 +65,9 @@ actor LocalKnowledgeProvider {
         return ns.substring(from: end).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func replaceAll(_ text: String, using regex: NSRegularExpression?, with replacement: String) -> String {
+    private static func replaceAll(
+        _ text: String, using regex: NSRegularExpression?, with replacement: String
+    ) -> String {
         guard let regex else { return text }
         let ns = text as NSString
         let range = NSRange(location: 0, length: ns.length)
@@ -124,6 +126,7 @@ actor LocalKnowledgeProvider {
             unloadModel()
             streamTasks.removeAll()
         }
+
         shutdownRequested = false
     }
 
@@ -184,7 +187,8 @@ actor LocalKnowledgeProvider {
     private static let requiredDiskBytes: Int64 = 1_200_000_000
 
     private func ensureDiskSpaceForModel() throws {
-        let supportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let supportURL =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         let values = try? supportURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         let available = values?.volumeAvailableCapacityForImportantUsage ?? 0
@@ -194,7 +198,8 @@ actor LocalKnowledgeProvider {
                 domain: "LocalKnowledgeProvider",
                 code: 2,
                 userInfo: [
-                    NSLocalizedDescriptionKey: "Not enough free space to download the AI model. Free up at least 1.2 GB and try again."
+                    NSLocalizedDescriptionKey:
+                        "Not enough free space to download the AI model. Free up at least 1.2 GB and try again."
                 ]
             )
         }
@@ -202,11 +207,13 @@ actor LocalKnowledgeProvider {
 
     private func warmupIfNeeded() async throws {
         guard !isWarmed, let container = modelContainer else { return }
+
         let params = GenerateParameters(maxTokens: 1, temperature: 0.0)
         let tokens = await container.encode("Hi")
         let input = LMInput(tokens: MLXArray(tokens))
         let stream = try await container.generate(input: input, parameters: params)
         for await _ in stream { break }
+
         clearGPUCache()
         isWarmed = true
     }
@@ -271,9 +278,11 @@ actor LocalKnowledgeProvider {
         defer { endInference() }
 
         let prompt = await KnowledgePrompts.conversationSummary(turns: turns, priorSummary: priorSummary)
+
         let parameters = GenerateParameters(maxTokens: 140, temperature: 0.2)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
+
         let stream = try await container.generate(input: input, parameters: parameters)
 
         var output = ""
@@ -362,12 +371,14 @@ actor LocalKnowledgeProvider {
         if modelContainer == nil {
             do { try await loadModel() } catch { return false }
         }
+
         guard let container = modelContainer else { return false }
 
         beginInference()
         defer { endInference() }
 
         let prompt = await KnowledgePrompts.intentClassifier(query: query, recentTurns: history)
+
         let parameters = GenerateParameters(maxTokens: 4, temperature: 0.0)
         let tokens = await container.encode(prompt)
         let input = LMInput(tokens: MLXArray(tokens))
@@ -379,9 +390,12 @@ actor LocalKnowledgeProvider {
                 if Task.isCancelled { break }
                 if case .chunk(let text) = event { output += text }
             }
+
             clearGPUCache()
             touch()
-            let normalized = output
+
+            let normalized =
+                output
                 .lowercased()
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return normalized.hasPrefix("chat")
@@ -540,7 +554,9 @@ actor LocalKnowledgeProvider {
                             continuation.yield(text)
                         }
                     }
-                    await KnowledgeLogger.rag.log("stream done: promptChars=\(prompt.count, privacy: .public) tokens=\(tokens.count, privacy: .public) events=\(eventCount, privacy: .public) chunks=\(chunkCount, privacy: .public)")
+                    await KnowledgeLogger.rag.log(
+                        "stream done: promptChars=\(prompt.count, privacy: .public) tokens=\(tokens.count, privacy: .public) events=\(eventCount, privacy: .public) chunks=\(chunkCount, privacy: .public)"
+                    )
 
                     self.clearGPUCache()
                     self.touch()
@@ -594,7 +610,8 @@ actor LocalKnowledgeProvider {
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let last = text.last, !".!?".contains(last),
-           let lastTerminal = text.lastIndex(where: { ".!?".contains($0) }) {
+            let lastTerminal = text.lastIndex(where: { ".!?".contains($0) })
+        {
             let trimmed = String(text[...lastTerminal])
             if Double(trimmed.count) >= Double(text.count) * 0.5 {
                 text = trimmed

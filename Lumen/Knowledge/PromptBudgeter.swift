@@ -26,7 +26,8 @@ enum PromptBudgeter {
         let highlightsBudget = Int(Double(available) * 0.20)
         let historyBudget = available - sourcesBudget - highlightsBudget
 
-        let context = buildContext(sources: sources, budget: sourcesBudget, substance: substance, includeReadDates: includeReadDates)
+        let context = buildContext(
+            sources: sources, budget: sourcesBudget, substance: substance, includeReadDates: includeReadDates)
         let (highlightsBlock, highlightsGuideline) = buildHighlights(highlights: highlights, budget: highlightsBudget)
         let historyBlock = buildHistory(history: history, budget: historyBudget, summary: conversationSummary)
 
@@ -45,14 +46,17 @@ enum PromptBudgeter {
         return f
     }()
 
-    private static func buildContext(sources: [PageContent], budget: Int, substance: [String: [String]], includeReadDates: Bool) -> String {
+    private static func buildContext(
+        sources: [PageContent], budget: Int, substance: [String: [String]], includeReadDates: Bool
+    ) -> String {
         let top = Array(sources.prefix(includeReadDates ? 5 : 3))
         guard !top.isEmpty, budget > 0 else { return "" }
-        let perSource = max(minSourceChars, budget / top.count)
 
+        let perSource = max(minSourceChars, budget / top.count)
         return top.map { page -> String in
             let baseLabel = page.title ?? page.domain
-            let label: String = includeReadDates
+            let label: String =
+                includeReadDates
                 ? "\(baseLabel) (read \(readDateFormatter.string(from: page.createdAt)))"
                 : baseLabel
             let summary = page.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -70,7 +74,8 @@ enum PromptBudgeter {
     }
 
     private static func buildHighlights(highlights: [String], budget: Int) -> (String, String) {
-        let cleaned = highlights
+        let cleaned =
+            highlights
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !cleaned.isEmpty, budget > 80 else { return ("", "") }
@@ -94,7 +99,8 @@ enum PromptBudgeter {
         guard !lines.isEmpty else { return ("", "") }
 
         let block = header + lines.joined(separator: "\n")
-        let guideline = "\n- When user-highlighted passages are present, weight them heavily — user explicitly marked them as important."
+        let guideline =
+            "\n- When user-highlighted passages are present, weight them heavily — user explicitly marked them as important."
         return (block, guideline)
     }
 

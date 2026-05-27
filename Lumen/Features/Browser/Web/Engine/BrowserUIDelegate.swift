@@ -14,14 +14,15 @@ final class BrowserUIDelegate: NSObject, WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if let handler = onRequestNewWebView,
-           let popupWebView = handler(configuration, navigationAction) {
+            let popupWebView = handler(configuration, navigationAction)
+        {
             return popupWebView
         }
 
         if navigationAction.targetFrame == nil {
             webView.load(navigationAction.request)
         }
-        
+
         return nil
     }
 
@@ -88,43 +89,60 @@ final class BrowserUIDelegate: NSObject, WKUIDelegate {
     }
 
     private func topViewController() -> UIViewController? {
-        guard let scene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first
+        guard
+            let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first
         else { return nil }
-        guard let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
-            ?? scene.windows.first?.rootViewController
+
+        guard
+            let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                ?? scene.windows.first?.rootViewController
         else { return nil }
+
         var top = root
         while let presented = top.presentedViewController { top = presented }
+
         return top
     }
 
-    private func presentAlert(host: String?, message: String, style: UIAlertController.Style, completion: @escaping () -> Void) {
+    private func presentAlert(
+        host: String?, message: String, style: UIAlertController.Style, completion: @escaping () -> Void
+    ) {
         guard let top = topViewController() else { completion(); return }
+
         let alert = UIAlertController(title: host ?? "", message: message, preferredStyle: style)
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completion() })
+
         top.present(alert, animated: true)
     }
 
     private func presentConfirm(host: String?, message: String, completionHandler: @escaping (Bool) -> Void) {
         guard let top = topViewController() else { completionHandler(false); return }
+
         let alert = UIAlertController(title: host ?? "", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
         alert.addAction(UIAlertAction(title: "Allow", style: .default) { _ in completionHandler(true) })
+
         top.present(alert, animated: true)
     }
 
-    private func presentPrompt(host: String?, message: String, defaultText: String?, completionHandler: @escaping (String?) -> Void) {
+    private func presentPrompt(
+        host: String?, message: String, defaultText: String?, completionHandler: @escaping (String?) -> Void
+    ) {
         guard let top = topViewController() else { completionHandler(nil); return }
+
         let alert = UIAlertController(title: host ?? "", message: message, preferredStyle: .alert)
         alert.addTextField { field in field.text = defaultText }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(nil) })
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-            completionHandler(alert.textFields?.first?.text ?? defaultText)
-        })
+        alert.addAction(
+            UIAlertAction(title: "OK", style: .default) { _ in
+                completionHandler(alert.textFields?.first?.text ?? defaultText)
+            })
+
         top.present(alert, animated: true)
     }
 }

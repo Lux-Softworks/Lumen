@@ -66,11 +66,12 @@ final class KnowledgeWebsiteViewModel {
             if let last = currentGroup.last {
                 let gap = last.timestamp.timeIntervalSince(page.timestamp)
                 if gap > gapThreshold {
-                    sessions.append(ReadingSession(
-                        id: UUID(),
-                        date: currentGroup.last?.timestamp ?? last.timestamp,
-                        pages: currentGroup
-                    ))
+                    sessions.append(
+                        ReadingSession(
+                            id: UUID(),
+                            date: currentGroup.last?.timestamp ?? last.timestamp,
+                            pages: currentGroup
+                        ))
                     currentGroup = []
                 }
             }
@@ -78,11 +79,12 @@ final class KnowledgeWebsiteViewModel {
         }
 
         if !currentGroup.isEmpty {
-            sessions.append(ReadingSession(
-                id: UUID(),
-                date: currentGroup.last?.timestamp ?? currentGroup[0].timestamp,
-                pages: currentGroup
-            ))
+            sessions.append(
+                ReadingSession(
+                    id: UUID(),
+                    date: currentGroup.last?.timestamp ?? currentGroup[0].timestamp,
+                    pages: currentGroup
+                ))
         }
 
         return sessions
@@ -92,9 +94,10 @@ final class KnowledgeWebsiteViewModel {
         if case .generating = synthesisState { return }
 
         if let existingSummary = website.summary,
-           !existingSummary.isEmpty,
-           let _ = website.synthesisUpdatedAt,
-           website.pageCountAtSynthesis >= website.pageCount {
+            !existingSummary.isEmpty,
+            let _ = website.synthesisUpdatedAt,
+            website.pageCountAtSynthesis >= website.pageCount
+        {
             synthesisState = .ready(existingSummary)
             return
         }
@@ -125,10 +128,10 @@ final class KnowledgeWebsiteViewModel {
             website.pageCountAtSynthesis = website.pageCount
             website.synthesisUpdatedAt = Date()
         } catch {
-            KnowledgeLogger.storage.error("website synthesis save failed: \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.storage.error(
+                "website synthesis save failed: \(String(describing: error), privacy: .public)")
         }
 
         synthesisState = .ready(result)
     }
 }
-

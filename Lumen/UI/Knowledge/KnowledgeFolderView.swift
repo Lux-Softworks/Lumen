@@ -21,7 +21,8 @@ struct FrontFolderShape: Shape {
         path.addQuadCurve(to: CGPoint(x: tabCornerRadius, y: 0), control: CGPoint(x: 0, y: 0))
         path.addLine(to: CGPoint(x: tabWidth - tabCornerRadius - tabFilletRadius, y: 0))
         path.addQuadCurve(
-            to: CGPoint(x: tabWidth - tabFilletRadius, y: tabCornerRadius), control: CGPoint(x: tabWidth - tabFilletRadius, y: 0))
+            to: CGPoint(x: tabWidth - tabFilletRadius, y: tabCornerRadius),
+            control: CGPoint(x: tabWidth - tabFilletRadius, y: 0))
         path.addLine(to: CGPoint(x: tabWidth - tabFilletRadius, y: tabHeight - tabFilletRadius))
         path.addQuadCurve(
             to: CGPoint(x: tabWidth, y: tabHeight), control: CGPoint(x: tabWidth - tabFilletRadius, y: tabHeight)
@@ -151,7 +152,7 @@ struct FolderItemButton: View {
                     LinearGradient(
                         colors: [
                             topicColor.opacity(0.38),
-                            topicColor.opacity(0.22)
+                            topicColor.opacity(0.22),
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -167,7 +168,7 @@ struct FolderItemButton: View {
                         colors: [
                             Color.white.opacity(0.55),
                             topicColor.opacity(0.3),
-                            Color.white.opacity(0.1)
+                            Color.white.opacity(0.1),
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -231,7 +232,7 @@ struct WebsitePageButton: View {
                 }
                 .padding(10)
             }
-            .aspectRatio(3/4, contentMode: .fit)
+            .aspectRatio(3 / 4, contentMode: .fit)
 
             Text(website.displayName)
                 .font(.system(size: 15, weight: .semibold))
@@ -478,11 +479,13 @@ struct KnowledgeFolderView: View {
             .padding(.vertical, 14)
 
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 20),
-                    GridItem(.flexible(), spacing: 20),
-                    GridItem(.flexible(), spacing: 20),
-                ], spacing: 24) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 20),
+                        GridItem(.flexible(), spacing: 20),
+                        GridItem(.flexible(), spacing: 20),
+                    ], spacing: 24
+                ) {
                     ForEach(viewModel.websites.indices, id: \.self) { index in
                         let website = viewModel.websites[index]
                         Button {
@@ -588,7 +591,6 @@ private struct PageDetailView: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 16)
                     }
-
 
                     if let meta = pageMetaLine {
                         Text(meta)

@@ -3,20 +3,20 @@ import Foundation
 enum DomainNameFormatter {
     nonisolated private static let strippedSubdomains: Set<String> = [
         "www", "www1", "www2", "m", "mobile", "amp", "en",
-        "app", "web", "site", "touch", "desktop", "beta"
+        "app", "web", "site", "touch", "desktop", "beta",
     ]
 
     nonisolated private static let knownMultiTLDs: Set<String> = [
         "co.uk", "co.jp", "co.in", "co.kr", "co.za", "co.nz", "co.il",
         "com.au", "com.br", "com.cn", "com.mx", "com.ar", "com.sg", "com.tw", "com.hk",
         "ac.uk", "ac.jp", "ac.nz", "gov.uk", "gov.au", "org.uk", "ne.jp", "or.jp",
-        "github.io", "compute.amazonaws.com", "herokuapp.com", "vercel.app", "netlify.app", "pages.dev"
+        "github.io", "compute.amazonaws.com", "herokuapp.com", "vercel.app", "netlify.app", "pages.dev",
     ]
 
     nonisolated private static let acronymApex: Set<String> = [
         "bbc", "cnn", "abc", "nbc", "cbs", "ibm", "nasa", "npr", "mit", "nsa",
         "nyt", "wsj", "ft", "fbi", "cia", "eu", "un", "who", "cdc",
-        "aws", "gcp", "ios", "usa", "uk", "hbr"
+        "aws", "gcp", "ios", "usa", "uk", "hbr",
     ]
 
     nonisolated private static let specialCases: [String: String] = [
@@ -37,7 +37,7 @@ enum DomainNameFormatter {
         "chatgpt": "ChatGPT", "anthropic": "Anthropic",
         "vercel": "Vercel", "netlify": "Netlify", "cloudflare": "Cloudflare",
         "npmjs": "npm", "pypi": "PyPI", "arxiv": "arXiv",
-        "soundcloud": "SoundCloud", "vimeo": "Vimeo"
+        "soundcloud": "SoundCloud", "vimeo": "Vimeo",
     ]
 
     nonisolated private static let ipv4Regex = try? NSRegularExpression(
@@ -59,7 +59,6 @@ enum DomainNameFormatter {
         let tldCount = Self.tldLabelCount(for: labels)
         let significant = max(labels.count - tldCount, 1)
         let nameLabels = Array(labels.prefix(significant))
-
         let parts = nameLabels.reversed().map(Self.humanize)
 
         if parts.count == 1 { return parts[0] }
@@ -74,9 +73,11 @@ enum DomainNameFormatter {
             return host
         }
 
-        let candidate = trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
+        let candidate =
+            trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
             ? trimmed
             : "https://\(trimmed)"
+
         if let components = URLComponents(string: candidate), let host = components.host, !host.isEmpty {
             return host
         }
@@ -112,6 +113,7 @@ enum DomainNameFormatter {
             if Self.acronymApex.contains(key) { return key.uppercased() }
             return key.prefix(1).uppercased() + key.dropFirst()
         }
+
         return mapped.joined(separator: " ")
     }
 }

@@ -12,7 +12,7 @@ struct CaptureQuality {
         "/cart", "/oauth", "/auth", "/password", "/reset", "/verify",
         "/billing", "/payment", "/pay", "/subscription", "/wallet",
         "/admin", "/dashboard", "/inbox", "/messages", "/chat",
-        "/dm", "/compose", "/profile/edit", "/security"
+        "/dm", "/compose", "/profile/edit", "/security",
     ]
 
     private static let blockedDomainSubstrings: [String] = [
@@ -38,7 +38,7 @@ struct CaptureQuality {
         "web.whatsapp.com", "messenger.com", "telegram.org", "discord.com/channels",
         "slack.com/client", "teams.microsoft.com",
 
-        "admin.", "portal.", "dashboard."
+        "admin.", "portal.", "dashboard.",
     ]
 
     static func evaluate(
@@ -51,7 +51,6 @@ struct CaptureQuality {
     ) -> CaptureQuality {
         let lowerDomain = domain.lowercased()
         let lowerURL = url.lowercased()
-
         for pattern in blockedDomainSubstrings {
             if lowerDomain.contains(pattern) || lowerURL.contains(pattern) {
                 return CaptureQuality(score: 0, shouldCapturePage: false, shouldCreateWebsite: false)
@@ -65,7 +64,8 @@ struct CaptureQuality {
             }
 
             if let query = parsed.query?.lowercased(),
-               query.contains("q=") || query.contains("query=") || query.contains("search=") {
+                query.contains("q=") || query.contains("query=") || query.contains("search=")
+            {
                 return CaptureQuality(score: 0, shouldCapturePage: false, shouldCreateWebsite: false)
             }
         }

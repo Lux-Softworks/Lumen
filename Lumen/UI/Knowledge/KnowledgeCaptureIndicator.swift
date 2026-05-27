@@ -56,6 +56,7 @@ struct KnowledgeCaptureIndicator: View {
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: visibleDurationMs * 1_000_000)
             guard !Task.isCancelled else { return }
+
             isVisible = false
         }
     }

@@ -86,10 +86,11 @@ struct KnowledgeAIView: View {
                     ForEach(viewModel.messages) { message in
                         ChatBubbleView(message: message)
                             .id(message.id)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity
-                            ))
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
                     }
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -101,10 +102,12 @@ struct KnowledgeAIView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onTapGesture { isFocused = false }
-            .onChange(of: MessageScrollSignal(
-                count: viewModel.messages.count,
-                lastText: viewModel.messages.last?.text
-            )) {
+            .onChange(
+                of: MessageScrollSignal(
+                    count: viewModel.messages.count,
+                    lastText: viewModel.messages.last?.text
+                )
+            ) {
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: viewModel.isThinking) { _, thinking in
@@ -142,70 +145,70 @@ struct KnowledgeAIView: View {
             }
 
             HStack(alignment: .center, spacing: 10) {
-            ZStack(alignment: .leading) {
-                TextField("", text: $viewModel.inputText, axis: .vertical)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(palette.text)
-                    .tint(palette.accent)
-                    .lineLimit(1...5)
-                    .focused($isFocused)
-                    .submitLabel(.send)
-                    .disabled(viewModel.isModelLoading)
-                    .onSubmit {
-                        guard canSend else { return }
-                        isFocused = false
-                        Haptics.fire(.tap)
-                        Task { await viewModel.send() }
-                    }
+                ZStack(alignment: .leading) {
+                    TextField("", text: $viewModel.inputText, axis: .vertical)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(palette.text)
+                        .tint(palette.accent)
+                        .lineLimit(1...5)
+                        .focused($isFocused)
+                        .submitLabel(.send)
+                        .disabled(viewModel.isModelLoading)
+                        .onSubmit {
+                            guard canSend else { return }
+                            isFocused = false
+                            Haptics.fire(.tap)
+                            Task { await viewModel.send() }
+                        }
 
-                if viewModel.inputText.isEmpty {
-                    if viewModel.isModelLoading {
-                        Text(" ")
-                            .font(.subheadline.weight(.semibold))
-                            .opacity(0)
-                            .overlay(alignment: .leading) {
-                                ThreeDotsView()
-                            }
-                            .allowsHitTesting(false)
-                    } else {
-                        Text("What do you want to know?")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(palette.text.opacity(0.3))
-                            .allowsHitTesting(false)
+                    if viewModel.inputText.isEmpty {
+                        if viewModel.isModelLoading {
+                            Text(" ")
+                                .font(.subheadline.weight(.semibold))
+                                .opacity(0)
+                                .overlay(alignment: .leading) {
+                                    ThreeDotsView()
+                                }
+                                .allowsHitTesting(false)
+                        } else {
+                            Text("What do you want to know?")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(palette.text.opacity(0.3))
+                                .allowsHitTesting(false)
+                        }
                     }
                 }
-            }
 
-            Button {
-                isFocused = false
-                Haptics.fire(.tap)
-                Task { await viewModel.send() }
-            } label: {
-                Circle()
-                    .fill(canSend ? palette.accent : palette.text.opacity(0.08))
-                    .frame(width: clampedSendButtonSize, height: clampedSendButtonSize)
-                    .overlay(
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: sendButtonIconSize, weight: .bold))
-                            .foregroundStyle(canSend ? .white : palette.text.opacity(0.25))
-                    )
-                    .animation(AppTheme.Motion.snappy, value: canSend)
-                    .contentShape(Circle())
+                Button {
+                    isFocused = false
+                    Haptics.fire(.tap)
+                    Task { await viewModel.send() }
+                } label: {
+                    Circle()
+                        .fill(canSend ? palette.accent : palette.text.opacity(0.08))
+                        .frame(width: clampedSendButtonSize, height: clampedSendButtonSize)
+                        .overlay(
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: sendButtonIconSize, weight: .bold))
+                                .foregroundStyle(canSend ? .white : palette.text.opacity(0.25))
+                        )
+                        .animation(AppTheme.Motion.snappy, value: canSend)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend)
+                .accessibilityLabel("Send message")
             }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
-            .accessibilityLabel("Send message")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(inputBackground)
-        .overlay(
-            RoundedRectangle(cornerRadius: clampedCornerRadius, style: .continuous)
-                .strokeBorder(
-                    palette.text.opacity(isFocused ? 0.18 : 0.07),
-                    lineWidth: 0.75
-                )
-        )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(inputBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: clampedCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        palette.text.opacity(isFocused ? 0.18 : 0.07),
+                        lineWidth: 0.75
+                    )
+            )
         }
         .padding(.horizontal, 16)
         .padding(.top, isFocused ? 12 : 10)
@@ -239,13 +242,14 @@ struct KnowledgeAIView: View {
     }
 
     private static func keyboardAnimation(from notification: Notification) -> Animation {
-        let duration = max(0.25, (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25)
+        let duration = max(
+            0.25, (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25)
         let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? 7
 
         switch UIView.AnimationCurve(rawValue: curveRaw) {
-        case .easeIn:    return .easeIn(duration: duration)
-        case .easeOut:   return .easeOut(duration: duration)
-        case .linear:    return .linear(duration: duration)
+        case .easeIn: return .easeIn(duration: duration)
+        case .easeOut: return .easeOut(duration: duration)
+        case .linear: return .linear(duration: duration)
         case .easeInOut: return .easeInOut(duration: duration)
         default:
             return .timingCurve(0.2, 0.8, 0.2, 1.0, duration: duration)
@@ -264,8 +268,10 @@ private struct ChatBubbleView: View {
     var body: some View {
         Group {
             if isUser {
-                HStack { Spacer(minLength: 60); userBubble }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack {
+                    Spacer(minLength: 60); userBubble
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
                 assistantView
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -915,7 +921,7 @@ private struct LumenSparkleMatrix: View {
             [0, 1, 2, 3, 4, 5, 6],
             [2, 3, 4],
             [3],
-            [3]
+            [3],
         ]
         var result: [(CGFloat, CGFloat)] = []
         for (row, cols) in layout.enumerated() {
@@ -931,7 +937,7 @@ private struct LumenSparkleMatrix: View {
     private static let pathOrder: [Int] = [
         0, 1, 3, 2, 7, 6, 5, 6, 7, 8,
         12, 13, 15, 16, 15, 13, 14, 11, 10, 9,
-        8, 4, 3, 1
+        8, 4, 3, 1,
     ]
 
     private static let dotPathPositions: [[Int]] = {
@@ -1027,12 +1033,13 @@ private struct LumenSparkleMatrix: View {
             let cy = center.y + pos.y * layoutRadius
 
             ctx.fill(
-                Path(ellipseIn: CGRect(
-                    x: cx - appliedDotRadius,
-                    y: cy - appliedDotRadius,
-                    width: appliedDotRadius * 2,
-                    height: appliedDotRadius * 2
-                )),
+                Path(
+                    ellipseIn: CGRect(
+                        x: cx - appliedDotRadius,
+                        y: cy - appliedDotRadius,
+                        width: appliedDotRadius * 2,
+                        height: appliedDotRadius * 2
+                    )),
                 with: .color(accent.opacity(opacity))
             )
         }

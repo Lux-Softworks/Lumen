@@ -9,20 +9,24 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
         didReceive message: WKScriptMessage
     ) {
         guard message.name == "annotation",
-              let body = message.body as? [String: Any],
-              let action = body["action"] as? String,
-              let webView = message.webView else { return }
+            let body = message.body as? [String: Any],
+            let action = body["action"] as? String,
+            let webView = message.webView
+        else { return }
 
         switch action {
         case "create":
             guard let url = body["url"] as? String,
-                  let text = body["text"] as? String,
-                  !text.isEmpty else { return }
-            let incognito = objc_getAssociatedObject(
-                webView.configuration,
-                &_WKWebViewAssociatedKeys.incognitoFlagKey
-            ) as? Bool ?? false
+                let text = body["text"] as? String,
+                !text.isEmpty
+            else { return }
+            let incognito =
+                objc_getAssociatedObject(
+                    webView.configuration,
+                    &_WKWebViewAssociatedKeys.incognitoFlagKey
+                ) as? Bool ?? false
             if incognito { return }
+
             let prefix = body["prefix"] as? String ?? ""
             let suffix = body["suffix"] as? String ?? ""
 
@@ -35,7 +39,8 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                         await MainActor.run { Self.applyAll(webView: wv) }
                     }
                 } catch {
-                    KnowledgeLogger.storage.error("annotation save failed: \(String(describing: error), privacy: .public)")
+                    KnowledgeLogger.storage.error(
+                        "annotation save failed: \(String(describing: error), privacy: .public)")
                 }
             }
 
@@ -46,6 +51,7 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
 
         case "request-delete":
             guard let id = body["id"] as? String else { return }
+
             let x = (body["x"] as? NSNumber)?.doubleValue ?? 0
             let y = (body["y"] as? NSNumber)?.doubleValue ?? 0
             let w = (body["w"] as? NSNumber)?.doubleValue ?? 0

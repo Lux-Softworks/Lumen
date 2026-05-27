@@ -407,7 +407,7 @@ struct BottomBarView: View {
 
     private func handleKeyboardWillShow(_ notification: Notification) {
         guard let info = notification.userInfo,
-              let frame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+            let frame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         else { return }
         let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
         withAnimation(reduceMotion ? nil : .easeInOut(duration: duration)) {

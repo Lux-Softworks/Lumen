@@ -91,11 +91,11 @@ struct HomeHeroView: View {
 
         var pool: [String] {
             switch self {
-            case .morning:   return ["good morning, let's learn.", "fresh start.", "today's first idea?"]
-            case .midday:    return ["ready to dig in?", "midday momentum.", "one more page."]
+            case .morning: return ["good morning, let's learn.", "fresh start.", "today's first idea?"]
+            case .midday: return ["ready to dig in?", "midday momentum.", "one more page."]
             case .afternoon: return ["stay curious.", "what's next?", "keep going."]
-            case .evening:   return ["tonight's rabbit hole?", "wind down with an idea.", "read something good."]
-            case .late:      return ["still up?", "one more before bed.", "quiet hours, loud ideas."]
+            case .evening: return ["tonight's rabbit hole?", "wind down with an idea.", "read something good."]
+            case .late: return ["still up?", "one more before bed.", "quiet hours, loud ideas."]
             }
         }
     }

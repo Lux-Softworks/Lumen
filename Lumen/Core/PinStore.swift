@@ -25,6 +25,7 @@ final class PinStore: ObservableObject {
         } else {
             pinned.insert(domain)
         }
+
         all = pinned.sorted()
         save()
     }

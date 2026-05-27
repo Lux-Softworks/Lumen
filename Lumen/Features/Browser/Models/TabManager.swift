@@ -72,6 +72,7 @@ final class TabManager: ObservableObject {
         tabs.append(tab)
         activeTabId = tab.id
         observeActiveViewModel()
+
         return webView
     }
 
@@ -80,6 +81,7 @@ final class TabManager: ObservableObject {
             guard let self, let tab else { return nil }
             return self.adoptPopup(config: config, parentIsIncognito: tab.isIncognito)
         }
+
         tab.viewModel.onWindowClose = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.closeTab(id: tab.id)
@@ -104,6 +106,7 @@ final class TabManager: ObservableObject {
         tabs.append(tab)
         activeTabId = tab.id
         observeActiveViewModel()
+
         tab.viewModel.loadURL(url)
     }
 
@@ -122,6 +125,7 @@ final class TabManager: ObservableObject {
     var tabBelowActive: Tab? {
         guard tabs.count > 1 else { return nil }
         guard let activeIndex = indexById[activeTabId] else { return nil }
+
         let belowIndex = activeIndex == 0 ? tabs.count - 1 : activeIndex - 1
         return tabs[belowIndex]
     }
@@ -166,6 +170,7 @@ final class TabManager: ObservableObject {
         tabs.append(tab)
         activeTabId = tab.id
         observeActiveViewModel()
+
         tab.viewModel.loadURL(last.url)
         return true
     }

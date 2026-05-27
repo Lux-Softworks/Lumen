@@ -2,23 +2,23 @@ import Foundation
 
 enum TopicColorPalette {
     static let hexColors: [String] = [
-        "#E57373", // coral
-        "#F06292", // rose
-        "#BA68C8", // orchid
-        "#9575CD", // lavender
-        "#7986CB", // iris
-        "#64B5F6", // sky
-        "#4FC3F7", // azure
-        "#4DD0E1", // teal
-        "#4DB6AC", // seafoam
-        "#81C784", // fern
-        "#AED581", // lime
-        "#DCE775", // chartreuse
-        "#FFD54F", // amber
-        "#FFB74D", // marigold
-        "#FF8A65", // persimmon
-        "#A1887F", // walnut
-        "#90A4AE"  // slate
+        "#E57373",  // coral
+        "#F06292",  // rose
+        "#BA68C8",  // orchid
+        "#9575CD",  // lavender
+        "#7986CB",  // iris
+        "#64B5F6",  // sky
+        "#4FC3F7",  // azure
+        "#4DD0E1",  // teal
+        "#4DB6AC",  // seafoam
+        "#81C784",  // fern
+        "#AED581",  // lime
+        "#DCE775",  // chartreuse
+        "#FFD54F",  // amber
+        "#FFB74D",  // marigold
+        "#FF8A65",  // persimmon
+        "#A1887F",  // walnut
+        "#90A4AE",  // slate
     ]
 
     static func hex(for name: String) -> String {

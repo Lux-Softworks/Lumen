@@ -198,7 +198,6 @@ final class ThreatDetector {
 
     func extractRegistrableDomain(from host: String) -> String {
         let parts = host.split(separator: ".")
-
         if parts.count <= 2 {
             return host
         }
@@ -265,11 +264,9 @@ final class ThreatDetector {
         guard request.resourceType == .script else { return nil }
 
         let urlString = request.url.absoluteString.lowercased()
-
         let isKnownFingerprintScript = fingerprintingPatterns.contains { pattern in
             urlString.contains(pattern)
         }
-
         guard isKnownFingerprintScript else { return nil }
 
         return ThreatEvent(
@@ -437,7 +434,6 @@ final class ThreatDetector {
         }
 
         let parts = domain.split(separator: ".")
-
         if parts.count > 2 {
             let parent = parts.suffix(2).joined(separator: ".")
             return knownTrackers[parent]

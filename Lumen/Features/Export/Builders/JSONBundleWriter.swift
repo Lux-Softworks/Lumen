@@ -60,8 +60,10 @@ nonisolated enum JSONBundleWriter {
         to url: URL
     ) throws {
         let bundle = makeBundle(payload: payload, scope: scope, toggles: toggles)
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
         let data = try encoder.encode(bundle)
         try data.write(to: url, options: .atomic)
     }
@@ -113,7 +115,8 @@ nonisolated enum JSONBundleWriter {
             )
         }
 
-        let annotations: [AnnotationOut] = toggles.includeAnnotations
+        let annotations: [AnnotationOut] =
+            toggles.includeAnnotations
             ? payload.annotations.map {
                 AnnotationOut(
                     id: $0.id,

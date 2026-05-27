@@ -19,7 +19,6 @@ nonisolated enum HTTPSUpgradeLogic {
             if httpsOnly {
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                 components?.scheme = "https"
-
                 if let httpsURL = components?.url {
                     return .upgrade(httpsURL)
                 }

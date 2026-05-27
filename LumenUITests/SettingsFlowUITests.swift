@@ -15,7 +15,7 @@ final class SettingsFlowUITests: XCTestCase {
 
         let header = app.textFields["browser.urlField"]
         XCTAssertTrue(header.waitForExistence(timeout: 3), "Settings header field did not appear")
-        
+
         let predicate = NSPredicate(format: "placeholderValue == %@", "Browser Settings")
         let expectation = expectation(for: predicate, evaluatedWith: header, handler: nil)
         let result = XCTWaiter().wait(for: [expectation], timeout: 2.0)
