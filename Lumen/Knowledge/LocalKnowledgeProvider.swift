@@ -6,12 +6,6 @@ import UIKit
 internal import Tokenizers
 import os
 
-enum KnowledgeIntent {
-    case action
-    case context
-    case knowledge
-}
-
 actor LocalKnowledgeProvider {
     static let shared = LocalKnowledgeProvider()
 
@@ -184,6 +178,20 @@ actor LocalKnowledgeProvider {
         #endif
     }
 
+    private func requireContainer() async throws -> ModelContainer {
+        if modelContainer == nil {
+            try await loadModel()
+        }
+
+        guard let container = modelContainer else {
+            throw NSError(
+                domain: "LocalKnowledgeProvider", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+        }
+
+        return container
+    }
+
     private static let requiredDiskBytes: Int64 = 1_200_000_000
 
     private func ensureDiskSpaceForModel() throws {
@@ -228,15 +236,7 @@ actor LocalKnowledgeProvider {
     }
 
     func summarizeWithLLM(content: String, title: String?) async throws -> String {
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
+        let container = try await requireContainer()
 
         beginInference()
         defer { endInference() }
@@ -264,15 +264,7 @@ actor LocalKnowledgeProvider {
         turns: [(role: String, text: String)],
         priorSummary: String?
     ) async throws -> String {
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
+        let container = try await requireContainer()
 
         beginInference()
         defer { endInference() }
@@ -297,15 +289,7 @@ actor LocalKnowledgeProvider {
     }
 
     func summarizeWebsiteWithLLM(content: String, title: String?) async throws -> String {
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
+        let container = try await requireContainer()
 
         beginInference()
         defer { endInference() }
@@ -332,15 +316,7 @@ actor LocalKnowledgeProvider {
     func synthesizeWebsiteReadingWithLLM(summaries: [String]) async throws -> String {
         guard !summaries.isEmpty else { return "" }
 
-        if modelContainer == nil {
-            try await loadModel()
-        }
-
-        guard let container = modelContainer else {
-            throw NSError(
-                domain: "LocalKnowledgeProvider", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
-        }
+        let container = try await requireContainer()
 
         beginInference()
         defer { endInference() }
@@ -368,11 +344,12 @@ actor LocalKnowledgeProvider {
         query: String,
         history: [(role: String, text: String)]
     ) async -> Bool {
-        if modelContainer == nil {
-            do { try await loadModel() } catch { return false }
+        let container: ModelContainer
+        do {
+            container = try await requireContainer()
+        } catch {
+            return false
         }
-
-        guard let container = modelContainer else { return false }
 
         beginInference()
         defer { endInference() }

@@ -1060,7 +1060,6 @@ actor KnowledgeStorage {
 
         let ranked =
             counts
-            .filter { $0.value.count >= 1 }
             .sorted { $0.value.count > $1.value.count }
             .prefix(40)
 
@@ -2279,7 +2278,6 @@ actor KnowledgeStorage {
             sqlite3_column_type(statement, 12) != SQLITE_NULL
             ? sqlite3_column_double(statement, 12) : nil
 
-        let _ = Int(sqlite3_column_int(statement, 13))
         let createdAt = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 14)))
 
         return PageContent(

@@ -69,7 +69,7 @@ final class KnowledgeWebsiteViewModel {
                     sessions.append(
                         ReadingSession(
                             id: UUID(),
-                            date: currentGroup.last?.timestamp ?? last.timestamp,
+                            date: last.timestamp,
                             pages: currentGroup
                         ))
                     currentGroup = []

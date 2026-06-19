@@ -2,9 +2,9 @@ import Foundation
 import os
 
 enum AppLogger {
-    static let subsystem = Bundle.main.bundleIdentifier ?? "com.luxsoftworks.Lumen"
+    nonisolated static let subsystem = Bundle.main.bundleIdentifier ?? "com.luxsoftworks.Lumen"
 
-    static func make(_ category: String) -> Logger {
+    nonisolated static func make(_ category: String) -> Logger {
         Logger(subsystem: subsystem, category: category)
     }
 }

@@ -25,13 +25,20 @@ enum DateQueryParser {
         return nil
     }
 
+    private static let betweenRegex = try? NSRegularExpression(
+        pattern: #"\bbetween\s+(.+?)\s+and\s+(.+?)(?=[?.!,]|$)"#,
+        options: [.caseInsensitive])
+    private static let sinceRegex = try? NSRegularExpression(
+        pattern: #"\bsince\s+(.+?)(?=[?.!,]|$)"#,
+        options: [.caseInsensitive])
+    private static let relativeNUnitRegex = try? NSRegularExpression(
+        pattern: #"(\d{1,3})\s+(days?|weeks?|months?|years?)"#)
+    private static let quarterRegex = try? NSRegularExpression(
+        pattern: #"q([1-4])(?:\s+(\d{4}))?"#, options: [.caseInsensitive])
+
     private static func parseBetween(in lower: String, query: String, now: Date, calendar: Calendar) -> Parsed? {
         guard
-            let regex = try? NSRegularExpression(
-                pattern: #"\bbetween\s+(.+?)\s+and\s+(.+?)(?=[?.!,]|$)"#,
-                options: [.caseInsensitive]
-            ),
-            let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
+            let match = betweenRegex?.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
             match.numberOfRanges >= 3,
             let fullR = Range(match.range, in: lower),
             let aR = Range(match.range(at: 1), in: lower),
@@ -54,11 +61,7 @@ enum DateQueryParser {
 
     private static func parseSince(in lower: String, query: String, now: Date, calendar: Calendar) -> Parsed? {
         guard
-            let regex = try? NSRegularExpression(
-                pattern: #"\bsince\s+(.+?)(?=[?.!,]|$)"#,
-                options: [.caseInsensitive]
-            ),
-            let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
+            let match = sinceRegex?.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
             match.numberOfRanges >= 2,
             let fullR = Range(match.range, in: lower),
             let inner = Range(match.range(at: 1), in: lower)
@@ -220,12 +223,8 @@ enum DateQueryParser {
     ]
 
     private static func relativeNUnitInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
-        guard let regex = try? NSRegularExpression(pattern: #"(\d{1,3})\s+(days?|weeks?|months?|years?)"#) else {
-            return nil
-        }
-
         let range = NSRange(phrase.startIndex..., in: phrase)
-        guard let match = regex.firstMatch(in: phrase, range: range), match.numberOfRanges >= 3,
+        guard let match = relativeNUnitRegex?.firstMatch(in: phrase, range: range), match.numberOfRanges >= 3,
             let nRange = Range(match.range(at: 1), in: phrase),
             let uRange = Range(match.range(at: 2), in: phrase),
             let n = Int(phrase[nRange])
@@ -252,8 +251,7 @@ enum DateQueryParser {
     }
 
     private static func quarterInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
-        guard let regex = try? NSRegularExpression(pattern: #"q([1-4])(?:\s+(\d{4}))?"#, options: [.caseInsensitive]),
-            let match = regex.firstMatch(in: phrase, range: NSRange(phrase.startIndex..., in: phrase)),
+        guard let match = quarterRegex?.firstMatch(in: phrase, range: NSRange(phrase.startIndex..., in: phrase)),
             match.numberOfRanges >= 2,
             let qR = Range(match.range(at: 1), in: phrase),
             let q = Int(phrase[qR])

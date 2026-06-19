@@ -103,9 +103,10 @@ final class KnowledgeMenuViewModel {
         guard !navigationPath.isEmpty else { return }
 
         let removed = navigationPath.removeLast()
+        let depthAfterPop = navigationPath.count
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(320))
-            guard let self else { return }
+            guard let self, self.navigationPath.count <= depthAfterPop else { return }
 
             switch removed {
             case .detail:

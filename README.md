@@ -13,10 +13,11 @@
   <img src="https://img.shields.io/badge/Swift_6.2-F05138?style=flat&logo=swift&logoColor=white" />
   <img src="https://img.shields.io/badge/Xcode_26.2+-147EFB?style=flat&logo=xcode&logoColor=white" />
   <img src="https://img.shields.io/badge/On--Device_AI-FF9F0A?style=flat" />
-  <img src="https://img.shields.io/badge/v1.4.0-E8E4DC?style=flat" />
+  <img src="https://img.shields.io/badge/v1.4.1-E8E4DC?style=flat" />
 </p>
 
 <p align="center">
+  <a href="#demo">Demo</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#knowledge-system">Knowledge</a> •
   <a href="#privacy">Privacy</a> •
@@ -26,7 +27,25 @@
 
 ---
 
-An iOS browser built from scratch in SwiftUI. Lumen reads along with you. It extracts, summarizes, and organizes every page you engage with into a personal knowledge base. After, you can ask questions about it, answered by a local LLM that never leaves your device.
+I kept reading great stuff online and then completely blanking on where I saw it, and so I built a browser that remembers for me.
+
+Lumen reads along as you browse. It grabs the good parts of every page you actually spend time on, summarizing them, and filing them into a knowledge base that lives entirely on your phone. You can ask about any of it later. A local LLM answers from _your_ reading, not the whole internet, and it never calls any external services.
+
+Runs on any iPhone or iPad on iOS 18+. No account, no server, no "sign in to continue." You browse like normal and it does the rest.
+
+<br/>
+
+## Demo
+
+<p align="center">
+  <img src="assets/home.png" width="23%" />
+  &nbsp;
+  <img src="assets/library-folders.png" width="23%" />
+  &nbsp;
+  <img src="assets/ask-answered.png" width="23%" />
+  &nbsp;
+  <img src="assets/privacy-menu.png" width="23%" />
+</p>
 
 <br/>
 
@@ -56,13 +75,11 @@ An iOS browser built from scratch in SwiftUI. Lumen reads along with you. It ext
  Pages       closures?"
 ```
 
-All you have to do is browse and Lumen does the rest.
-
 <br/>
 
 ## Knowledge System
 
-The knowledge panel has two modes:
+The knowledge system has two tabs:
 
 <table>
 <tr>
@@ -70,20 +87,20 @@ The knowledge panel has two modes:
 
 ### ✦ &nbsp;AI Chat
 
-Ask questions in natural language. Lumen pulls relevant pages via semantic search, feeds them to a local Llama 3.2 1B model, and returns answers grounded in **your actual reading history** and not the whole internet.
+Ask like you'd text a friend. Lumen finds the pages that matter, hands them to a local Llama 3.2 1B, and answers from **what you read online** instead of internet surfing.
 
-Every answer cites its sources, so you can trace exactly where each response came from.
+Every answer shows its sources, so you can always check its validity.
 
 </td>
 <td width="50%">
 
 ### 📂 &nbsp;Folders
 
-Your reading auto-organizes into a hierarchy:
+Everything you read sorts itself into folders:
 
 **Topics** → **Websites** → **Pages**
 
-Each level gets its own LLM-generated summary. Topics are classified automatically. Websites get synthesis summaries built from your reading patterns across their pages.
+Every layer writes its own little summary. Topics get sorted automatically, and each site gets a synthesis of everything you read there.
 
 </td>
 </tr>
@@ -91,7 +108,7 @@ Each level gets its own LLM-generated summary. Topics are classified automatical
 
 ```
 ┌─────────────────────────────────────────┐
-│  EVERYTHING RUNS ON-DEVICE              │
+│  EVERYTHING RUNS LOCALLY                │
 │                                         │
 │  LLM inference    ████████  MLX Swift   │
 │  Embeddings       ████████  NLEmbedding │
@@ -107,23 +124,23 @@ Each level gets its own LLM-generated summary. Topics are classified automatical
 
 ## Privacy
 
-Lumen has no server, meaning there's nothing to send.
+There's no server that we send anything to. That's kind of the whole point :)
 
-| Layer              | Protection                                                            |
-| ------------------ | --------------------------------------------------------------------- |
-| **Network**        | HTTPS-only upgrades, mixed-content blocking                           |
-| **Cookies**        | Third-party cookies blocked by default                                |
-| **Tracking**       | Built-in tracker database with threat classification                  |
-| **Fingerprinting** | Fingerprint resistance via content security policies                  |
-| **Data**           | All knowledge stays in local SQLite                                   |
-| **AI**             | LLM runs on-device via MLX                                            |
+| Layer              | Protection                                           |
+| ------------------ | ---------------------------------------------------- |
+| **Network**        | HTTPS-only upgrades, mixed-content blocking          |
+| **Cookies**        | Third-party cookies blocked by default               |
+| **Tracking**       | Built-in tracker database with threat classification |
+| **Fingerprinting** | Fingerprint resistance via content security policies |
+| **Data**           | All knowledge stays in local SQLite                  |
+| **AI**             | LLM runs on-device via MLX                           |
 
 <br/>
 
 ## Stack
 
 ```
-Swift 6.2 · SwiftUI · iOS 18+ · Xcode 26.2+
+Swift 6.2 · SwiftUI / iOS 18+ · Xcode 26.2+
 │
 ├── 🧠  MLX Swift ──────── on-device Llama 3.2 1B inference
 ├── 🌐  WKWebView ──────── hardened browser engine
@@ -167,15 +184,32 @@ In Xcode:
 
 The first time you open the knowledge panel, Lumen downloads the `mlx-community/Llama-3.2-1B-Instruct-4bit` weights (~700 MB) from Hugging Face and caches them on-device. After that, everything runs fully offline.
 
+### Deployment
+
+Lumen is a client-only iOS app. "Deploying" means getting the build onto a device:
+
+- **Run on your own device** — connect an iPhone/iPad (iOS 18+), select it as the destination, and **⌘R**. Trust the developer profile under **Settings → General → VPN & Device Management** on first run.
+- **Share via TestFlight** — in Xcode, **Product → Archive**, then distribute the archive to App Store Connect and invite testers through TestFlight.
+- **App Store release** — submit the same archive for App Store review. Distribution through Apple's App Store is explicitly permitted by the license exception below.
+
 <br/>
 
-## License and Contributing
+## License
 
 [AGPL-3.0 with an Apple App Store distribution exception](LICENSE) — if you build on this, share it back.
 
 The exception (added as additional permission under GNU AGPL version 3 section 7) authorizes distribution of this software through Apple's App Store under Apple's terms. All other distribution remains governed by the AGPL-3.0.
 
-If you would like to contribute to the browser, please make a branch and follow all rulesets + conventions. Thanks for helping improve our community and software!
+## Contributing
+
+Want to help? Awesome — here's the process:
+
+1. **Fork** the repository and create a feature branch off `main` (`git checkout -b your-feature`).
+2. **Match the conventions** — read [`CLAUDE.md`](CLAUDE.md) for the project's code style. Most importantly: this codebase contains self-explanatory code (meaning no comments), and all building/testing happens **in Xcode** (build with ⌘R, run tests with ⌘U).
+3. **Test on a physical device** for anything AI-related. The on-device LLM does not run in the Simulator.
+4. **Open a pull request** against `main` with a clear description of what changed and why.
+
+Thanks for helping improve our community and software!
 
 ## AI Declaration
 

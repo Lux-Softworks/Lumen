@@ -446,8 +446,9 @@ final class KnowledgeAIViewModel {
     ) async {
         let libraryContext = await buildLibraryContext()
 
-        messages.append(ChatMessage(role: .assistant, text: "", isStreaming: true))
-        let streamIndex = messages.count - 1
+        let streamMessage = ChatMessage(role: .assistant, text: "", isStreaming: true)
+        let streamMessageID = streamMessage.id
+        messages.append(streamMessage)
         let summary = conversationSummary
 
         activeTask = Task {
@@ -456,12 +457,16 @@ final class KnowledgeAIViewModel {
             let flushInterval: TimeInterval = 0.08
             var lastFlush = Date(timeIntervalSince1970: 0)
 
+            @MainActor func streamingIndex() -> Int? {
+                messages.firstIndex(where: { $0.id == streamMessageID })
+            }
+
             @MainActor func flushIfDue(force: Bool = false) {
                 let now = Date()
                 guard force || now.timeIntervalSince(lastFlush) >= flushInterval else { return }
                 lastFlush = now
-                if streamIndex < messages.count, messages[streamIndex].text != raw {
-                    messages[streamIndex].text = raw
+                if let idx = streamingIndex(), messages[idx].text != raw {
+                    messages[idx].text = raw
                 }
             }
 
@@ -483,16 +488,16 @@ final class KnowledgeAIViewModel {
                 streamError = error
             }
 
-            if streamIndex < messages.count {
+            if let idx = streamingIndex() {
                 if raw.isEmpty {
-                    messages[streamIndex].text =
+                    messages[idx].text =
                         streamError != nil
                         ? "Couldn't generate a reply."
                         : "…"
                 } else {
-                    messages[streamIndex].text = raw
+                    messages[idx].text = raw
                 }
-                messages[streamIndex].isStreaming = false
+                messages[idx].isStreaming = false
             }
 
             finishThinking()

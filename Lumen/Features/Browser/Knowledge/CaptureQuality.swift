@@ -63,9 +63,8 @@ struct CaptureQuality {
                 return CaptureQuality(score: 0, shouldCapturePage: false, shouldCreateWebsite: false)
             }
 
-            if let query = parsed.query?.lowercased(),
-                query.contains("q=") || query.contains("query=") || query.contains("search=")
-            {
+            let queryKeys = URLComponents(string: url)?.queryItems?.map { $0.name.lowercased() } ?? []
+            if queryKeys.contains(where: { $0 == "q" || $0 == "query" || $0 == "search" }) {
                 return CaptureQuality(score: 0, shouldCapturePage: false, shouldCreateWebsite: false)
             }
         }

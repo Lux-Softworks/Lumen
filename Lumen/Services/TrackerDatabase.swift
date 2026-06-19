@@ -1,6 +1,7 @@
 import Foundation
 
 actor TrackerDatabase {
+    private init() {}
 
     static let shared = TrackerDatabase()
 
@@ -9,11 +10,10 @@ actor TrackerDatabase {
     private(set) var domainCount: Int = 0
     private(set) var isLoaded: Bool = false
 
-    private init() {}
-
     func ensureLoaded() {
         if isLoaded { return }
-        loadBundledDatabase()
+
+        guard loadBundledDatabase() else { return }
         isLoaded = true
     }
 
@@ -47,20 +47,22 @@ actor TrackerDatabase {
         entityCount = 0
         domainCount = 0
         isLoaded = false
-        loadBundledDatabase()
+
+        guard loadBundledDatabase() else { return }
         isLoaded = true
     }
 
-    private func loadBundledDatabase() {
+    private func loadBundledDatabase() -> Bool {
         guard let url = Bundle.main.url(forResource: "disconnect-services", withExtension: "json") else {
-            return
+            return false
         }
 
         guard let data = try? Data(contentsOf: url) else {
-            return
+            return false
         }
 
         parseDisconnectJSON(data)
+        return true
     }
 
     func parseDisconnectJSON(_ data: Data) {

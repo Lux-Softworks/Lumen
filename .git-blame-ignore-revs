@@ -2,8 +2,8 @@
 # GitHub honors this file automatically. Locally it is wired up via:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 #
-# After committing the swift-format + grouping pass as ONE commit, append its
-# full 40-char SHA below (one per line). Comment lines like these are ignored.
-#
-# e.g.
-# 0123456789abcdef0123456789abcdef01234567  Lumen: repo-wide swift-format + logical-block spacing
+# Add full 40-char SHAs below, one per line, SHA ONLY — git rejects inline
+# comments after the SHA. Lines starting with # are ignored.
+
+# Repository-wide formatting for readability.
+2482fad242fe5e01d93346c63c0829fb7876aad3
