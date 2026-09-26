@@ -16,8 +16,8 @@ struct ReadingSession: Identifiable, Sendable {
     var headerLabel: String {
         let dateLabel = ReadingSession.formatDate(date)
         let count = pages.count
-        let mins = totalReadingTime
-        let timeStr = mins > 0 ? " · \(mins)m" : ""
+        let seconds = totalReadingTime
+        let timeStr = seconds > 0 ? " · \(ReadingDuration.label(seconds: seconds))" : ""
         let pageStr = count == 1 ? "1 page" : "\(count) pages"
         return "\(dateLabel) · \(pageStr)\(timeStr)"
     }
@@ -88,6 +88,12 @@ final class KnowledgeWebsiteViewModel {
         }
 
         return sessions
+    }
+
+    func removePage(id pageID: String) {
+        let remainingPages = sessions.flatMap(\.pages).filter { $0.id != pageID }
+        sessions = Self.clusterIntoSessions(remainingPages)
+        website.pageCount = remainingPages.count
     }
 
     func loadSynthesis() async {

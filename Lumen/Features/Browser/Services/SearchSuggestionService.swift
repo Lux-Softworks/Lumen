@@ -9,20 +9,50 @@ struct SearchSuggestion: Identifiable, Equatable, Hashable {
 final class SearchSuggestionService {
     static let shared = SearchSuggestionService()
 
-    private let urlTemplate =
-        "https://suggestqueries.google.com/complete/search?client=firefox&q=%@"
+    private static let maxSuggestions = 5
 
     private init() {}
 
-    func fetchSuggestions(for query: String) async throws -> [SearchSuggestion] {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+    static func requestURL(
+        for query: String,
+        engine: SearchEngine,
+        isIncognito: Bool,
+        isEnabled: Bool
+    ) -> URL? {
+        guard isEnabled, !isIncognito else { return nil }
+
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+
+        return engine.suggestionURL(for: trimmed)
+    }
+
+    static func parseSuggestions(from data: Data) -> [SearchSuggestion] {
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [Any],
+            jsonArray.count >= 2,
+            let suggestions = jsonArray[1] as? [String]
+        else {
+            return []
+        }
+
+        return suggestions.prefix(maxSuggestions).map { SearchSuggestion(text: $0) }
+    }
+
+    func fetchSuggestions(
+        for query: String,
+        engine: SearchEngine,
+        isIncognito: Bool,
+        isEnabled: Bool
+    ) async throws -> [SearchSuggestion] {
         guard
-            let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+            let url = Self.requestURL(
+                for: query, engine: engine, isIncognito: isIncognito, isEnabled: isEnabled
+            )
         else { return [] }
-        guard let url = URL(string: String(format: urlTemplate, encodedQuery)) else { return [] }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 3.0
+        request.httpShouldHandleCookies = false
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -30,13 +60,6 @@ final class SearchSuggestionService {
             return []
         }
 
-        guard let jsonArray = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any],
-            jsonArray.count >= 2,
-            let suggestionsArray = jsonArray[1] as? [String]
-        else {
-            return []
-        }
-
-        return suggestionsArray.prefix(5).map { SearchSuggestion(text: $0) }
+        return Self.parseSuggestions(from: data)
     }
 }

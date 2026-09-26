@@ -8,17 +8,22 @@ enum FaviconService {
         return cache
     }()
 
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.timeoutIntervalForRequest = 5
+        return URLSession(configuration: configuration)
+    }()
+
     static func faviconURL(for pageURL: URL) -> URL? {
         guard let host = pageURL.host, !host.isEmpty else { return nil }
 
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "www.google.com"
-        components.path = "/s2/favicons"
-        components.queryItems = [
-            URLQueryItem(name: "domain", value: host),
-            URLQueryItem(name: "sz", value: "256"),
-        ]
+        components.host = host
+        components.port = pageURL.port
+        components.path = "/favicon.ico"
 
         return components.url
     }
@@ -27,7 +32,10 @@ enum FaviconService {
         guard let url = faviconURL(for: pageURL) else { return nil }
         let key = url as NSURL
         if let cached = cache.object(forKey: key) { return cached }
-        guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+        guard let (data, response) = try? await session.data(from: url) else { return nil }
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            return nil
+        }
         guard let image = UIImage(data: data) else { return nil }
         let cost = data.count
         cache.setObject(image, forKey: key, cost: cost)

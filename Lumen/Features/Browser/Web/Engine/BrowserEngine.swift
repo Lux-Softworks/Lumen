@@ -106,6 +106,14 @@ enum BrowserEngine {
             config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        let trackerScanScript = WKUserScript(
+            source: TrackerScanScript.source,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        config.userContentController.addUserScript(trackerScanScript)
+        config.userContentController.add(TrackerScanMessageHandler(), name: TrackerScanScript.handlerName)
+
         let readingSignalConfig = ReadingSignalConfig.default
         let readingSignalScript = WKUserScript(
             source: ReadingSignalScript.makeScript(config: readingSignalConfig),
@@ -213,12 +221,18 @@ enum BrowserEngine {
             webView, &_WKWebViewAssociatedKeys.uiDelegateKey, uiDelegate,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
+        webView.navigationDelegate = interceptor
+        webView.retainedDelegate = interceptor
+
         Task { @MainActor in
             await TrackerDatabase.shared.ensureLoaded()
             let entries = await TrackerDatabase.shared.allEntries()
             detector.loadTrackerDatabase(entries)
-            webView.navigationDelegate = interceptor
-            webView.retainedDelegate = interceptor
+        }
+
+        Task { @MainActor [weak interceptor] in
+            let blockList = await ContentBlockingRules.shared.compiled()?.blockList
+            interceptor?.trackerBlockList = blockList
         }
 
         if let handler = objc_getAssociatedObject(
@@ -238,6 +252,13 @@ enum BrowserEngine {
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC
             )
         }
+    }
+
+    @MainActor
+    static func applyPagePolicy(_ policy: PrivacyPolicy, to preferences: WKWebpagePreferences, in webView: WKWebView) {
+        preferences.allowsContentJavaScript = policy.allowsJavaScript
+        webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically =
+            policy.javaScriptCanOpenWindowsAutomatically
     }
 
     static func makeRequest(url: URL) -> URLRequest {

@@ -227,6 +227,14 @@ struct SettingsPage: View {
                 divider
 
                 settingsRow(
+                    icon: "text.magnifyingglass",
+                    title: "Search Suggestions",
+                    isOn: $settings.searchSuggestions
+                ) {}
+
+                divider
+
+                settingsRow(
                     icon: "arrow.up.forward.app",
                     title: "Open Native Apps",
                     subtitle: settings.nativeAppsPolicy.rawValue,
@@ -379,7 +387,12 @@ struct SettingsPage: View {
             }
 
             settingsGroup {
-                settingsRow(icon: "brain.head.profile", title: "Collect Knowledge", isOn: $settings.collectKnowledge) {}
+                settingsRow(
+                    icon: "brain.head.profile",
+                    title: "Collect Knowledge",
+                    subtitle: "For all sites",
+                    isOn: $settings.collectKnowledge
+                ) {}
             }
 
             lumenFoundCard
@@ -423,11 +436,15 @@ struct SettingsPage: View {
         trackersLabel.font = .callout.weight(.regular)
         trackersLabel.foregroundColor = palette.text
 
-        var base = AttributedString("Lumen scrubbed ")
+        var base = AttributedString("Lumen blocked ")
         base.font = .callout.weight(.regular)
         base.foregroundColor = palette.text
 
-        let attributed = base + trackersNumber + trackersLabel
+        var scope = AttributedString(" on this page")
+        scope.font = .callout.weight(.regular)
+        scope.foregroundColor = palette.text
+
+        let attributed = base + trackersNumber + trackersLabel + scope
 
         return Text(attributed)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -444,15 +461,6 @@ struct SettingsPage: View {
     private var displayOptionsContent: some View {
         VStack(spacing: 16) {
             settingsGroup {
-                settingsRow(
-                    icon: "character.bubble",
-                    title: "Translate",
-                    subtitle: "Page language",
-                    showChevron: true
-                ) {}
-
-                divider
-
                 pageZoomRow
 
                 divider
@@ -792,7 +800,7 @@ struct SettingsPage: View {
 
     private var privacyPolicyContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Last updated: 2026")
+            Text("Last updated: September 2026")
                 .font(.footnote)
                 .foregroundStyle(palette.text.opacity(0.45))
                 .padding(.horizontal, 16)
@@ -802,25 +810,37 @@ struct SettingsPage: View {
                     policySection(
                         title: "What We Collect",
                         body:
-                            "Lumen does not collect, transmit, or sell your browsing data. All history and preferences are stored locally on your device."
+                            "Nothing. Lumen has no analytics, no ads and no account. It sends nothing about you or your browsing to us."
                     )
                     divider
                     policySection(
-                        title: "Tracking Protection",
+                        title: "On Your Device",
                         body:
-                            "Lumen blocks third-party trackers, fingerprinting scripts, and crypto miners to protect your privacy as you browse."
+                            "Your history, bookmarks, settings and knowledge library are stored on this device. The language model that answers your questions runs on this device too. The knowledge database is excluded from device backups."
                     )
                     divider
                     policySection(
-                        title: "Search Queries",
+                        title: "Model Download",
                         body:
-                            "When you search, your query is sent directly to your chosen search engine. Lumen does not intercept or log search terms."
+                            "The first time it is needed, Lumen downloads the Llama 3.2 1B language model from Hugging Face. This happens once; after that the model runs offline."
                     )
                     divider
                     policySection(
-                        title: "Data Storage",
+                        title: "Search Suggestions",
                         body:
-                            "Browsing history, settings, and website data are stored only on your device and never leave it."
+                            "As you type in the address bar, Lumen asks your chosen search engine for suggestions, so it sees what you type. Turn off Search Suggestions in Settings to stop this. Incognito tabs never ask for suggestions."
+                    )
+                    divider
+                    policySection(
+                        title: "Site Icons",
+                        body:
+                            "Lumen fetches a site's icon from that site itself, not from a third party. Icons for pages you open in incognito tabs are not fetched."
+                    )
+                    divider
+                    policySection(
+                        title: "Tracker Blocking",
+                        body:
+                            "With Block Trackers on, Lumen blocks requests to trackers on the Disconnect list and blocks third-party cookies. You can turn it off for all sites or for one site. Page resources requested over HTTP are loaded over HTTPS."
                     )
                     divider
                     policySection(

@@ -71,9 +71,12 @@ final class BrowserViewModel: NSObject, ObservableObject {
                 if self.threatEvents.count > Self.maxThreatEvents {
                     self.threatEvents.removeFirst(self.threatEvents.count - Self.maxThreatEvents)
                 }
-                self.blockedTrackersCount =
-                    self.threatEvents.filter { $0.type == .tracker }.count
             }
+
+            nav.onBlockedTrackersChanged = { [weak self] count in
+                self?.blockedTrackersCount = count
+            }
+            blockedTrackersCount = nav.blockedTrackerHosts.count
         }
 
         if let uiDelegate = webView.uiDelegate as? BrowserUIDelegate {
@@ -133,7 +136,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
             pendingRequest = request
         }
 
-        logger.info("Loading: \(url.absoluteString)")
+        logger.info("Loading: \(url.absoluteString, privacy: .private)")
     }
 
     func goBack() {

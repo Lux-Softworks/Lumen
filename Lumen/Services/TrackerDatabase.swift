@@ -6,6 +6,7 @@ actor TrackerDatabase {
     static let shared = TrackerDatabase()
 
     private var trackers: [String: ThreatDetector.TrackerInfo] = [:]
+    private var disconnectEntries: [DisconnectEntry] = []
     private(set) var entityCount: Int = 0
     private(set) var domainCount: Int = 0
     private(set) var isLoaded: Bool = false
@@ -44,6 +45,7 @@ actor TrackerDatabase {
 
     func reload() {
         trackers.removeAll()
+        disconnectEntries.removeAll()
         entityCount = 0
         domainCount = 0
         isLoaded = false
@@ -66,79 +68,49 @@ actor TrackerDatabase {
     }
 
     func parseDisconnectJSON(_ data: Data) {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let categories = root["categories"] as? [String: Any]
-        else {
-            return
-        }
+        let entries = DisconnectList.entries(from: data)
 
-        let categoryMapping: [String: EntityCategory] = [
-            "Advertising": .advertising,
-            "Analytics": .analytics,
-            "Social": .social,
-            "Cryptomining": .cryptomining,
-            "Fingerprinting": .fingerprinting,
-            "Content": .unknown,
-            "Disconnect": .advertising,
-            "Anti-fraud": .unknown,
-        ]
+        guard !entries.isEmpty else { return }
 
         var newTrackers: [String: ThreatDetector.TrackerInfo] = [:]
         var seenEntities: Set<String> = []
 
-        for (categoryName, categoryEntries) in categories {
-            guard let entries = categoryEntries as? [[String: Any]] else {
-                continue
+        for entry in entries {
+            let info = ThreatDetector.TrackerInfo(
+                entityName: entry.entityName,
+                category: DisconnectList.category(forKey: entry.categoryKey),
+                domains: entry.domains
+            )
+
+            for domain in entry.domains {
+                let cleaned =
+                    domain
+                    .replacingOccurrences(of: "http://", with: "")
+                    .replacingOccurrences(of: "https://", with: "")
+                    .components(separatedBy: "/").first ?? domain
+
+                newTrackers[cleaned] = info
             }
 
-            let category = categoryMapping[categoryName] ?? .unknown
-
-            for entry in entries {
-                for (entityName, entityData) in entry {
-                    guard let entityDict = entityData as? [String: Any] else {
-                        continue
-                    }
-
-                    var allDomains: [String] = []
-
-                    for (key, value) in entityDict {
-                        if key == "performance" || key == "dnt" {
-                            continue
-                        }
-
-                        if let domainList = value as? [String] {
-                            allDomains.append(contentsOf: domainList)
-                        }
-                    }
-
-                    guard !allDomains.isEmpty else { continue }
-
-                    let info = ThreatDetector.TrackerInfo(
-                        entityName: entityName,
-                        category: category,
-                        domains: allDomains
-                    )
-
-                    for domain in allDomains {
-                        let cleaned =
-                            domain
-                            .replacingOccurrences(of: "http://", with: "")
-                            .replacingOccurrences(of: "https://", with: "")
-                            .components(separatedBy: "/").first ?? domain
-
-                        newTrackers[cleaned] = info
-                    }
-
-                    seenEntities.insert(entityName)
-                }
-            }
+            seenEntities.insert(entry.entityName)
         }
 
         for (key, value) in newTrackers {
             trackers[key] = value
         }
 
+        disconnectEntries = entries
         entityCount = seenEntities.count
         domainCount = trackers.count
+    }
+
+    func contentRuleSource() throws -> ContentRuleSource {
+        let blockList = TrackerBlockList(entries: disconnectEntries)
+
+        return ContentRuleSource(
+            blockList: blockList,
+            trackingRules: try TrackerBlockList.encode(blockList.contentRules()),
+            mixedContentRules: try TrackerBlockList.encode(TrackerBlockList.mixedContentRules)
+        )
     }
 }

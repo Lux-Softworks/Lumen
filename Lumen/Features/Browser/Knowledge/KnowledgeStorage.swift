@@ -422,6 +422,16 @@ actor KnowledgeStorage {
         try execute(createFTSTriggers)
     }
 
+    static let rootSlashMigrations: [String] = ["pages", "annotations"].map { table in
+        """
+            UPDATE OR IGNORE \(table)
+            SET normalized_url = substr(normalized_url, 1, instr(normalized_url, '/') - 1)
+                || substr(normalized_url, instr(normalized_url, '/') + 1)
+            WHERE instr(normalized_url, '/') = length(normalized_url)
+                OR substr(normalized_url, instr(normalized_url, '/'), 2) = '/?'
+        """
+    }
+
     private func runMigrations() throws {
         if try !columnExists(table: "websites", column: "synthesis_updated_at") {
             try execute("ALTER TABLE websites ADD COLUMN synthesis_updated_at INTEGER")
@@ -482,6 +492,10 @@ actor KnowledgeStorage {
         try execute("CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id)")
         try execute("CREATE INDEX IF NOT EXISTS idx_annotations_created ON annotations(created_at DESC)")
         try migrateFTSToContentTable()
+
+        for migration in Self.rootSlashMigrations {
+            try execute(migration)
+        }
     }
 
     private func migrateFTSToContentTable() throws {
@@ -1659,6 +1673,25 @@ actor KnowledgeStorage {
         return topic.id
     }
 
+    static let moveWebsitePagesSQL = "UPDATE pages SET topic_id = ? WHERE website_id = ?"
+
+    func moveWebsite(websiteID: String, toTopic topicID: String?) throws {
+        try initialize()
+
+        try execute(
+            Self.moveWebsitePagesSQL,
+            bindValues: { [self] statement in
+                if let topicID = topicID {
+                    sqlite3_bind_text(statement, 1, topicID, -1, SQLITE_TRANSIENT)
+                } else {
+                    sqlite3_bind_null(statement, 1)
+                }
+                sqlite3_bind_text(statement, 2, websiteID, -1, SQLITE_TRANSIENT)
+            })
+
+        try assignWebsiteToTopic(websiteID: websiteID, topicID: topicID)
+    }
+
     func assignWebsiteToTopic(websiteID: String, topicID: String?) throws {
         try initialize()
 
@@ -1764,6 +1797,11 @@ actor KnowledgeStorage {
             )
             """
         try execute(sql)
+    }
+
+    func refreshTopicWebsiteCounts() throws {
+        try initialize()
+        try updateTopicCounts()
     }
 
     func deleteTopic(id: String) throws {

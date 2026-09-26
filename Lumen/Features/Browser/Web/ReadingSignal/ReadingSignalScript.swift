@@ -82,17 +82,15 @@ enum ReadingSignalScript {
             window.addEventListener('scroll', updateScrollDepth, { passive: true });
             updateScrollDepth();
 
-            var interval = setInterval(function() {
-                if (hasFired) {
-                    clearInterval(interval);
-                    return;
-                }
-
+            setInterval(function() {
                 if (document.visibilityState === 'visible') {
                     dwellSeconds += POLL_INTERVAL_MS / 1000;
                 }
 
                 updateScrollDepth();
+
+                if (hasFired) { return; }
+
                 checkSelection();
 
                 var thresholds = effectiveThresholds();
@@ -103,13 +101,12 @@ enum ReadingSignalScript {
                     hasFired = true;
                     scrollDepthAtFire = maxScrollDepth;
                     readingTimeAtFire = dwellSeconds;
-                    clearInterval(interval);
 
                     try {
                         window.webkit.messageHandlers.readingSignal.postMessage({
                             url: window.location.href,
                             title: document.title || '',
-                            readingTime: dwellSeconds,
+                            readingTime: Math.round(dwellSeconds),
                             scrollDepth: maxScrollDepth,
                             triggered: true,
                             isUpdate: false
@@ -126,12 +123,11 @@ enum ReadingSignalScript {
                     hasFired = true;
                     scrollDepthAtFire = maxScrollDepth;
                     readingTimeAtFire = dwellSeconds;
-                    clearInterval(interval);
                     try {
                         window.webkit.messageHandlers.readingSignal.postMessage({
                             url: window.location.href,
                             title: document.title || '',
-                            readingTime: dwellSeconds,
+                            readingTime: Math.round(dwellSeconds),
                             scrollDepth: maxScrollDepth,
                             triggered: true,
                             isUpdate: false
@@ -146,11 +142,13 @@ enum ReadingSignalScript {
                 var timeGrew = dwellSeconds - readingTimeAtFire > 30;
 
                 if (depthGrew || timeGrew) {
+                    scrollDepthAtFire = maxScrollDepth;
+                    readingTimeAtFire = dwellSeconds;
                     try {
                         window.webkit.messageHandlers.readingSignal.postMessage({
                             url: window.location.href,
                             title: document.title || '',
-                            readingTime: dwellSeconds,
+                            readingTime: Math.round(dwellSeconds),
                             scrollDepth: maxScrollDepth,
                             triggered: true,
                             isUpdate: true
@@ -167,7 +165,7 @@ enum ReadingSignalScript {
                     window.webkit.messageHandlers.readingSignal.postMessage({
                         url: window.location.href,
                         title: document.title || '',
-                        readingTime: dwellSeconds,
+                        readingTime: Math.round(dwellSeconds),
                         scrollDepth: maxScrollDepth,
                         triggered: true,
                         isUpdate: false

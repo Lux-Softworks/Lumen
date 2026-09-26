@@ -21,6 +21,50 @@ enum SearchEngine: String, CaseIterable, Identifiable {
         }
     }
 
+    func suggestionURL(for query: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        let queryItems: [URLQueryItem]
+
+        switch self {
+        case .google:
+            components.host = "suggestqueries.google.com"
+            components.path = "/complete/search"
+            queryItems = [
+                URLQueryItem(name: "client", value: "firefox"),
+                URLQueryItem(name: "q", value: query)
+            ]
+        case .duckDuckGo:
+            components.host = "duckduckgo.com"
+            components.path = "/ac/"
+            queryItems = [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "type", value: "list")
+            ]
+        case .bing:
+            components.host = "api.bing.com"
+            components.path = "/osjson.aspx"
+            queryItems = [URLQueryItem(name: "query", value: query)]
+        case .brave:
+            components.host = "search.brave.com"
+            components.path = "/api/suggest"
+            queryItems = [URLQueryItem(name: "q", value: query)]
+        }
+
+        components.percentEncodedQueryItems = queryItems.map { item in
+            URLQueryItem(name: item.name, value: item.value.map(Self.encodeQueryValue))
+        }
+
+        return components.url
+    }
+
+    private static func encodeQueryValue(_ value: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+?#")
+
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
     var homePage: URL {
         switch self {
         case .google:

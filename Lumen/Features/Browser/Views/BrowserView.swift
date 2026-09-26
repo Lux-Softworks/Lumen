@@ -130,11 +130,27 @@ struct BrowserView: View {
             sessionSuggestions = []
             return
         }
+        let settings = BrowserSettings.shared
+        let engine = settings.searchEngine
+        let isEnabled = settings.searchSuggestions
+        let isIncognito = incognitoActive || activeTab?.isIncognito == true
+
+        guard
+            SearchSuggestionService.requestURL(
+                for: trimmed, engine: engine, isIncognito: isIncognito, isEnabled: isEnabled
+            ) != nil
+        else {
+            sessionSuggestions = []
+            return
+        }
+
         suggestionFetchTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
             do {
-                let web = try await SearchSuggestionService.shared.fetchSuggestions(for: trimmed)
+                let web = try await SearchSuggestionService.shared.fetchSuggestions(
+                    for: trimmed, engine: engine, isIncognito: isIncognito, isEnabled: isEnabled
+                )
                 guard !Task.isCancelled else { return }
                 sessionSuggestions = web
             } catch {
@@ -208,6 +224,8 @@ struct BrowserView: View {
                 if newPhase == .background || newPhase == .inactive {
                     SearchHistoryStore.shared.flush()
                 }
+
+                ClearHistoryOnClose.handle(newPhase, isEnabled: BrowserSettings.shared.clearHistoryOnClose)
             }
             .onChange(of: tabManager.tabs.count) { old, new in
                 guard new < old else { return }
@@ -728,6 +746,13 @@ struct BrowserView: View {
             },
             ambientTint: currentPageThemeColor
         )
+        .environment(\.openKnowledgeSource, handleOpenKnowledgeSource)
+    }
+
+    private func handleOpenKnowledgeSource(_ url: URL) {
+        tabManager.newTab()
+        tabManager.activeTab?.viewModel.loadURL(url)
+        bottomBarState = .collapsed
     }
 
     private func wireDownloadHandler() {

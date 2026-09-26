@@ -6,6 +6,7 @@ struct KnowledgeWebsiteView: View {
     var onBack: () -> Void
     var onSelectPage: ((PageContent) -> Void)? = nil
     var onExportPage: ((PageContent) -> Void)? = nil
+    var onDeletePage: ((PageContent) -> Void)?
     @Environment(\.palette) private var palette
     @ScaledMetric(relativeTo: .body) private var pageChevronSize: CGFloat = 10
 
@@ -155,7 +156,7 @@ struct KnowledgeWebsiteView: View {
                 Spacer(minLength: 12)
 
                 if let readingTime = page.readingTime, readingTime > 0 {
-                    Text("\(readingTime)m")
+                    Text(ReadingDuration.label(seconds: readingTime))
                         .microText()
                         .foregroundStyle(palette.text.opacity(0.2))
                 }
@@ -177,12 +178,21 @@ struct KnowledgeWebsiteView: View {
         }
         .buttonStyle(.plain)
 
-        if let onExportPage {
+        if onExportPage != nil || onDeletePage != nil {
             card.contextMenu {
-                Button {
-                    onExportPage(page)
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                if let onExportPage {
+                    Button {
+                        onExportPage(page)
+                    } label: {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                }
+                if let onDeletePage {
+                    Button(role: .destructive) {
+                        onDeletePage(page)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
         } else {
@@ -230,7 +240,7 @@ private struct ShimmerBar: View {
             title: "Getting started with Swift Concurrency",
             content: "Content here",
             summary: "Covers async/await, actors, and task groups in Swift 5.5+.",
-            readingTime: 8,
+            readingTime: 480,
             scrollDepth: 0.74
         ),
         PageContent(
@@ -238,7 +248,7 @@ private struct ShimmerBar: View {
             title: "Actor isolation explained",
             content: "Content here",
             summary: "Deep dive into how actors prevent data races.",
-            readingTime: 5,
+            readingTime: 300,
             scrollDepth: 0.9
         ),
     ]

@@ -27,7 +27,16 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         }
     }
 
+    var trackerBlockList: TrackerBlockList?
+    var policyProvider: (URL?) -> PrivacyPolicy = { BrowserSettings.shared.policy(for: $0) }
+    var nativeAppsPolicyProvider: () -> NativeAppsPolicy = { BrowserSettings.shared.nativeAppsPolicy }
+    private(set) var blockedTrackerHosts: Set<String> = []
+    private var committedPageURL: URL?
+    private var pageBlocksTrackers = false
+    private var pendingPageBlocksTrackers = false
+
     var onThreatDetected: ((ThreatEvent) -> Void)?
+    var onBlockedTrackersChanged: ((Int) -> Void)?
     var onDidCommit: ((WKWebView) -> Void)?
     var onDidFinishLoad: ((WKWebView) -> Void)?
 
@@ -36,6 +45,24 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         self.httpsOnly = httpsOnly
         super.init()
         self.detector.delegate = self
+    }
+
+    func beginPage(_ url: URL?, blocksTrackers: Bool) {
+        committedPageURL = url
+        pageBlocksTrackers = blocksTrackers
+        blockedTrackerHosts.removeAll()
+        onBlockedTrackersChanged?(0)
+    }
+
+    func recordResourceURLs(_ urls: [URL]) {
+        guard pageBlocksTrackers, let trackerBlockList, let committedPageURL else { return }
+
+        let found = trackerBlockList.blockedTrackerHosts(in: urls, pageURL: committedPageURL)
+
+        guard !found.isSubset(of: blockedTrackerHosts) else { return }
+
+        blockedTrackerHosts.formUnion(found)
+        onBlockedTrackersChanged?(blockedTrackerHosts.count)
     }
 
     func clearSession() {
@@ -48,16 +75,17 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
     func webView(
         _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        preferences: WKWebpagePreferences,
+        decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
     ) {
         guard let url = navigationAction.request.url else {
-            decisionHandler(.cancel)
+            decisionHandler(.cancel, preferences)
             return
         }
 
         if blockedFingerprintingScripts.contains(url) {
             logger.warning("Blocking fingerprinting script: \(url.absoluteString, privacy: .private)")
-            decisionHandler(.cancel)
+            decisionHandler(.cancel, preferences)
             return
         }
 
@@ -70,10 +98,10 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
             if isUserInitiated && isMainFrame {
                 logger.info("Forwarding marketplace-kit handoff to WebKit/MarketplaceKit")
-                decisionHandler(.allow)
+                decisionHandler(.allow, preferences)
             } else {
                 logger.warning("Ignoring non-user-initiated marketplace-kit invocation")
-                decisionHandler(.cancel)
+                decisionHandler(.cancel, preferences)
             }
 
             return
@@ -103,18 +131,18 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                 "HTTPS upgrade: \(url.absoluteString, privacy: .private) → \(httpsURL.absoluteString, privacy: .private)"
             )
             webView.load(URLRequest(url: httpsURL))
-            decisionHandler(.cancel)
+            decisionHandler(.cancel, preferences)
             return
 
         case .cancel:
-            if navigationAction.navigationType == .linkActivated,
-                let scheme, scheme != "http", scheme != "https",
-                UIApplication.shared.canOpenURL(url)
-            {
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            }
+            let launch = NativeAppLaunchDecision.decide(
+                for: url,
+                policy: nativeAppsPolicyProvider(),
+                isUserInitiated: navigationAction.navigationType == .linkActivated
+            )
+            handOffToApp(url, launch: launch)
             logger.warning("Blocking request with unauthorized scheme: \(scheme ?? "none", privacy: .public)")
-            decisionHandler(.cancel)
+            decisionHandler(.cancel, preferences)
             return
 
         case .allow:
@@ -139,7 +167,86 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
                     "\(threats.count, privacy: .public) threat(s) on \(url.host ?? "unknown", privacy: .private)")
             }
 
-            decisionHandler(.allow)
+            guard navigationAction.targetFrame?.isMainFrame == true else {
+                recordResourceURLs([url])
+                decisionHandler(.allow, preferences)
+                return
+            }
+
+            preparePage(for: url, in: webView, preferences: preferences) {
+                decisionHandler(.allow, preferences)
+            }
+        }
+    }
+
+    private func preparePage(
+        for url: URL,
+        in webView: WKWebView,
+        preferences: WKWebpagePreferences,
+        completion: @escaping () -> Void
+    ) {
+        let policy = policyProvider(url)
+        BrowserEngine.applyPagePolicy(policy, to: preferences, in: webView)
+        pendingPageBlocksTrackers = policy.blocksThirdPartyCookies
+
+        Task { [weak self, weak webView] in
+            let compiled = await ContentBlockingRules.shared.compiled()
+
+            if let compiled, let webView {
+                ContentBlockingRules.apply(
+                    compiled,
+                    to: webView.configuration.userContentController,
+                    blocksTrackers: policy.blocksThirdPartyCookies,
+                    upgradesMixedContent: policy.limitsNavigationToHTTPS
+                )
+                self?.trackerBlockList = compiled.blockList
+            }
+
+            completion()
+        }
+    }
+
+    private func handOffToApp(_ url: URL, launch: NativeAppLaunchDecision) {
+        switch launch {
+        case .open:
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+
+        case .ask:
+            Task { @MainActor in
+                if await Self.confirmOpeningInApp(url) {
+                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                }
+            }
+
+        case .stay:
+            break
+        }
+    }
+
+    @MainActor
+    private static func confirmOpeningInApp(_ url: URL) async -> Bool {
+        await withCheckedContinuation { continuation in
+            guard let top = topViewController() else {
+                continuation.resume(returning: false)
+                return
+            }
+
+            let scheme = url.scheme ?? ""
+            let alert = UIAlertController(
+                title: "Open in another app?",
+                message: "This page wants to open a \(scheme): link outside Lumen.",
+                preferredStyle: .alert
+            )
+
+            alert.addAction(
+                UIAlertAction(title: "Cancel", style: .cancel) { _ in
+                    continuation.resume(returning: false)
+                })
+            alert.addAction(
+                UIAlertAction(title: "Open", style: .default) { _ in
+                    continuation.resume(returning: true)
+                })
+            top.present(alert, animated: true)
         }
     }
 
@@ -286,6 +393,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        beginPage(webView.url, blocksTrackers: pendingPageBlocksTrackers)
         onDidCommit?(webView)
     }
 

@@ -261,6 +261,7 @@ private struct ChatBubbleView: View {
     let message: ChatMessage
     private var isUser: Bool { message.role == .user }
     @Environment(\.palette) private var palette
+    @Environment(\.openKnowledgeSource) private var openKnowledgeSource
     @ScaledMetric(relativeTo: .body) private var matchIconSize: CGFloat = 9
     @ScaledMetric(relativeTo: .body) private var matchLabelSize: CGFloat = 10
     @ScaledMetric(relativeTo: .body) private var sourceLabelSize: CGFloat = 10
@@ -358,24 +359,46 @@ private struct ChatBubbleView: View {
         VStack(alignment: .leading, spacing: 3) {
             ForEach(Array(message.sources.enumerated()), id: \.element.id) { idx, source in
                 StaggeredFade(delay: 0.12 + Double(idx) * 0.07) {
-                    HStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 1, style: .continuous)
-                            .fill(palette.accent.opacity(0.4))
-                            .frame(width: 2, height: 10)
-                        Text(source.domain)
-                            .font(.system(size: sourceLabelSize, weight: .medium))
-                            .foregroundStyle(palette.text.opacity(0.35))
-                            .lineLimit(1)
-                        if let title = source.title, !title.isEmpty {
-                            Text("· \(title)")
-                                .font(.system(size: sourceLabelSize))
-                                .foregroundStyle(palette.text.opacity(0.2))
-                                .lineLimit(1)
+                    if let openKnowledgeSource, let url = KnowledgeSourceLink.url(for: source) {
+                        Button {
+                            openKnowledgeSource(url)
+                        } label: {
+                            sourceLabel(source, isLink: true)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                                .padding(.vertical, -6)
                         }
-                        Spacer(minLength: 0)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(source.displayTitle) in a new tab")
+                    } else {
+                        sourceLabel(source, isLink: false)
                     }
                 }
             }
+        }
+    }
+
+    private func sourceLabel(_ source: PageContent, isLink: Bool) -> some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(palette.accent.opacity(0.4))
+                .frame(width: 2, height: 10)
+            Text(source.domain)
+                .font(.system(size: sourceLabelSize, weight: .medium))
+                .foregroundStyle(palette.text.opacity(0.35))
+                .lineLimit(1)
+            if let title = source.title, !title.isEmpty {
+                Text("· \(title)")
+                    .font(.system(size: sourceLabelSize))
+                    .foregroundStyle(palette.text.opacity(0.2))
+                    .lineLimit(1)
+            }
+            if isLink {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: sourceLabelSize, weight: .medium))
+                    .foregroundStyle(palette.text.opacity(0.2))
+            }
+            Spacer(minLength: 0)
         }
     }
 }

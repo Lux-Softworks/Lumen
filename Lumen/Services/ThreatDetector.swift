@@ -20,12 +20,15 @@ enum ThreatSeverity: Int, Codable, Comparable {
     }
 }
 
-enum EntityCategory: String, Codable {
+nonisolated enum EntityCategory: String, Codable, Sendable {
     case advertising
     case analytics
     case social
     case cryptomining
     case fingerprinting
+    case email
+    case content
+    case antiFraud
     case unknown
 }
 
@@ -234,7 +237,10 @@ final class ThreatDetector {
         case .cryptomining:
             severity = .critical
 
-        case .unknown:
+        case .email:
+            severity = .medium
+
+        case .content, .antiFraud, .unknown:
             severity = .low
         }
 

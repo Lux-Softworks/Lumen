@@ -157,6 +157,59 @@ final class KnowledgeMenuViewModel {
         }
     }
 
+    static func moveDestinations(for website: Website, among topics: [Topic]) -> [Topic] {
+        let namedTopics = topics.filter { !$0.isUncategorized && $0.id != website.topicID }
+        guard website.topicID != nil else { return namedTopics }
+
+        return namedTopics + [Topic(id: Topic.uncategorizedID, name: Topic.uncategorizedName)]
+    }
+
+    func deleteWebsite(_ website: Website) async {
+        do {
+            try await KnowledgeStorage.shared.deleteWebsite(websiteID: website.id)
+            try await KnowledgeStorage.shared.refreshTopicWebsiteCounts()
+            websites.removeAll { $0.id == website.id }
+            await loadTopics()
+        } catch {
+            self.error = error
+        }
+    }
+
+    func deletePage(_ page: PageContent) async {
+        do {
+            try await KnowledgeStorage.shared.deletePage(pageID: page.id)
+            pages.removeAll { $0.id == page.id }
+            websiteViewModel?.removePage(id: page.id)
+
+            if let refreshedWebsite = try await KnowledgeStorage.shared.fetchWebsite(id: page.websiteID),
+                let index = websites.firstIndex(where: { $0.id == refreshedWebsite.id }) {
+                websites[index] = refreshedWebsite
+            }
+        } catch {
+            self.error = error
+        }
+    }
+
+    func moveWebsite(_ website: Website, to topic: Topic) async {
+        let destinationID = topic.isUncategorized ? nil : topic.id
+
+        do {
+            try await KnowledgeStorage.shared.moveWebsite(websiteID: website.id, toTopic: destinationID)
+
+            if selectedTopic == nil {
+                if let index = websites.firstIndex(where: { $0.id == website.id }) {
+                    websites[index].topicID = destinationID
+                }
+            } else {
+                websites.removeAll { $0.id == website.id }
+            }
+
+            await loadTopics()
+        } catch {
+            self.error = error
+        }
+    }
+
     func seedData() async {
         isLoading = true
         defer { isLoading = false }

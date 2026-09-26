@@ -54,6 +54,9 @@ final class BrowserSettings: ObservableObject {
     @Published var defaultSearchEngine: String {
         didSet { defaults.set(defaultSearchEngine, forKey: "defaultSearchEngine") }
     }
+    @Published var searchSuggestions: Bool {
+        didSet { defaults.set(searchSuggestions, forKey: "searchSuggestions") }
+    }
     @Published var clearHistoryOnClose: Bool {
         didSet { defaults.set(clearHistoryOnClose, forKey: "clearHistoryOnClose") }
     }
@@ -77,6 +80,7 @@ final class BrowserSettings: ObservableObject {
         self.blockPopups = defaults.object(forKey: "blockPopups") as? Bool ?? true
         self.blockTrackers = defaults.object(forKey: "blockTrackers") as? Bool ?? true
         self.defaultSearchEngine = defaults.string(forKey: "defaultSearchEngine") ?? "Google"
+        self.searchSuggestions = defaults.object(forKey: "searchSuggestions") as? Bool ?? true
         self.clearHistoryOnClose = defaults.object(forKey: "clearHistoryOnClose") as? Bool ?? false
         let savedPolicy = defaults.string(forKey: "nativeAppsPolicy") ?? ""
         self.nativeAppsPolicy = NativeAppsPolicy(rawValue: savedPolicy) ?? .ask

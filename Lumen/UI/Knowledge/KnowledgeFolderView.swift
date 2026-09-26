@@ -272,6 +272,8 @@ struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
 
     @State private var topicToDelete: Topic? = nil
+    @State private var websiteToDelete: Website?
+    @State private var pageToDelete: PageContent?
     @State private var exportSheet: ExportSheetItem? = nil
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -335,6 +337,36 @@ struct KnowledgeFolderView: View {
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("All websites and saved pages inside this folder will be permanently deleted.")
+        }
+        .alert(
+            "Delete \"\(websiteToDelete?.displayName ?? "Website")\"?",
+            isPresented: Binding(
+                get: { websiteToDelete != nil },
+                set: { if !$0 { websiteToDelete = nil } }
+            ),
+            presenting: websiteToDelete
+        ) { website in
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deleteWebsite(website) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This website and all its saved pages will be permanently deleted.")
+        }
+        .alert(
+            "Delete \"\(pageToDelete?.displayTitle ?? "Page")\"?",
+            isPresented: Binding(
+                get: { pageToDelete != nil },
+                set: { if !$0 { pageToDelete = nil } }
+            ),
+            presenting: pageToDelete
+        ) { page in
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deletePage(page) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This saved page will be permanently deleted.")
         }
     }
 
@@ -501,6 +533,24 @@ struct KnowledgeFolderView: View {
                             } label: {
                                 Label("Export", systemImage: "square.and.arrow.up")
                             }
+                            let destinations = KnowledgeMenuViewModel.moveDestinations(
+                                for: website, among: viewModel.topics)
+                            if !destinations.isEmpty {
+                                Menu {
+                                    ForEach(destinations) { topic in
+                                        Button(topic.name) {
+                                            Task { await viewModel.moveWebsite(website, to: topic) }
+                                        }
+                                    }
+                                } label: {
+                                    Label("Move to…", systemImage: "folder")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                websiteToDelete = website
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -519,7 +569,8 @@ struct KnowledgeFolderView: View {
                 onSelectPage: { page in viewModel.selectPage(page) },
                 onExportPage: { page in
                     exportSheet = ExportSheetItem(scope: .page(id: page.id))
-                }
+                },
+                onDeletePage: { page in pageToDelete = page }
             )
         }
     }
@@ -706,7 +757,7 @@ private struct PageDetailView: View {
         var parts: [String] = []
         parts.append(page.domain)
         if let time = page.readingTime, time > 0 {
-            parts.append("\(time) min read")
+            parts.append("\(ReadingDuration.label(seconds: time)) reading")
         }
         if let depth = page.scrollDepth, depth > 0 {
             parts.append("\(Int(depth * 100))% read")
