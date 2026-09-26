@@ -24,4 +24,8 @@ actor KnowledgeClassifier {
             return ""
         }
     }
+
+    static func pickTopic(summary: String, candidates: [String]) async -> String? {
+        await LocalKnowledgeProvider.shared.pickTopic(summary: summary, candidates: candidates)
+    }
 }

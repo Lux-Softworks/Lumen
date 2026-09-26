@@ -381,6 +381,50 @@ actor LocalKnowledgeProvider {
         }
     }
 
+    nonisolated static func matchCandidate(output: String, candidates: [String]) -> String? {
+        let normalized = output.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        return candidates.first { candidate in
+            let lower = candidate.lowercased()
+            return normalized == lower || normalized.hasPrefix(lower + " ") || normalized.hasPrefix(lower)
+        }
+    }
+
+    func pickTopic(summary: String, candidates: [String]) async -> String? {
+        guard candidates.count > 1, !summary.isEmpty else { return nil }
+
+        let container: ModelContainer
+        do {
+            container = try await requireContainer()
+        } catch {
+            return nil
+        }
+
+        beginInference()
+        defer { endInference() }
+
+        let prompt = await KnowledgePrompts.topicPick(summary: summary, candidates: candidates)
+        let parameters = GenerateParameters(maxTokens: 8, temperature: 0.0)
+        let tokens = await container.encode(prompt)
+        let input = LMInput(tokens: MLXArray(tokens))
+
+        do {
+            let stream = try await container.generate(input: input, parameters: parameters)
+            var output = ""
+            for await event in stream {
+                if Task.isCancelled { break }
+                if case .chunk(let text) = event { output += text }
+            }
+
+            clearGPUCache()
+            touch()
+
+            return Self.matchCandidate(output: output, candidates: candidates)
+        } catch {
+            return nil
+        }
+    }
+
     func chatStream(
         query: String,
         history: [(role: String, text: String)],
@@ -416,7 +460,7 @@ actor LocalKnowledgeProvider {
                         libraryContext: libraryContext
                     )
 
-                    let parameters = GenerateParameters(maxTokens: 256, temperature: 0.7)
+                    let parameters = GenerateParameters(maxTokens: 400, temperature: 0.7)
                     let tokens = await container.encode(prompt)
                     let input = LMInput(tokens: MLXArray(tokens))
 
@@ -513,7 +557,7 @@ actor LocalKnowledgeProvider {
                     }
 
                     let parameters = GenerateParameters(
-                        maxTokens: 512,
+                        maxTokens: 900,
                         temperature: 0.3
                     )
                     let tokens = await container.encode(prompt)

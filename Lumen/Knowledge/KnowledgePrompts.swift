@@ -1,7 +1,7 @@
 import Foundation
 
 enum KnowledgePrompts {
-    private static let llamaSpecialTokens = [
+    private nonisolated static let llamaSpecialTokens = [
         "<|begin_of_text|>",
         "<|end_of_text|>",
         "<|eot_id|>",
@@ -12,7 +12,7 @@ enum KnowledgePrompts {
         "<|python_tag|>",
     ]
 
-    static func sanitize(_ s: String) -> String {
+    nonisolated static func sanitize(_ s: String) -> String {
         var out = s
         for token in llamaSpecialTokens {
             out = out.replacingOccurrences(of: token, with: "")
@@ -128,6 +128,31 @@ enum KnowledgePrompts {
             """
     }
 
+    static func topicPick(summary: String, candidates: [String]) -> String {
+        let summary = sanitize(summary)
+        let list = candidates.map(sanitize).joined(separator: ", ")
+
+        return """
+            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            Pick the one topic that fits the article best from the topics offered. Reply with that topic name exactly as written, nothing else — no punctuation, no explanation.<|eot_id|>\
+            <|start_header_id|>user<|end_header_id|>
+            Article: Apple released a new MacBook Pro with a faster chip and longer battery life.
+            Topics: Technology, Programming, Business<|eot_id|>\
+            <|start_header_id|>assistant<|end_header_id|>
+            Technology<|eot_id|>\
+            <|start_header_id|>user<|end_header_id|>
+            Article: The Federal Reserve held interest rates steady, citing cooling inflation.
+            Topics: Finance, Politics, Business<|eot_id|>\
+            <|start_header_id|>assistant<|end_header_id|>
+            Finance<|eot_id|>\
+            <|start_header_id|>user<|end_header_id|>
+            Article: \(summary.prefix(400))
+            Topics: \(list)<|eot_id|>\
+            <|start_header_id|>assistant<|end_header_id|>
+
+            """
+    }
+
     static func conversationalChat(
         query: String,
         history: [(role: String, text: String)],
@@ -187,14 +212,13 @@ enum KnowledgePrompts {
 
         return """
             <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Answer using only the notes below. Reply with at most 3 bullets, each on its own line starting with "- ". Each bullet is ONE short sentence — a single key fact, under 14 words. This is a quick scan, not an essay: no intro, no wrap-up, no second clause, no elaboration. Stop after the last point.
+            Answer the question directly using only the notes below. Reply with one short paragraph of two to four complete sentences — lead with the answer itself, then the most useful supporting detail. Plain prose.
 
             Rules:
-            - Every line is a "- " bullet. Lead with the most important; give at most three, then stop.
-            - Keep each bullet under 14 words. Cut filler, background, and hedging — just the fact.
-            - Use only what the notes contain; treat it as true. If they don't cover it, reply with one short bullet saying so.
+            - Use only what the notes contain; treat it as true. If they don't cover the question, say so in one short sentence and stop.
+            - Write bullets only when the user asks for a list of several separate items; each bullet is then one short sentence on its own line starting with "- ".
             - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes", "sources", "the text", or whether anyone read anything.
-            - Don't blend separate subjects. Never quote verbatim. Bold **key terms** sparingly.\(highlightsGuideline)
+            - Don't blend separate subjects. Never quote verbatim. Bold **key terms** sparingly. Finish every sentence — never trail off.\(highlightsGuideline)
 
             Notes:
             \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>

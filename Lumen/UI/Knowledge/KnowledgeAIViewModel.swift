@@ -386,29 +386,38 @@ final class KnowledgeAIViewModel {
             .filter { $0.count >= 2 && !listAllStopwords.contains($0) }
     }
 
-    private static func relevanceGated(
+    static func relevanceGated(
         _ ranked: [(page: PageContent, score: Double)],
         query: String,
         floor: Double
     ) -> [PageContent] {
         guard let topScore = ranked.first?.score else { return [] }
         let relativeMargin = 0.13
+        let rescueFloor = 0.25
         let byMargin = ranked.filter { $0.score >= floor && $0.score >= topScore - relativeMargin }
 
-        let terms = distinctiveTerms(query)
-        let lexical =
-            terms.isEmpty
-            ? byMargin
-            : byMargin.filter { entry in
-                let haystack =
-                    ((entry.page.title ?? "") + " " + (entry.page.summary ?? "") + " "
-                    + entry.page.content.prefix(50_000)).lowercased()
-                let words = Set(haystack.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-                return terms.allSatisfy { words.contains($0) }
-            }
+        if byMargin.isEmpty {
+            guard topScore >= rescueFloor else { return [] }
+            return ranked.prefix(2).map { $0.page }
+        }
 
-        let kept = lexical.isEmpty ? Array(byMargin.prefix(1)) : lexical
+        let terms = distinctiveTerms(query)
+        let lexical = byMargin.filter { lexicalPass($0.page, terms: terms) }
+
+        let minimumKeep = min(2, byMargin.count)
+        let kept = lexical.count >= minimumKeep ? lexical : Array(byMargin.prefix(minimumKeep))
         return kept.map { $0.page }
+    }
+
+    private static func lexicalPass(_ page: PageContent, terms: [String]) -> Bool {
+        guard !terms.isEmpty else { return true }
+        let haystack =
+            ((page.title ?? "") + " " + (page.summary ?? "") + " "
+            + page.content.prefix(50_000)).lowercased()
+        let words = Set(haystack.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
+        let hits = terms.filter { words.contains($0) }.count
+        if terms.count >= 3 { return hits * 2 >= terms.count }
+        return hits >= 1
     }
 
     private func isListAllQuery(_ residual: String) -> Bool {

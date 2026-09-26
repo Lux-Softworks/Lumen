@@ -345,6 +345,7 @@ actor KnowledgeStorage {
                 scroll_depth REAL,
                 word_count INTEGER,
                 created_at INTEGER NOT NULL,
+                topic_id TEXT,
                 FOREIGN KEY (website_id) REFERENCES websites(id) ON DELETE CASCADE
             );
             """
@@ -354,6 +355,7 @@ actor KnowledgeStorage {
             CREATE INDEX IF NOT EXISTS idx_websites_last_visit ON websites(last_visit DESC);
             CREATE INDEX IF NOT EXISTS idx_pages_website ON pages(website_id);
             CREATE INDEX IF NOT EXISTS idx_pages_timestamp ON pages(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_pages_topic ON pages(topic_id);
             """
 
         let createEmbeddingsTable = """
@@ -433,6 +435,10 @@ actor KnowledgeStorage {
         if try !columnExists(table: "pages", column: "content_hash") {
             try execute("ALTER TABLE pages ADD COLUMN content_hash TEXT")
             try execute("CREATE INDEX IF NOT EXISTS idx_pages_content_hash ON pages(content_hash)")
+        }
+        if try !columnExists(table: "pages", column: "topic_id") {
+            try execute("ALTER TABLE pages ADD COLUMN topic_id TEXT")
+            try execute("CREATE INDEX IF NOT EXISTS idx_pages_topic ON pages(topic_id)")
         }
         try execute(
             """
@@ -1669,6 +1675,86 @@ actor KnowledgeStorage {
             })
 
         try updateTopicCounts()
+    }
+
+    func updatePageTopic(pageID: String, topicID: String?) throws {
+        try initialize()
+
+        let sql = "UPDATE pages SET topic_id = ? WHERE id = ?"
+        try execute(
+            sql,
+            bindValues: { [self] statement in
+                if let topicID = topicID {
+                    sqlite3_bind_text(statement, 1, topicID, -1, SQLITE_TRANSIENT)
+                } else {
+                    sqlite3_bind_null(statement, 1)
+                }
+                sqlite3_bind_text(statement, 2, pageID, -1, SQLITE_TRANSIENT)
+            })
+    }
+
+    func recomputeWebsiteTopic(forPageID pageID: String) throws {
+        try initialize()
+
+        var websiteID: String?
+        var lookup: OpaquePointer?
+        defer { sqlite3_finalize(lookup) }
+        guard
+            sqlite3_prepare_v2(db, "SELECT website_id FROM pages WHERE id = ?", -1, &lookup, nil)
+                == SQLITE_OK
+        else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(lookup, 1, pageID, -1, SQLITE_TRANSIENT)
+        if sqlite3_step(lookup) == SQLITE_ROW {
+            websiteID = String(cString: sqlite3_column_text(lookup, 0))
+        }
+        guard let websiteID else { return }
+
+        var currentTopicID: String?
+        var currentStatement: OpaquePointer?
+        defer { sqlite3_finalize(currentStatement) }
+        guard
+            sqlite3_prepare_v2(
+                db, "SELECT topic_id FROM websites WHERE id = ?", -1, &currentStatement, nil)
+                == SQLITE_OK
+        else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(currentStatement, 1, websiteID, -1, SQLITE_TRANSIENT)
+        if sqlite3_step(currentStatement) == SQLITE_ROW,
+            let raw = sqlite3_column_text(currentStatement, 0)
+        {
+            currentTopicID = String(cString: raw)
+        }
+
+        var counts: [(topicID: String, count: Int)] = []
+        var voteStatement: OpaquePointer?
+        defer { sqlite3_finalize(voteStatement) }
+        guard
+            sqlite3_prepare_v2(
+                db,
+                """
+                SELECT topic_id, COUNT(*) FROM pages
+                WHERE website_id = ? AND topic_id IS NOT NULL
+                GROUP BY topic_id
+                """,
+                -1, &voteStatement, nil
+            ) == SQLITE_OK
+        else {
+            throw StorageError.failedToPrepare(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(voteStatement, 1, websiteID, -1, SQLITE_TRANSIENT)
+        while sqlite3_step(voteStatement) == SQLITE_ROW {
+            let topicID = String(cString: sqlite3_column_text(voteStatement, 0))
+            let count = Int(sqlite3_column_int(voteStatement, 1))
+            counts.append((topicID: topicID, count: count))
+        }
+
+        let winner = TopicVote.majority(counts: counts, current: currentTopicID)
+        if winner != currentTopicID {
+            try assignWebsiteToTopic(websiteID: websiteID, topicID: winner)
+        }
     }
 
     private func updateTopicCounts() throws {

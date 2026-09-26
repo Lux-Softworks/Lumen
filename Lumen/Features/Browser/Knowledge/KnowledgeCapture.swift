@@ -56,12 +56,7 @@ final class KnowledgeCaptureService: ObservableObject {
         guard let webView = webView else { return }
         guard webView.window != nil else { return }
 
-        let incognito =
-            objc_getAssociatedObject(
-                webView.configuration,
-                &_WKWebViewAssociatedKeys.incognitoFlagKey
-            ) as? Bool ?? false
-        guard !incognito else { return }
+        guard !BrowserEngine.isIncognito(webView) else { return }
 
         await Self.waitForDOMReady(webView: webView)
         guard webView.window != nil else { return }
@@ -102,14 +97,14 @@ final class KnowledgeCaptureService: ObservableObject {
         guard quality.shouldCapturePage else { return }
         guard webView.window != nil else { return }
 
-        let topicName = await SemanticTopicClassifier.shared.classify(
+        let classification = await SemanticTopicClassifier.shared.classify(
             title: extractedContent.title,
             content: extractedContent.content
         )
         guard webView.window != nil else { return }
 
         var resolvedTopicID: String? = nil
-        if !topicName.isEmpty {
+        if let topicName = classification.best {
             do {
                 if let existingTopic = try await KnowledgeStorage.shared.fetchTopic(name: topicName) {
                     resolvedTopicID = existingTopic.id
@@ -179,6 +174,11 @@ final class KnowledgeCaptureService: ObservableObject {
             )
             let pageID = saveResult.pageID
 
+            if let resolvedTopicID {
+                try? await KnowledgeStorage.shared.updatePageTopic(pageID: pageID, topicID: resolvedTopicID)
+                try? await KnowledgeStorage.shared.recomputeWebsiteTopic(forPageID: pageID)
+            }
+
             captureToken &+= 1
             NotificationCenter.default.post(
                 name: .knowledgeCaptured,
@@ -186,11 +186,15 @@ final class KnowledgeCaptureService: ObservableObject {
                 userInfo: ["isUpdate": !saveResult.isNew]
             )
 
+            let topicCandidates = classification.candidates
+            let provisionalTopicName = classification.best
             let bgTask = Task.detached(priority: .background) { [extractedContent, newlyCreatedWebsiteID] in
                 await Self.runEnrichment(
                     pageID: pageID,
                     extracted: extractedContent,
-                    newlyCreatedWebsiteID: newlyCreatedWebsiteID
+                    newlyCreatedWebsiteID: newlyCreatedWebsiteID,
+                    topicCandidates: topicCandidates,
+                    provisionalTopicName: provisionalTopicName
                 )
             }
             backgroundTasks.insert(bgTask)
@@ -209,7 +213,9 @@ final class KnowledgeCaptureService: ObservableObject {
     private static func runEnrichment(
         pageID: String,
         extracted: ExtractedContent,
-        newlyCreatedWebsiteID: String?
+        newlyCreatedWebsiteID: String?,
+        topicCandidates: [String],
+        provisionalTopicName: String?
     ) async {
         await yieldIfActive()
         await savePageEmbedding(pageID: pageID, content: extracted.content)
@@ -221,7 +227,15 @@ final class KnowledgeCaptureService: ObservableObject {
         await saveChunks(pageID: pageID, content: extracted.content)
 
         await yieldIfActive()
-        await summarizePage(pageID: pageID, extracted: extracted)
+        let summary = await summarizePage(pageID: pageID, extracted: extracted)
+
+        await yieldIfActive()
+        await refineTopic(
+            pageID: pageID,
+            summary: summary,
+            candidates: topicCandidates,
+            provisionalTopicName: provisionalTopicName
+        )
 
         await yieldIfActive()
         if let siteID = newlyCreatedWebsiteID {
@@ -264,15 +278,47 @@ final class KnowledgeCaptureService: ObservableObject {
         )
     }
 
-    private static func summarizePage(pageID: String, extracted: ExtractedContent) async {
-        if Task.isCancelled { return }
+    private static func summarizePage(pageID: String, extracted: ExtractedContent) async -> String {
+        if Task.isCancelled { return "" }
         let summary = await KnowledgeClassifier.summarize(
             content: extracted.content,
             title: extracted.title
         )
-        guard !summary.isEmpty else { return }
+        guard !summary.isEmpty else { return "" }
 
         try? await KnowledgeStorage.shared.updatePageSummary(pageID: pageID, summary: summary)
+        return summary
+    }
+
+    private static func refineTopic(
+        pageID: String,
+        summary: String,
+        candidates: [String],
+        provisionalTopicName: String?
+    ) async {
+        if Task.isCancelled { return }
+        guard candidates.count > 1, !summary.isEmpty else { return }
+        guard let pick = await KnowledgeClassifier.pickTopic(summary: summary, candidates: candidates),
+            pick != provisionalTopicName
+        else { return }
+
+        do {
+            let topicID: String
+            if let existing = try await KnowledgeStorage.shared.fetchTopic(name: pick) {
+                topicID = existing.id
+            } else {
+                topicID = try await KnowledgeStorage.shared.createTopic(
+                    name: pick,
+                    color: TopicColorPalette.hex(for: pick)
+                )
+            }
+            try await KnowledgeStorage.shared.updatePageTopic(pageID: pageID, topicID: topicID)
+            try await KnowledgeStorage.shared.recomputeWebsiteTopic(forPageID: pageID)
+        } catch {
+            KnowledgeLogger.capture.error(
+                "topic refine failed: \(String(describing: error), privacy: .public)"
+            )
+        }
     }
 
     private static func summarizeWebsite(siteID: String, extracted: ExtractedContent) async {
@@ -311,7 +357,9 @@ final class KnowledgeCaptureService: ObservableObject {
         return formatted.isEmpty ? nil : formatted
     }
 
-    func handleUpdateSignal(_ payload: ReadingSignalPayload) async {
+    func handleUpdateSignal(_ payload: ReadingSignalPayload, webView: WKWebView?) async {
+        guard BrowserSettings.shared.collectKnowledge else { return }
+        guard let webView, !BrowserEngine.isIncognito(webView) else { return }
         do {
             try await KnowledgeStorage.shared.updatePageEngagement(
                 url: payload.url,

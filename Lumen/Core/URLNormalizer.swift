@@ -36,7 +36,7 @@ nonisolated enum URLNormalizer {
         if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
 
         var path = comps.path
-        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        while path.hasSuffix("/") { path.removeLast() }
 
         var result = host + path
         if let query = comps.query, !query.isEmpty {

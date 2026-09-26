@@ -20,12 +20,7 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                 let text = body["text"] as? String,
                 !text.isEmpty
             else { return }
-            let incognito =
-                objc_getAssociatedObject(
-                    webView.configuration,
-                    &_WKWebViewAssociatedKeys.incognitoFlagKey
-                ) as? Bool ?? false
-            if incognito { return }
+            if BrowserEngine.isIncognito(webView) { return }
 
             let prefix = body["prefix"] as? String ?? ""
             let suffix = body["suffix"] as? String ?? ""

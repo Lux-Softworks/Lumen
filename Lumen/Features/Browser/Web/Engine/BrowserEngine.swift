@@ -122,9 +122,9 @@ enum BrowserEngine {
                 await KnowledgeCaptureService.shared.handleSignal(payload, webView: webView)
             }
         }
-        readingSignalHandler.onReadingSignalUpdated = { payload, _ in
-            Task { @MainActor in
-                await KnowledgeCaptureService.shared.handleUpdateSignal(payload)
+        readingSignalHandler.onReadingSignalUpdated = { payload, webView in
+            Task { @MainActor [weak webView] in
+                await KnowledgeCaptureService.shared.handleUpdateSignal(payload, webView: webView)
             }
         }
         config.userContentController.add(readingSignalHandler, name: "readingSignal")
@@ -245,6 +245,11 @@ enum BrowserEngine {
         request.timeoutInterval = 30
 
         return request
+    }
+
+    @MainActor
+    static func isIncognito(_ webView: WKWebView) -> Bool {
+        objc_getAssociatedObject(webView, &_WKWebViewAssociatedKeys.incognitoFlagKey) as? Bool ?? false
     }
 }
 
