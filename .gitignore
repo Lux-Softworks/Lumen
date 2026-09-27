@@ -1,6 +1,7 @@
 docs/plans/
 docs/superpowers/
 .claude/
+Configuration/Signing.local.xcconfig
 .superpowers/
 
 .DS_Store

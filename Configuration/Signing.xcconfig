@@ -1,0 +1,4 @@
+DEVELOPMENT_TEAM = XF6K537DNY
+LUMEN_BUNDLE_ID_PREFIX = com.luxsoftworks
+
+#include? "Signing.local.xcconfig"

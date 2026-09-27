@@ -179,12 +179,9 @@ cd Lumen
 open Lumen.xcodeproj
 ```
 
-In Xcode:
-
-1. Select the **Lumen** target → **Signing & Capabilities**.
-2. Replace the bundled team (`XF6K537DNY`) with your own, and change the bundle identifier from `com.luxsoftworks.Lumen` to something unique to you (e.g. `com.yourname.Lumen`). Do the same for the `LumenTests` and `LumenUITests` targets.
-3. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open.
-4. Pick a destination (iOS 18+ iPhone or iOS 18+ simulator on Apple Silicon) and hit **⌘R**.
+1. To run on your own iPhone, sign with your own Apple team. Copy `Configuration/Signing.local.example.xcconfig` to `Configuration/Signing.local.xcconfig` (git ignores it), then set `DEVELOPMENT_TEAM` to your team ID and `LUMEN_BUNDLE_ID_PREFIX` to something unique to you (e.g. `com.yourname`). All three targets pick it up; there are no project settings to edit.
+2. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open.
+3. Pick a destination (iOS 18+ iPhone or iOS 18+ simulator on Apple Silicon) and hit **⌘R**.
 
 To run the tests from the terminal, use `scripts/test.sh` (see [docs/testing.md](docs/testing.md)).
 

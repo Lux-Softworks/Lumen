@@ -31,6 +31,7 @@ Lumen/
   UI/                  SwiftUI views: bottom bar, settings, knowledge panel, theme
 LumenTests/            unit tests (Swift Testing)
 LumenUITests/          UI tests (XCTest)
+Configuration/         signing settings (Signing.xcconfig + a gitignored local override)
 scripts/test.sh        build + run tests on a Simulator
 ```
 
@@ -49,4 +50,4 @@ scripts/test.sh        build + run tests on a Simulator
 - **SourceKit reports false "Cannot find type 'X' in scope"** for cross-module symbols (`EmbeddingService`, `ChatMessage`, `PageContent`, `URLNormalizer`, …). That is editor noise; `scripts/test.sh` is the real check.
 - **Bumping `EmbeddingService.embeddingVersion` clears and re-embeds everything** in the user's library.
 - **Keep new retrieval scoring on the existing scale.** Retrieval blends FTS keyword hits, semantic cosine, and `rankPagesByVector` (the max of best-chunk and page-embedding similarity); `rerankByRelevance` re-scores candidates on that same scale.
-- **Signing:** team `XF6K537DNY`, bundle id `com.luxsoftworks.Lumen`. Replace both for all three targets to run on your own device.
+- **Signing lives in `Configuration/Signing.xcconfig`**, not in the project file. To sign with another team, copy `Configuration/Signing.local.example.xcconfig` to `Configuration/Signing.local.xcconfig` (gitignored) and fill it in. Never put `DEVELOPMENT_TEAM` or a literal bundle id back into `project.pbxproj`.
