@@ -152,7 +152,7 @@ struct FolderItemButton: View {
                     LinearGradient(
                         colors: [
                             topicColor.opacity(0.38),
-                            topicColor.opacity(0.22),
+                            topicColor.opacity(0.22)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -168,7 +168,7 @@ struct FolderItemButton: View {
                         colors: [
                             Color.white.opacity(0.55),
                             topicColor.opacity(0.3),
-                            Color.white.opacity(0.1),
+                            Color.white.opacity(0.1)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -271,10 +271,10 @@ struct WebsitePageButton: View {
 struct KnowledgeFolderView: View {
     @Bindable var viewModel: KnowledgeMenuViewModel
 
-    @State private var topicToDelete: Topic? = nil
+    @State private var topicToDelete: Topic?
     @State private var websiteToDelete: Website?
     @State private var pageToDelete: PageContent?
-    @State private var exportSheet: ExportSheetItem? = nil
+    @State private var exportSheet: ExportSheetItem?
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -441,7 +441,7 @@ struct KnowledgeFolderView: View {
                             columns: [
                                 GridItem(.flexible(), spacing: 24),
                                 GridItem(.flexible(), spacing: 24),
-                                GridItem(.flexible(), spacing: 24),
+                                GridItem(.flexible(), spacing: 24)
                             ],
                             spacing: 32
                         ) {
@@ -515,7 +515,7 @@ struct KnowledgeFolderView: View {
                     columns: [
                         GridItem(.flexible(), spacing: 20),
                         GridItem(.flexible(), spacing: 20),
-                        GridItem(.flexible(), spacing: 20),
+                        GridItem(.flexible(), spacing: 20)
                     ], spacing: 24
                 ) {
                     ForEach(viewModel.websites.indices, id: \.self) { index in

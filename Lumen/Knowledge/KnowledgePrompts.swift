@@ -1,7 +1,7 @@
 import Foundation
 
 enum KnowledgePrompts {
-    private nonisolated static let llamaSpecialTokens = [
+    nonisolated private static let llamaSpecialTokens = [
         "<|begin_of_text|>",
         "<|end_of_text|>",
         "<|eot_id|>",
@@ -9,7 +9,7 @@ enum KnowledgePrompts {
         "<|start_header_id|>",
         "<|end_header_id|>",
         "<|finetune_right_pad_id|>",
-        "<|python_tag|>",
+        "<|python_tag|>"
     ]
 
     nonisolated static func sanitize(_ s: String) -> String {
@@ -198,67 +198,42 @@ enum KnowledgePrompts {
             """
     }
 
-    static func ragAnswer(
-        query: String,
-        context: String,
-        highlightsBlock: String,
-        highlightsGuideline: String,
-        historyBlock: String
-    ) -> String {
-        let query = sanitize(query)
-        let context = sanitize(context)
-        let highlightsBlock = sanitize(highlightsBlock)
-        let historyBlock = sanitize(historyBlock)
+    static func ragAnswer(query: String, blocks: PromptBudgeter.Blocks, dateScopePhrase: String?) -> String {
+        let instructions = dateScopePhrase.map { dateScopedAnswerInstructions(scopePhrase: sanitize($0)) } ?? answerInstructions
 
         return """
             <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            Answer the question directly using only the notes below. Reply with one short paragraph of two to four complete sentences — lead with the answer itself, then the most useful supporting detail. Plain prose.
-
-            Rules:
-            - Use only what the notes contain; treat it as true. If they don't cover the question, say so in one short sentence and stop.
-            - Write bullets only when the user asks for a list of several separate items; each bullet is then one short sentence on its own line starting with "- ".
-            - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes", "sources", "the text", or whether anyone read anything.
-            - Don't blend separate subjects. Never quote verbatim. Bold **key terms** sparingly. Finish every sentence — never trail off.\(highlightsGuideline)
+            \(instructions)\(blocks.highlightsGuideline)
 
             Notes:
-            \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
-            \(query)<|eot_id|>\
+            \(sanitize(blocks.context))\(sanitize(blocks.highlightsBlock))\(sanitize(blocks.historyBlock))<|eot_id|><|start_header_id|>user<|end_header_id|>
+            \(sanitize(query))<|eot_id|>\
             <|start_header_id|>assistant<|end_header_id|>
 
             """
     }
 
-    static func ragAnswerDateScoped(
-        query: String,
-        context: String,
-        highlightsBlock: String,
-        highlightsGuideline: String,
-        historyBlock: String,
-        scopePhrase: String
-    ) -> String {
-        let query = sanitize(query)
-        let context = sanitize(context)
-        let highlightsBlock = sanitize(highlightsBlock)
-        let historyBlock = sanitize(historyBlock)
-        let scopePhrase = sanitize(scopePhrase)
+    private static let answerInstructions = """
+        Answer the question directly using only the notes below. Reply with one short paragraph of two to four complete sentences — lead with the answer itself, then the most useful supporting detail. Plain prose.
 
-        return """
-            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            List what the user saved \(scopePhrase), using only the notes below. Each note is one page; its read date is in parentheses after the title.
+        Rules:
+        - Use only what the notes contain; treat it as true. If they don't cover the question, say so in one short sentence and stop.
+        - Write bullets only when the user asks for a list of several separate items; each bullet is then one short sentence on its own line starting with "- ".
+        - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes", "sources", "the text", or whether anyone read anything.
+        - Don't blend separate subjects. Never quote verbatim. Bold **key terms** sparingly. Finish every sentence — never trail off.
+        """
 
-            Reply as a short bulleted list, one bullet per page, each on its own line starting with "- ". Format each bullet as: **Page title** — one short phrase on what it covered, under 16 words. At most 5 bullets, most recent first.
+    private static func dateScopedAnswerInstructions(scopePhrase: String) -> String {
+        """
+        List what the user saved \(scopePhrase), using only the notes below. Each note is one page; its read date is in parentheses after the title.
 
-            Rules:
-            - Every line is a "- " bullet. No intro, no wrap-up.
-            - Use only the notes; treat them as true. Add a date only when it helps, and only the one given after the title — never invent a date.
-            - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes" or "sources".
-            - Don't blend pages together. Never quote verbatim. Bold only the **title**.\(highlightsGuideline)
+        Reply as a short bulleted list, one bullet per page, each on its own line starting with "- ". Format each bullet as: **Page title** — one short phrase on what it covered, under 16 words. At most 5 bullets, most recent first.
 
-            Notes:
-            \(context)\(highlightsBlock)\(historyBlock)<|eot_id|><|start_header_id|>user<|end_header_id|>
-            \(query)<|eot_id|>\
-            <|start_header_id|>assistant<|end_header_id|>
-
-            """
+        Rules:
+        - Every line is a "- " bullet. No intro, no wrap-up.
+        - Use only the notes; treat them as true. Add a date only when it helps, and only the one given after the title — never invent a date.
+        - Never apologize, never say anything is fake or retract, never describe your process. Don't mention "notes" or "sources".
+        - Don't blend pages together. Never quote verbatim. Bold only the **title**.
+        """
     }
 }

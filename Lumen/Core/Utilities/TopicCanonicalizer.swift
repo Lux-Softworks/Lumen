@@ -182,7 +182,7 @@ enum TopicCanonicalizer {
         "religion": "Religion",
         "parenting": "Parenting",
         "family": "Family",
-        "relationships": "Relationships",
+        "relationships": "Relationships"
     ]
 
     static func canonical(for raw: String) -> String {

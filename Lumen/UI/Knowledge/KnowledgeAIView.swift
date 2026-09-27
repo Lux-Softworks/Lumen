@@ -840,7 +840,7 @@ private struct PixelSparkleMarker: View {
         [0, 1, 2, 3, 4, 5, 6],
         [2, 3, 4],
         [3],
-        [3],
+        [3]
     ]
 
     var body: some View {
@@ -944,7 +944,7 @@ private struct LumenSparkleMatrix: View {
             [0, 1, 2, 3, 4, 5, 6],
             [2, 3, 4],
             [3],
-            [3],
+            [3]
         ]
         var result: [(CGFloat, CGFloat)] = []
         for (row, cols) in layout.enumerated() {
@@ -960,7 +960,7 @@ private struct LumenSparkleMatrix: View {
     private static let pathOrder: [Int] = [
         0, 1, 3, 2, 7, 6, 5, 6, 7, 8,
         12, 13, 15, 16, 15, 13, 14, 11, 10, 9,
-        8, 4, 3, 1,
+        8, 4, 3, 1
     ]
 
     private static let dotPathPositions: [[Int]] = {

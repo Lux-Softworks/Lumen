@@ -136,8 +136,7 @@ enum ExportPayloadBuilder {
         )
     }
 
-    private static func aggregatePages(for websites: [Website], storage: KnowledgeStorage) async throws -> [PageContent]
-    {
+    private static func aggregatePages(for websites: [Website], storage: KnowledgeStorage) async throws -> [PageContent] {
         guard !websites.isEmpty else { return [] }
         return try await storage.fetchPages(websiteIDs: websites.map { $0.id })
     }

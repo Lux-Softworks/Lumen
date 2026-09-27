@@ -58,6 +58,6 @@ nonisolated enum URLNormalizer {
         "mc_cid", "mc_eid", "igshid", "s_cid", "ref", "ref_", "ref_src",
         "referrer", "source", "src", "campaign", "_hsenc", "_hsmi",
         "_ga", "_gac", "aff", "affiliate", "trk", "pk_campaign", "pk_kwd",
-        "spm", "share", "shared", "shareid", "share_source",
+        "spm", "share", "shared", "shareid", "share_source"
     ]
 }

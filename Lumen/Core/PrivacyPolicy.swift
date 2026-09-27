@@ -10,5 +10,5 @@ struct PrivacyPolicy: Codable {
     var javaScriptCanOpenWindowsAutomatically: Bool = false
     var suppressesIncrementalRendering: Bool = true
     var limitsNavigationToHTTPS: Bool = true
-    var customUserAgent: String? = nil
+    var customUserAgent: String?
 }

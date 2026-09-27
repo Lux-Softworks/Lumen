@@ -4,8 +4,8 @@ import SwiftUI
 struct KnowledgeWebsiteView: View {
     @State var viewModel: KnowledgeWebsiteViewModel
     var onBack: () -> Void
-    var onSelectPage: ((PageContent) -> Void)? = nil
-    var onExportPage: ((PageContent) -> Void)? = nil
+    var onSelectPage: ((PageContent) -> Void)?
+    var onExportPage: ((PageContent) -> Void)?
     var onDeletePage: ((PageContent) -> Void)?
     @Environment(\.palette) private var palette
     @ScaledMetric(relativeTo: .body) private var pageChevronSize: CGFloat = 10
@@ -216,7 +216,7 @@ private struct ShimmerBar: View {
                     stops: [
                         .init(color: palette.text.opacity(0.08), location: phase),
                         .init(color: palette.text.opacity(0.16), location: phase + 0.3),
-                        .init(color: palette.text.opacity(0.08), location: phase + 0.6),
+                        .init(color: palette.text.opacity(0.08), location: phase + 0.6)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -250,7 +250,7 @@ private struct ShimmerBar: View {
             summary: "Deep dive into how actors prevent data races.",
             readingTime: 300,
             scrollDepth: 0.9
-        ),
+        )
     ]
     let website = Website(domain: "example.com", displayName: "Swift.org")
     let vm = KnowledgeWebsiteViewModel(website: website, pages: pages)

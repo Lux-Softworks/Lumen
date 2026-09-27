@@ -21,13 +21,13 @@ final class KnowledgeMenuViewModel {
     var websites: [Website] = []
     var pages: [PageContent] = []
 
-    var selectedTopic: Topic? = nil
-    var selectedWebsite: Website? = nil
-    var selectedPage: PageContent? = nil
-    var websiteViewModel: KnowledgeWebsiteViewModel? = nil
+    var selectedTopic: Topic?
+    var selectedWebsite: Website?
+    var selectedPage: PageContent?
+    var websiteViewModel: KnowledgeWebsiteViewModel?
 
     var isLoading = false
-    var error: Error? = nil
+    var error: Error?
 
     func loadTopics() async {
         let wasEmpty = topics.isEmpty

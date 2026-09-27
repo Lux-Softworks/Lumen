@@ -15,7 +15,7 @@ enum Haptics {
 
     static var clock: () -> CFTimeInterval = { CACurrentMediaTime() }
     static var modeProvider: () -> HapticsMode = { BrowserSettings.shared.hapticsMode }
-    static var fireImpl: ((HapticsEvent) -> Void)? = nil
+    static var fireImpl: ((HapticsEvent) -> Void)?
 
     static func prepareAll() {
         softGen.prepare(); rigidGen.prepare(); lightGen.prepare()

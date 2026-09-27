@@ -12,7 +12,7 @@ struct CaptureQuality {
         "/cart", "/oauth", "/auth", "/password", "/reset", "/verify",
         "/billing", "/payment", "/pay", "/subscription", "/wallet",
         "/admin", "/dashboard", "/inbox", "/messages", "/chat",
-        "/dm", "/compose", "/profile/edit", "/security",
+        "/dm", "/compose", "/profile/edit", "/security"
     ]
 
     private static let blockedDomainSubstrings: [String] = [
@@ -38,17 +38,10 @@ struct CaptureQuality {
         "web.whatsapp.com", "messenger.com", "telegram.org", "discord.com/channels",
         "slack.com/client", "teams.microsoft.com",
 
-        "admin.", "portal.", "dashboard.",
+        "admin.", "portal.", "dashboard."
     ]
 
-    static func evaluate(
-        url: String,
-        domain: String,
-        wordCount: Int,
-        readingTime: Int,
-        scrollDepth: Double,
-        hasArticleMetadata: Bool
-    ) -> CaptureQuality {
+    static func evaluate(url: String, domain: String) -> CaptureQuality {
         let lowerDomain = domain.lowercased()
         let lowerURL = url.lowercased()
         for pattern in blockedDomainSubstrings {

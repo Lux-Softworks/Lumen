@@ -159,8 +159,7 @@ enum AnnotationScript {
     static func applyJS(annotations: [[String: String]]) -> String {
         let json: String
         if let data = try? JSONSerialization.data(withJSONObject: annotations),
-            let str = String(data: data, encoding: .utf8)
-        {
+            let str = String(data: data, encoding: .utf8) {
             json = str
         } else {
             json = "[]"

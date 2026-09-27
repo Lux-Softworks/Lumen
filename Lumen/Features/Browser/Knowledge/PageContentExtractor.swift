@@ -37,7 +37,7 @@ struct PageContentExtractor {
         }()
 
         let cleanedContent = try cleanHTML(article.content)
-        let siteName = (try? extractSiteName(from: html)) ?? nil
+        let siteName = try? extractSiteName(from: html)
 
         return ExtractedContent(
             url: resolvedURL,
@@ -68,7 +68,7 @@ struct PageContentExtractor {
             extractedText = String(extractedText.prefix(Self.maxContentChars))
         }
 
-        var extractedTitle: String? = nil
+        var extractedTitle: String?
         if let attrs = pdf.documentAttributes, let title = attrs[PDFDocumentAttribute.titleAttribute] as? String {
             extractedTitle = title
         }
@@ -92,7 +92,7 @@ private extension PageContentExtractor {
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
             "yyyy-MM-dd'T'HH:mmXXXXX",
             "EEE, dd MMM yyyy HH:mm:ss ZZZZZ",
-            "yyyy-MM-dd",
+            "yyyy-MM-dd"
         ]
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -149,14 +149,13 @@ private extension PageContentExtractor {
             "meta[name=og:site_name]",
             "meta[name=application-name]",
             "meta[name=apple-mobile-web-app-title]",
-            "meta[property=twitter:site]",
+            "meta[property=twitter:site]"
         ]
 
         for query in metaQueries {
             if let element = try doc.select(query).first(),
                 let raw = try? element.attr("content"),
-                let cleaned = sanitizeSiteName(raw)
-            {
+                let cleaned = sanitizeSiteName(raw) {
                 return cleaned
             }
         }
@@ -174,7 +173,7 @@ private extension PageContentExtractor {
         let lower = value.lowercased()
         let rejected: Set<String> = [
             "website", "site", "home", "homepage", "page", "untitled",
-            "document", "index", "default", "n/a", "none", "unknown",
+            "document", "index", "default", "n/a", "none", "unknown"
         ]
         if rejected.contains(lower) { return nil }
 

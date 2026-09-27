@@ -123,7 +123,7 @@ struct HardenedWebView: UIViewControllerRepresentable {
         refreshControl.addSubview(starImageView)
         NSLayoutConstraint.activate([
             starImageView.centerXAnchor.constraint(equalTo: refreshControl.centerXAnchor),
-            starImageView.centerYAnchor.constraint(equalTo: refreshControl.centerYAnchor),
+            starImageView.centerYAnchor.constraint(equalTo: refreshControl.centerYAnchor)
         ])
         context.coordinator.starView = starImageView
 
@@ -255,7 +255,7 @@ final class WebViewHostController: UIViewController {
             tint.topAnchor.constraint(equalTo: view.topAnchor),
             tint.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tint.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            heightConstraint,
+            heightConstraint
         ])
         self.tintHeightConstraint = heightConstraint
         self.statusBarTintView = tint
@@ -279,7 +279,7 @@ final class WebViewHostController: UIViewController {
             top,
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 }

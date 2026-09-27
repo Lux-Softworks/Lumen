@@ -110,16 +110,14 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         if navigationAction.navigationType == .linkActivated
             || navigationAction.navigationType == .formSubmitted
             || navigationAction.navigationType == .other
-                && navigationAction.targetFrame?.isMainFrame == true
-        {
+                && navigationAction.targetFrame?.isMainFrame == true {
             if scheme == "http" || scheme == "https" {
                 currentPageURL = url
             }
         }
 
         if navigationAction.navigationType == .backForward,
-            navigationAction.targetFrame?.isMainFrame == true
-        {
+            navigationAction.targetFrame?.isMainFrame == true {
             Task { @MainActor in Haptics.fire(.soft) }
         }
 
@@ -255,8 +253,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
         if let response = navigationResponse.response as? HTTPURLResponse,
-            let url = response.url
-        {
+            let url = response.url {
             let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? ""
 
             if navigationResponse.isForMainFrame {
@@ -319,8 +316,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
 
         if method == NSURLAuthenticationMethodHTTPBasic
             || method == NSURLAuthenticationMethodHTTPDigest
-            || method == NSURLAuthenticationMethodNTLM
-        {
+            || method == NSURLAuthenticationMethodNTLM {
             Task { @MainActor in
                 let credential = await Self.promptForCredential(
                     host: challenge.protectionSpace.host,
@@ -362,7 +358,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
             alert.addAction(
                 UIAlertAction(title: "Sign In", style: .default) { _ in
                     let fields = alert.textFields ?? []
-                    let user = fields.count > 0 ? fields[0].text ?? "" : ""
+                    let user = fields.first?.text ?? ""
                     let password = fields.count > 1 ? fields[1].text ?? "" : ""
                     let credential = URLCredential(user: user, password: password, persistence: .forSession)
                     continuation.resume(returning: credential)
@@ -423,7 +419,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        logger.error("Navigation failed: \(error.localizedDescription, privacy: .public)")
+        logger.error("Navigation failed: \(error.localizedDescription, privacy: .private)")
         if (error as NSError).code != NSURLErrorCancelled {
             Task { @MainActor in Haptics.fire(.error) }
         }
@@ -513,8 +509,7 @@ final class NetworkInterceptor: NSObject, WKNavigationDelegate {
         fingerprintEventsByScript[scriptUrl] = events
 
         if events.count >= Self.fingerprintBlockThreshold,
-            !blockedFingerprintingScripts.contains(scriptUrl)
-        {
+            !blockedFingerprintingScripts.contains(scriptUrl) {
             blockedFingerprintingScripts.insert(scriptUrl)
             logger.warning("Blocked fingerprinter: \(scriptUrl.absoluteString, privacy: .private)")
             neutralizeFingerprinting(in: webView)

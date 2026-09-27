@@ -211,8 +211,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
         guard !trimmed.isEmpty else { return defaultURL }
 
         if let parsed = URL(string: trimmed), parsed.scheme != nil,
-            parsed.host != nil || parsed.scheme == "about"
-        {
+            parsed.host != nil || parsed.scheme == "about" {
             return parsed
         } else if trimmed.contains(".") && !trimmed.contains(" ") {
             return URL(string: "https://\(trimmed)") ?? defaultURL
@@ -265,8 +264,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
                             self.pendingHistoryRecord,
                             !self.isIncognito,
                             let url = webView.url?.absoluteString,
-                            let title = webView.title, !title.isEmpty
-                        {
+                            let title = webView.title, !title.isEmpty {
                             HistoryStore.shared.record(url: url, title: title)
                             self.pendingHistoryRecord = false
                         }
@@ -379,7 +377,7 @@ final class BrowserViewModel: NSObject, ObservableObject {
 
     private var themeColorCache: [String: UIColor] = [:]
 
-    @Published var themeColor: UIColor? = nil
+    @Published var themeColor: UIColor?
 
     var onScrollUpdate: ((CGFloat, CGFloat, CGFloat, CGFloat) -> Void)?
 

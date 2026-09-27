@@ -68,7 +68,7 @@ struct TabHeaderLabel: View {
     var isIncognito: Bool = false
     var textOpacity: CGFloat = 1
     var iconSize: CGFloat = 16
-    var contrastBackground: UIColor? = nil
+    var contrastBackground: UIColor?
 
     @Environment(\.palette) private var palette
 

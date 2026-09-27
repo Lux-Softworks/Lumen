@@ -18,7 +18,7 @@ enum TopicColorPalette {
         "#FFB74D",  // marigold
         "#FF8A65",  // persimmon
         "#A1887F",  // walnut
-        "#90A4AE",  // slate
+        "#90A4AE"  // slate
     ]
 
     static func hex(for name: String) -> String {

@@ -5,11 +5,11 @@ struct ThemedToggle: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        Button(action: {
+        Button {
             withAnimation(.smooth(duration: 0.25)) {
                 isOn.toggle()
             }
-        }) {
+        } label: {
             ZStack {
                 Capsule()
                     .fill(isOn ? palette.accent : palette.text.opacity(0.1))

@@ -161,8 +161,7 @@ final class SearchHistoryStore: ObservableObject {
         }
 
         if s.count >= 32,
-            s.range(of: #"^[a-fA-F0-9]+$"#, options: .regularExpression) != nil
-        {
+            s.range(of: #"^[a-fA-F0-9]+$"#, options: .regularExpression) != nil {
             return true
         }
 
@@ -170,8 +169,7 @@ final class SearchHistoryStore: ObservableObject {
             s.range(of: #"^[A-Za-z0-9+/=_\-]+$"#, options: .regularExpression) != nil,
             s.range(of: #"[A-Z]"#, options: .regularExpression) != nil,
             s.range(of: #"[a-z]"#, options: .regularExpression) != nil,
-            s.range(of: #"\d"#, options: .regularExpression) != nil
-        {
+            s.range(of: #"\d"#, options: .regularExpression) != nil {
             return true
         }
 
@@ -198,7 +196,7 @@ final class SearchHistoryStore: ObservableObject {
 
             try data.write(to: storeURL, options: [.atomic, .completeFileProtectionUnlessOpen])
         } catch {
-            Self.logger.error("save failed: \(String(describing: error), privacy: .public)")
+            Self.logger.error("save failed: \(String(describing: error), privacy: .private)")
         }
     }
 

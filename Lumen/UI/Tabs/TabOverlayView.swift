@@ -3,16 +3,16 @@ import UIKit
 
 struct TabOverlayView: View {
     @ObservedObject var tabManager: TabManager
-    var hiddenTabId: UUID? = nil
+    var hiddenTabId: UUID?
     var shrinkProgress: CGFloat = 1
     var resetToken: Int = 0
-    var pendingShrinkBelowId: UUID? = nil
+    var pendingShrinkBelowId: UUID?
     var onSelectTab: (UUID, CGPoint) -> Void
 
     private let scale: CGFloat = 0.69
     private let toolbarHeight: CGFloat = 80
 
-    @State private var lastScrolledToId: UUID? = nil
+    @State private var lastScrolledToId: UUID?
     @State private var lastTabSwitchAt: Date = .distantPast
     @State private var scrollOffset: CGFloat = 0
     @State private var isDeletingTab: Bool = false

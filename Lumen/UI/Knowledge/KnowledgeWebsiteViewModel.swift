@@ -101,9 +101,8 @@ final class KnowledgeWebsiteViewModel {
 
         if let existingSummary = website.summary,
             !existingSummary.isEmpty,
-            let _ = website.synthesisUpdatedAt,
-            website.pageCountAtSynthesis >= website.pageCount
-        {
+            website.synthesisUpdatedAt != nil,
+            website.pageCountAtSynthesis >= website.pageCount {
             synthesisState = .ready(existingSummary)
             return
         }
@@ -135,7 +134,7 @@ final class KnowledgeWebsiteViewModel {
             website.synthesisUpdatedAt = Date()
         } catch {
             KnowledgeLogger.storage.error(
-                "website synthesis save failed: \(String(describing: error), privacy: .public)")
+                "website synthesis save failed: \(String(describing: error), privacy: .private)")
         }
 
         synthesisState = .ready(result)

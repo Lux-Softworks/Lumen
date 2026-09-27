@@ -17,7 +17,7 @@ struct ProgressView: View {
             colors: [
                 palette.accent.opacity(0.7),
                 palette.accent.opacity(0.85),
-                palette.accent,
+                palette.accent
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -29,7 +29,7 @@ struct ProgressView: View {
             colors: [
                 palette.accent.opacity(0.35),
                 palette.accent.opacity(0.8),
-                palette.accent.opacity(0.45),
+                palette.accent.opacity(0.45)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -42,7 +42,7 @@ struct ProgressView: View {
                 .init(color: .clear, location: 0.0),
                 .init(color: .clear, location: 0.52),
                 .init(color: palette.accent.opacity(0.45), location: 0.80),
-                .init(color: palette.accent.opacity(0.85), location: 1.0),
+                .init(color: palette.accent.opacity(0.85), location: 1.0)
             ],
             startPoint: .leading,
             endPoint: .trailing

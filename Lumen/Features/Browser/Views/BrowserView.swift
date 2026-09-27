@@ -15,9 +15,9 @@ struct BrowserView: View {
 
     @State private var activeTabViewState: TabViewState = .fullScreen
     @State private var shrinkProgress: CGFloat = 0
-    @State private var tabSelectionOrigin: CGPoint? = nil
+    @State private var tabSelectionOrigin: CGPoint?
     @State private var tabOverlayResetToken: Int = 0
-    @State private var pendingShrinkBelowId: UUID? = nil
+    @State private var pendingShrinkBelowId: UUID?
 
     @State private var webViewReady = true
     @State private var coverFinished = false
@@ -32,7 +32,7 @@ struct BrowserView: View {
     @State private var urlText: String = ""
     @State private var editingSuggestion: Bool = false
     @State private var sessionSuggestions: [SearchSuggestion] = []
-    @State private var suggestionFetchTask: Task<Void, Never>? = nil
+    @State private var suggestionFetchTask: Task<Void, Never>?
 
     @FocusState private var isAddressBarFocused: Bool
 
@@ -180,26 +180,28 @@ struct BrowserView: View {
                 }
             }
             .ignoresSafeArea()
-            .applyNavigationCoverChangeHandlers(
-                showNavigationCover: $showNavigationCover,
-                navigationCoverOpacity: $navigationCoverOpacity,
-                navigationCoverProgress: $navigationCoverProgress,
-                coverFinished: $coverFinished,
-                pageCommitted: $pageCommitted,
-                webViewReady: $webViewReady,
-                onFadeIn: fadeInWebView
-            )
-            .applyPageLoadHandlers(
-                pageReadyToken: pageReadyToken,
-                firstPaintToken: firstPaintToken,
-                isActiveTabLoading: isActiveTabLoading,
-                activeTabProgress: activeTabProgress,
-                webViewReady: $webViewReady,
-                coverFinished: coverFinished,
-                pageCommitted: $pageCommitted,
-                bottomBarState: $bottomBarState,
-                onFadeIn: fadeInWebView
-            )
+            .modifier(
+                NavigationCoverChangeHandlers(
+                    showNavigationCover: $showNavigationCover,
+                    navigationCoverOpacity: $navigationCoverOpacity,
+                    navigationCoverProgress: $navigationCoverProgress,
+                    coverFinished: $coverFinished,
+                    pageCommitted: $pageCommitted,
+                    webViewReady: $webViewReady,
+                    onFadeIn: fadeInWebView
+                ))
+            .modifier(
+                PageLoadHandlers(
+                    pageReadyToken: pageReadyToken,
+                    firstPaintToken: firstPaintToken,
+                    isActiveTabLoading: isActiveTabLoading,
+                    activeTabProgress: activeTabProgress,
+                    webViewReady: $webViewReady,
+                    coverFinished: coverFinished,
+                    pageCommitted: $pageCommitted,
+                    bottomBarState: $bottomBarState,
+                    onFadeIn: fadeInWebView
+                ))
             .applyTabManagerHandlers(
                 tabManager: tabManager,
                 activeTabViewState: $activeTabViewState,
@@ -237,7 +239,7 @@ struct BrowserView: View {
                     sessionSuggestions = []
                 }
             }
-            .onChange(of: bottomBarState) { oldState, newState in
+            .onChange(of: bottomBarState) { _, newState in
                 let isExpanded =
                     newState == .search || newState == .browserSettings
                     || newState == .siteSettings || newState == .knowledge
@@ -504,8 +506,7 @@ struct BrowserView: View {
                     let isBlank = currentURL.isEmpty || currentURL == "about:blank"
 
                     if !isBlank && bottomBarState != .search && bottomBarState != .browserSettings
-                        && bottomBarState != .siteSettings && bottomBarState != .knowledge
-                    {
+                        && bottomBarState != .siteSettings && bottomBarState != .knowledge {
                         bottomBarState = .collapsed
                     }
                 }
@@ -709,8 +710,7 @@ struct BrowserView: View {
                 guard let url = vm?.currentURL else { return }
                 let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
                 if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                    let root = scene.keyWindow?.rootViewController
-                {
+                    let root = scene.keyWindow?.rootViewController {
                     root.present(vc, animated: true)
                 }
             },
@@ -872,8 +872,7 @@ struct BrowserView: View {
                     bottomBarState = .browserSettings
                 } else if let url = activeTab?.viewModel.currentURL,
                     !url.absoluteString.isEmpty,
-                    url.absoluteString != "about:blank"
-                {
+                    url.absoluteString != "about:blank" {
                     bottomBarState = .siteSettings
                 } else {
                     bottomBarState = .browserSettings
@@ -972,8 +971,7 @@ struct BrowserView: View {
     private func looksLikeURL(_ s: String) -> Bool {
         guard !s.contains(" ") else { return false }
         if let parsed = URL(string: s), parsed.scheme != nil,
-            parsed.host != nil || parsed.scheme == "about"
-        {
+            parsed.host != nil || parsed.scheme == "about" {
             return true
         }
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-/_~"))
@@ -986,8 +984,7 @@ struct BrowserView: View {
 
     private func handleCopyUrl() {
         if let validURL = activeTab?.viewModel.currentURL?.absoluteString,
-            !validURL.isEmpty, validURL != "about:blank"
-        {
+            !validURL.isEmpty, validURL != "about:blank" {
             UIPasteboard.general.string = validURL
         } else {
             UIPasteboard.general.string = urlText
@@ -1202,52 +1199,6 @@ private struct ActiveTabChangedHandlers: ViewModifier {
 }
 
 extension View {
-    fileprivate func applyNavigationCoverChangeHandlers(
-        showNavigationCover: Binding<Bool>,
-        navigationCoverOpacity: Binding<CGFloat>,
-        navigationCoverProgress: Binding<CGFloat>,
-        coverFinished: Binding<Bool>,
-        pageCommitted: Binding<Bool>,
-        webViewReady: Binding<Bool>,
-        onFadeIn: @escaping () -> Void
-    ) -> some View {
-        modifier(
-            NavigationCoverChangeHandlers(
-                showNavigationCover: showNavigationCover,
-                navigationCoverOpacity: navigationCoverOpacity,
-                navigationCoverProgress: navigationCoverProgress,
-                coverFinished: coverFinished,
-                pageCommitted: pageCommitted,
-                webViewReady: webViewReady,
-                onFadeIn: onFadeIn
-            ))
-    }
-
-    fileprivate func applyPageLoadHandlers(
-        pageReadyToken: Int,
-        firstPaintToken: Int,
-        isActiveTabLoading: Bool,
-        activeTabProgress: Double,
-        webViewReady: Binding<Bool>,
-        coverFinished: Bool,
-        pageCommitted: Binding<Bool>,
-        bottomBarState: Binding<BottomBarState>,
-        onFadeIn: @escaping () -> Void
-    ) -> some View {
-        modifier(
-            PageLoadHandlers(
-                pageReadyToken: pageReadyToken,
-                firstPaintToken: firstPaintToken,
-                isActiveTabLoading: isActiveTabLoading,
-                activeTabProgress: activeTabProgress,
-                webViewReady: webViewReady,
-                coverFinished: coverFinished,
-                pageCommitted: pageCommitted,
-                bottomBarState: bottomBarState,
-                onFadeIn: onFadeIn
-            ))
-    }
-
     fileprivate func applyTabManagerHandlers(
         tabManager: TabManager,
         activeTabViewState: Binding<TabViewState>,

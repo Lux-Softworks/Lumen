@@ -6,10 +6,10 @@ struct KnowledgeButton: View {
     @Environment(\.palette) var palette
 
     var body: some View {
-        Button(action: {
+        Button {
             Haptics.fire(.tap)
             action()
-        }) {
+        } label: {
             ZStack {
                 Rectangle()
                     .fill(.regularMaterial)

@@ -19,7 +19,7 @@ struct IncognitoGatingTests {
         let flagOnConfigCopy =
             objc_getAssociatedObject(
                 webView.configuration,
-                &_WKWebViewAssociatedKeys.incognitoFlagKey
+                &WebViewAssociatedKeys.incognitoFlagKey
             ) as? Bool ?? false
         #expect(!flagOnConfigCopy)
     }

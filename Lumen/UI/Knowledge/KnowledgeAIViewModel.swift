@@ -17,10 +17,10 @@ final class KnowledgeAIViewModel {
     var isThinking: Bool = false
     var isModelLoading: Bool = false
     var sparklePhase: SparklePhase = .idle
-    var statusMessage: String? = nil
+    var statusMessage: String?
 
     private var activeTask: Task<Void, Never>?
-    private var conversationSummary: String? = nil
+    private var conversationSummary: String?
     private var compactedThroughIndex: Int = 0
     private let autoCompactThreshold = 8
     private let keepRecentTurns = 3
@@ -29,19 +29,19 @@ final class KnowledgeAIViewModel {
         "Thinking…",
         "Pondering…",
         "Wondering…",
-        "Reflecting…",
+        "Reflecting…"
     ]
 
     private static let searchingMessages = [
         "Searching…",
         "Browsing…",
         "Scanning…",
-        "Digging…",
+        "Digging…"
     ]
 
     private static let compactingMessages = [
         "Condensing…",
-        "Summarizing…",
+        "Summarizing…"
     ]
 
     private func setStatus(_ message: String?) {
@@ -58,7 +58,7 @@ final class KnowledgeAIViewModel {
         do {
             try await LocalKnowledgeProvider.shared.loadModel()
         } catch {
-            KnowledgeLogger.rag.error("model load failed: \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.rag.error("model load failed: \(String(describing: error), privacy: .private)")
         }
 
         sparklePhase = .idle
@@ -76,7 +76,7 @@ final class KnowledgeAIViewModel {
 
         isThinking = true
         sparklePhase = .spinning
-        setStatus(Self.thinkingMessages.randomElement()!)
+        setStatus(Self.thinkingMessages.randomElement())
 
         await maybeCompactHistory(priorMessages: priorMessages)
 
@@ -98,7 +98,7 @@ final class KnowledgeAIViewModel {
             return
         }
 
-        setStatus(Self.searchingMessages.randomElement()!)
+        setStatus(Self.searchingMessages.randomElement())
 
         let correctionNote = correction.changed ? "Showing results for “\(query)”" : nil
         let parsedDate = DateQueryParser.parse(query)
@@ -190,7 +190,7 @@ final class KnowledgeAIViewModel {
                 highlights.append(contentsOf: anns.map { $0.text })
             } catch {
                 KnowledgeLogger.query.error(
-                    "annotation fetch failed pageID=\(page.id, privacy: .public): \(String(describing: error), privacy: .public)"
+                    "annotation fetch failed pageID=\(page.id, privacy: .private): \(String(describing: error), privacy: .private)"
                 )
             }
         }
@@ -200,7 +200,7 @@ final class KnowledgeAIViewModel {
             correctionNote: correctionNote)
         let streamMessageID = streamMessage.id
         messages.append(streamMessage)
-        setStatus(Self.thinkingMessages.randomElement()!)
+        setStatus(Self.thinkingMessages.randomElement())
 
         let summary = conversationSummary
         let dateScopePhrase = parsedDate?.phrase
@@ -216,7 +216,7 @@ final class KnowledgeAIViewModel {
 
         activeTask = Task {
             var raw = ""
-            var streamError: Error? = nil
+            var streamError: Error?
             let flushInterval: TimeInterval = 0.08
             var lastFlush = Date(timeIntervalSince1970: 0)
 
@@ -298,7 +298,7 @@ final class KnowledgeAIViewModel {
 
             guard modelProducedOutput else { return }
 
-            var scoredMatch: SourceMatch? = nil
+            var scoredMatch: SourceMatch?
             do {
                 let rows = try await KnowledgeStorage.shared.fetchPageEmbeddings(pageIDs: sources.map { $0.id })
                 let vectors = rows.map { $0.vector }
@@ -309,7 +309,7 @@ final class KnowledgeAIViewModel {
                 )
                 scoredMatch = AnswerValidityScorer.match(answer: finalText, validity: validity)
             } catch {
-                KnowledgeLogger.rag.error("validity scoring failed: \(String(describing: error), privacy: .public)")
+                KnowledgeLogger.rag.error("validity scoring failed: \(String(describing: error), privacy: .private)")
             }
 
             if let scoredMatch, let idx = streamingIndex() {
@@ -339,7 +339,7 @@ final class KnowledgeAIViewModel {
         "tell", "show", "list", "give", "about", "stuff", "things", "thing",
         "anything", "everything", "saved", "article", "articles", "page", "pages",
         "the", "an", "of", "to", "in", "on", "for", "and", "or",
-        "is", "are", "was", "were", "me", "my", "you", "your", "it", "that", "this",
+        "is", "are", "was", "were", "me", "my", "you", "your", "it", "that", "this"
     ]
 
     private static let knowledgeQueryPatterns: [NSRegularExpression] = {
@@ -349,7 +349,7 @@ final class KnowledgeAIViewModel {
             #"\bwhat do i know about\b"#,
             #"\b(tell|show|remind) me (about|what|which|more about|everything about)\b"#,
             #"\bsummari[sz]e\b"#,
-            #"\bmy (saved|reading|library|notes|pages|history|articles|bookmarks)\b"#,
+            #"\bmy (saved|reading|library|notes|pages|history|articles|bookmarks)\b"#
         ]
         return raw.compactMap { try? NSRegularExpression(pattern: $0, options: .caseInsensitive) }
     }()
@@ -359,7 +359,7 @@ final class KnowledgeAIViewModel {
         "what have i read about ", "what have i read on ", "tell me what i read about ",
         "what did i see about ", "what did i learn about ", "what did i study about ",
         "what do i know about ", "remind me what i read about ", "remind me about ",
-        "tell me about ", "what did i read ", "what have i read ", "what did i see ",
+        "tell me about ", "what did i read ", "what have i read ", "what did i see "
     ].sorted { $0.count > $1.count }
 
     private static func topicQuestion(from query: String) -> String {
@@ -436,7 +436,7 @@ final class KnowledgeAIViewModel {
             "what", "which", "who", "whom", "whose", "when", "where", "why", "how",
             "do", "does", "did", "can", "could", "would", "should", "may", "might",
             "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
-            "my", "your", "his", "her", "its", "our", "their", "about", "with", "from",
+            "my", "your", "his", "her", "its", "our", "their", "about", "with", "from"
         ]
         let tokens =
             raw
@@ -462,7 +462,7 @@ final class KnowledgeAIViewModel {
 
         activeTask = Task {
             var raw = ""
-            var streamError: Error? = nil
+            var streamError: Error?
             let flushInterval: TimeInterval = 0.08
             var lastFlush = Date(timeIntervalSince1970: 0)
 
@@ -586,7 +586,7 @@ final class KnowledgeAIViewModel {
         }
         guard !turns.isEmpty else { return }
 
-        setStatus(Self.compactingMessages.randomElement()!)
+        setStatus(Self.compactingMessages.randomElement())
         do {
             let newSummary = try await LocalKnowledgeProvider.shared.summarizeConversationWithLLM(
                 turns: turns,
@@ -597,10 +597,10 @@ final class KnowledgeAIViewModel {
                 compactedThroughIndex = keepFrom
             }
         } catch {
-            KnowledgeLogger.rag.error("conversation compaction failed: \(String(describing: error), privacy: .public)")
+            KnowledgeLogger.rag.error("conversation compaction failed: \(String(describing: error), privacy: .private)")
         }
 
-        setStatus(Self.searchingMessages.randomElement()!)
+        setStatus(Self.searchingMessages.randomElement())
     }
 
     func clearMessages() {
@@ -622,7 +622,7 @@ enum QueryCorrector {
         "did", "does", "have", "had", "has", "was", "were", "are", "the", "and",
         "about", "from", "with", "that", "this", "these", "those", "your", "read",
         "tell", "show", "give", "list", "into", "over", "want", "know", "there",
-        "their", "they", "them", "then", "than", "some", "more", "most", "much",
+        "their", "they", "them", "then", "than", "some", "more", "most", "much"
     ]
 
     static func correct(_ query: String) async -> QueryCorrection {

@@ -41,7 +41,7 @@ final class SiteSettingsStore: ObservableObject {
             let data = try JSONEncoder().encode(hostSettings)
             try data.write(to: fileURL)
         } catch {
-            Self.logger.error("save failed: \(String(describing: error), privacy: .public)")
+            Self.logger.error("save failed: \(String(describing: error), privacy: .private)")
         }
     }
 
@@ -51,7 +51,7 @@ final class SiteSettingsStore: ObservableObject {
             let data = try Data(contentsOf: fileURL)
             hostSettings = try JSONDecoder().decode([String: PrivacyPolicy].self, from: data)
         } catch {
-            Self.logger.error("load failed: \(String(describing: error), privacy: .public)")
+            Self.logger.error("load failed: \(String(describing: error), privacy: .private)")
         }
     }
 

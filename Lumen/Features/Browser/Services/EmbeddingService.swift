@@ -84,8 +84,7 @@ nonisolated final class EmbeddingService: @unchecked Sendable {
 
         if let ctx = ensureLoaded(),
             Self.looksEnglish(clean),
-            let vector = contextualVector(ctx, text: clean)
-        {
+            let vector = contextualVector(ctx, text: clean) {
             return vector
         }
 

@@ -29,7 +29,7 @@ actor LocalKnowledgeProvider {
         "(?i)^here('s| is| are)\\b[^:]*:",
         "(?i)^(in |based on |according to |sure|okay|of course)[^:]*:",
         "(?i)^.{0,20}(concise|natural|brief|short|sentence)[^:]*:",
-        "(?i)^.{0,20}(response|answer|summary)[^:]*:",
+        "(?i)^.{0,20}(response|answer|summary)[^:]*:"
     ])
 
     private static let outputMetaSentences: [NSRegularExpression] = compile([
@@ -37,14 +37,14 @@ actor LocalKnowledgeProvider {
         "(?i)^(let me|i'?ll|i can|i would)\\b[^.]*\\.\\s*",
         "(?i)^i('?ve| have)?\\s*(looked|searched|checked|reviewed|scanned|gone through|looked through)\\b[^.]*\\.\\s*",
         "(?i)^(based on|from|according to|looking at|drawing on)\\s+(your|the)\\s+(saved |reading |)?(pages?|sources?|history|notes)\\b[^.]*\\.\\s*",
-        "(?i)^(in|from) your saved pages[^.]*\\.\\s*",
+        "(?i)^(in|from) your saved pages[^.]*\\.\\s*"
     ])
 
     private static let summaryMetaPrefixes: [NSRegularExpression] = compile([
         "(?i)^here('s| is| are)\\b[^:]*:",
         "(?i)^(sure|okay|of course|this)[^:]*:",
         "(?i)^.{0,15}(summary|description|purpose|overview)[^:]*:",
-        "(?i)^(the (article|page|website|site|content) (is about|covers|discusses|describes|explains))\\s*",
+        "(?i)^(the (article|page|website|site|content) (is about|covers|discusses|describes|explains))\\s*"
     ])
 
     private static let strayStarRegex = try? NSRegularExpression(pattern: "(?<![*])\\*(?![*])")
@@ -536,25 +536,8 @@ actor LocalKnowledgeProvider {
                         substance: substance
                     )
 
-                    let prompt: String
-                    if let scope = dateScopePhrase {
-                        prompt = await KnowledgePrompts.ragAnswerDateScoped(
-                            query: query,
-                            context: blocks.context,
-                            highlightsBlock: blocks.highlightsBlock,
-                            highlightsGuideline: blocks.highlightsGuideline,
-                            historyBlock: blocks.historyBlock,
-                            scopePhrase: scope
-                        )
-                    } else {
-                        prompt = await KnowledgePrompts.ragAnswer(
-                            query: query,
-                            context: blocks.context,
-                            highlightsBlock: blocks.highlightsBlock,
-                            highlightsGuideline: blocks.highlightsGuideline,
-                            historyBlock: blocks.historyBlock
-                        )
-                    }
+                    let prompt = await KnowledgePrompts.ragAnswer(
+                        query: query, blocks: blocks, dateScopePhrase: dateScopePhrase)
 
                     let parameters = GenerateParameters(
                         maxTokens: 900,
@@ -631,8 +614,7 @@ actor LocalKnowledgeProvider {
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let last = text.last, !".!?".contains(last),
-            let lastTerminal = text.lastIndex(where: { ".!?".contains($0) })
-        {
+            let lastTerminal = text.lastIndex(where: { ".!?".contains($0) }) {
             let trimmed = String(text[...lastTerminal])
             if Double(trimmed.count) >= Double(text.count) * 0.5 {
                 text = trimmed

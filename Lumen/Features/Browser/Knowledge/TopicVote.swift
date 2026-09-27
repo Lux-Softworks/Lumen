@@ -8,6 +8,6 @@ nonisolated enum TopicVote {
         if let current, leaders.contains(where: { $0.topicID == current }) {
             return current
         }
-        return leaders.map { $0.topicID }.sorted().first
+        return leaders.map { $0.topicID }.min()
     }
 }

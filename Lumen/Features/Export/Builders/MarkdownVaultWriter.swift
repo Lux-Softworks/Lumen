@@ -1,12 +1,17 @@
 import Foundation
 
 nonisolated enum MarkdownVaultWriter {
+    private struct ProgressReporting {
+        let onProgress: (Int, Int) -> Void
+        let shouldCancel: () -> Bool
+    }
+
     static func write(
         payload: ExportPayload,
         toggles: ExportCoordinator.Request.Toggles,
         into vaultDir: URL,
-        onProgress: (Int, Int) -> Void,
-        shouldCancel: () -> Bool
+        onProgress: @escaping (Int, Int) -> Void,
+        shouldCancel: @escaping () -> Bool
     ) throws {
         let topicsDir = vaultDir.appendingPathComponent("Topics")
         let sitesDir = vaultDir.appendingPathComponent("Sites")
@@ -24,8 +29,7 @@ nonisolated enum MarkdownVaultWriter {
             payload: payload,
             toggles: toggles,
             filenamesByPageID: filenamesByPageID,
-            onProgress: onProgress,
-            shouldCancel: shouldCancel
+            progress: ProgressReporting(onProgress: onProgress, shouldCancel: shouldCancel)
         )
     }
 
@@ -175,8 +179,7 @@ nonisolated enum MarkdownVaultWriter {
         payload: ExportPayload,
         toggles: ExportCoordinator.Request.Toggles,
         filenamesByPageID: [String: String],
-        onProgress: (Int, Int) -> Void,
-        shouldCancel: () -> Bool
+        progress: ProgressReporting
     ) throws {
         let total = payload.pages.count
         let topicByID = Dictionary(uniqueKeysWithValues: payload.topics.map { ($0.id, $0) })
@@ -185,7 +188,7 @@ nonisolated enum MarkdownVaultWriter {
             grouping: payload.annotations, by: { $0.pageID ?? "" })
 
         for (index, page) in payload.pages.enumerated() {
-            if shouldCancel() { throw CancellationError() }
+            if progress.shouldCancel() { throw CancellationError() }
 
             let domain = page.domain.isEmpty ? "unknown" : page.domain
             let domainDir = dir.appendingPathComponent(slug(domain))
@@ -257,7 +260,7 @@ nonisolated enum MarkdownVaultWriter {
                 options: .atomic
             )
 
-            onProgress(index + 1, total)
+            progress.onProgress(index + 1, total)
         }
     }
 

@@ -51,6 +51,8 @@ force_unwrapping:
   severity: warning
 fatal_error_message:
   severity: error
+nesting:
+  type_level: 2
 
 custom_rules:
   no_print:
@@ -63,8 +65,8 @@ custom_rules:
 
   logger_privacy:
     name: "Logger interpolation without privacy"
-    regex: 'logger\.(debug|info|notice|warning|error|fault|log)\("[^"]*\\\([^)]*\)[^"]*"\)'
-    message: "Logger string interpolations should use 'privacy:' (public/private/sensitive)."
+    regex: '\b(?:logger|log|KnowledgeLogger\.\w+)\.(?:debug|info|notice|warning|error|fault|log|trace|critical)\(\s*"(?:[^"\\]|\\[^(]|\\\((?:[^()]|\([^()]*\))*\))*\\\((?:(?!privacy:)[^()]|\((?:(?!privacy:)[^()])*\))*\)'
+    message: "Every value in a logger message needs a privacy level, e.g. \\(url, privacy: .private). Use .public only for values that never hold user data."
     severity: warning
 
 reporter: "xcode"

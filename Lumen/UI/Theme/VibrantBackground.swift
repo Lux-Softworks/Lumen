@@ -27,7 +27,7 @@ struct VibrantBackground: View {
             LinearGradient(
                 colors: [
                     ambientPalette.tint.opacity(0.10),
-                    ambientPalette.tint.opacity(0.04),
+                    ambientPalette.tint.opacity(0.04)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -43,7 +43,7 @@ struct VibrantBackground: View {
                 colors: [
                     IncognitoPalette.background,
                     IncognitoPalette.uiElement,
-                    IncognitoPalette.background,
+                    IncognitoPalette.background
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -53,7 +53,7 @@ struct VibrantBackground: View {
             LinearGradient(
                 colors: [
                     AppTheme.Colors.background,
-                    AppTheme.Colors.background.opacity(0.92),
+                    AppTheme.Colors.background.opacity(0.92)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -94,7 +94,7 @@ struct VibrantBackground: View {
                 blur: 85, x: 0.18, y: -0.32, blend: .plusLighter),
             BlobSpec(
                 color: Color(red: 0.55, green: 0.40, blue: 1.00), opacity: 0.20, scale: 0.85,
-                blur: 95, x: -0.30, y: 0.32, blend: .plusLighter),
+                blur: 95, x: -0.30, y: 0.32, blend: .plusLighter)
         ]
     }
 
@@ -121,7 +121,7 @@ struct VibrantBackground: View {
                 .white.opacity(isIncognito ? 0.04 : 0.08),
                 .clear,
                 .clear,
-                .white.opacity(isIncognito ? 0.02 : 0.04),
+                .white.opacity(isIncognito ? 0.02 : 0.04)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -163,6 +163,6 @@ struct VibrantBackground: View {
             blur: 100, x: -0.30, y: 0.30, blend: .plusLighter),
         BlobSpec(
             color: Color(red: 0.50, green: 0.62, blue: 0.78), opacity: 0.10, scale: 0.75,
-            blur: 90, x: 0.22, y: -0.30, blend: .plusLighter),
+            blur: 90, x: 0.22, y: -0.30, blend: .plusLighter)
     ]
 }

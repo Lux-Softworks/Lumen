@@ -35,7 +35,7 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                     }
                 } catch {
                     KnowledgeLogger.storage.error(
-                        "annotation save failed: \(String(describing: error), privacy: .public)")
+                        "annotation save failed: \(String(describing: error), privacy: .private)")
                 }
             }
 
@@ -79,7 +79,7 @@ final class AnnotationHandler: NSObject, WKScriptMessageHandler {
                     "id": ann.id,
                     "text": ann.text,
                     "prefix": ann.prefix,
-                    "suffix": ann.suffix,
+                    "suffix": ann.suffix
                 ]
             }
             let script = AnnotationScript.applyJS(annotations: payload)

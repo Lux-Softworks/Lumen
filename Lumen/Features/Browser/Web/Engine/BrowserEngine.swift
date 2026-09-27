@@ -103,7 +103,7 @@ enum BrowserEngine {
         config.userContentController.add(fingerprintMessageHandler, name: "fingerprintObserver")
 
         objc_setAssociatedObject(
-            config, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
+            config, &WebViewAssociatedKeys.fingerprintHandlerKey, fingerprintMessageHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         let trackerScanScript = WKUserScript(
@@ -138,7 +138,7 @@ enum BrowserEngine {
         config.userContentController.add(readingSignalHandler, name: "readingSignal")
 
         objc_setAssociatedObject(
-            config, &_WKWebViewAssociatedKeys.readingSignalHandlerKey, readingSignalHandler,
+            config, &WebViewAssociatedKeys.readingSignalHandlerKey, readingSignalHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         let annotationCaptureScript = WKUserScript(
@@ -152,13 +152,13 @@ enum BrowserEngine {
         config.userContentController.add(annotationHandler, name: "annotation")
 
         objc_setAssociatedObject(
-            config, &_WKWebViewAssociatedKeys.annotationHandlerKey, annotationHandler,
+            config, &WebViewAssociatedKeys.annotationHandlerKey, annotationHandler,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         if isIncognito {
             objc_setAssociatedObject(
                 config,
-                &_WKWebViewAssociatedKeys.incognitoFlagKey,
+                &WebViewAssociatedKeys.incognitoFlagKey,
                 true,
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC
             )
@@ -218,7 +218,7 @@ enum BrowserEngine {
         let uiDelegate = BrowserUIDelegate()
         webView.uiDelegate = uiDelegate
         objc_setAssociatedObject(
-            webView, &_WKWebViewAssociatedKeys.uiDelegateKey, uiDelegate,
+            webView, &WebViewAssociatedKeys.uiDelegateKey, uiDelegate,
             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
         webView.navigationDelegate = interceptor
@@ -236,18 +236,17 @@ enum BrowserEngine {
         }
 
         if let handler = objc_getAssociatedObject(
-            webView.configuration, &_WKWebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler
-        {
+            webView.configuration, &WebViewAssociatedKeys.fingerprintHandlerKey) as? FingerprintMessageHandler {
             handler.interceptor = interceptor
             objc_setAssociatedObject(
-                webView, &_WKWebViewAssociatedKeys.fingerprintHandlerKey, handler,
+                webView, &WebViewAssociatedKeys.fingerprintHandlerKey, handler,
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
 
         if isIncognito {
             objc_setAssociatedObject(
                 webView,
-                &_WKWebViewAssociatedKeys.incognitoFlagKey,
+                &WebViewAssociatedKeys.incognitoFlagKey,
                 true,
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC
             )
@@ -270,11 +269,11 @@ enum BrowserEngine {
 
     @MainActor
     static func isIncognito(_ webView: WKWebView) -> Bool {
-        objc_getAssociatedObject(webView, &_WKWebViewAssociatedKeys.incognitoFlagKey) as? Bool ?? false
+        objc_getAssociatedObject(webView, &WebViewAssociatedKeys.incognitoFlagKey) as? Bool ?? false
     }
 }
 
-internal enum _WKWebViewAssociatedKeys {
+enum WebViewAssociatedKeys {
     static var retainedNavigationDelegateKey: UInt8 = 0
     static var fingerprintHandlerKey: UInt8 = 1
     static var readingSignalHandlerKey: UInt8 = 2
@@ -312,13 +311,13 @@ final class FingerprintMessageHandler: NSObject, WKScriptMessageHandler {
 extension WKWebView {
     fileprivate var retainedDelegate: WKNavigationDelegate? {
         get {
-            objc_getAssociatedObject(self, &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey)
+            objc_getAssociatedObject(self, &WebViewAssociatedKeys.retainedNavigationDelegateKey)
                 as? WKNavigationDelegate
         }
         set {
             objc_setAssociatedObject(
                 self,
-                &_WKWebViewAssociatedKeys.retainedNavigationDelegateKey,
+                &WebViewAssociatedKeys.retainedNavigationDelegateKey,
                 newValue,
                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC
             )

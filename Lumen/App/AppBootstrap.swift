@@ -37,7 +37,7 @@ final class AppBootstrap: ObservableObject {
                 await MainActor.run { self?.knowledgeStorage = .ready }
             } catch {
                 let description = String(describing: error)
-                KnowledgeLogger.storage.error("KnowledgeStorage init failed: \(description, privacy: .public)")
+                KnowledgeLogger.storage.error("KnowledgeStorage init failed: \(description, privacy: .private)")
                 await MainActor.run { self?.knowledgeStorage = .failed(description) }
             }
         }

@@ -11,7 +11,7 @@ struct ExportView: View {
     }
 
     var initialScope: Scope = .wholeBase
-    var fixedCoordinatorScope: ExportCoordinator.Request.Scope? = nil
+    var fixedCoordinatorScope: ExportCoordinator.Request.Scope?
     var onDismiss: () -> Void
 
     @Environment(\.palette) private var palette
@@ -23,12 +23,12 @@ struct ExportView: View {
     @State private var startDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var endDate: Date = Date()
 
-    @State private var exportProgress: ExportCoordinator.Progress? = nil
+    @State private var exportProgress: ExportCoordinator.Progress?
     @State private var lastTotal: Int = 1
-    @State private var shareItem: ShareItem? = nil
-    @State private var activeTask: Task<Void, Never>? = nil
+    @State private var shareItem: ShareItem?
+    @State private var activeTask: Task<Void, Never>?
     @State private var progressGateVisible: Bool = false
-    @State private var gateTask: Task<Void, Never>? = nil
+    @State private var gateTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,15 +57,7 @@ struct ExportView: View {
                 .padding(.vertical, 12)
         }
         .onAppear { scope = initialScope }
-        .sheet(
-            item: $shareItem,
-            onDismiss: {
-                exportProgress = nil
-                progressGateVisible = false
-                gateTask?.cancel()
-                gateTask = nil
-            }
-        ) { item in
+        .sheet(item: $shareItem, onDismiss: resetAfterShare) { item in
             ShareSheet(url: item.url)
         }
         .alert(
@@ -393,6 +385,13 @@ struct ExportView: View {
                 }
             }
         }
+    }
+
+    private func resetAfterShare() {
+        exportProgress = nil
+        progressGateVisible = false
+        gateTask?.cancel()
+        gateTask = nil
     }
 
     private func cancelExport() {

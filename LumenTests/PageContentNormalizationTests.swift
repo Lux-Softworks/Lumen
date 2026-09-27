@@ -19,7 +19,7 @@ struct PageContentNormalizationTests {
     }
 
     @Test func extractDomainEmptyForInvalid() {
-        #expect(PageContent.extractDomain(from: "notaurl") == "")
+        #expect(PageContent.extractDomain(from: "notaurl").isEmpty)
     }
 
     @Test func countWordsIgnoresWhitespace() {

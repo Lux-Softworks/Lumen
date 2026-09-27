@@ -13,7 +13,7 @@ enum AnswerValidityScorer {
         "most", "some", "any", "all", "each", "every", "only", "other",
         "read", "reading", "article", "articles", "library", "page", "pages",
         "saved", "source", "sources", "summary", "summaries", "site", "sites",
-        "didn", "don", "doesn", "haven", "hasn", "isn", "wasn", "weren", "won",
+        "didn", "don", "doesn", "haven", "hasn", "isn", "wasn", "weren", "won"
     ]
 
     private static let refusalPatterns: [String] = [
@@ -41,7 +41,7 @@ enum AnswerValidityScorer {
         "sources don't cover",
         "sources don't address",
         "no information",
-        "no relevant",
+        "no relevant"
     ]
 
     static func score(answer: String, sources: [PageContent], sourceEmbeddings: [[Double]]) async -> Double {

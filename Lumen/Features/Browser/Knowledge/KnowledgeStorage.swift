@@ -283,7 +283,7 @@ actor KnowledgeStorage {
         let paths = [
             dbPath,
             dbPath + "-wal",
-            dbPath + "-shm",
+            dbPath + "-shm"
         ]
         for path in paths {
             guard FileManager.default.fileExists(atPath: path) else { continue }
@@ -1120,8 +1120,8 @@ actor KnowledgeStorage {
             let boosted = score + 0.02
             if boosted > (bestByPage[pageID] ?? -1) { bestByPage[pageID] = boosted }
         }
-        for (pageID, score) in pageScores {
-            if score > (bestByPage[pageID] ?? -1) { bestByPage[pageID] = score }
+        for (pageID, score) in pageScores where score > (bestByPage[pageID] ?? -1) {
+            bestByPage[pageID] = score
         }
 
         return
@@ -1190,8 +1190,7 @@ actor KnowledgeStorage {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if let queryVector = trimmedQuery.isEmpty
             ? nil
-            : await EmbeddingService.shared.generateEmbedding(for: trimmedQuery)
-        {
+            : await EmbeddingService.shared.generateEmbedding(for: trimmedQuery) {
             let ranked = try await rankPagesByVector(
                 queryVector,
                 limit: limit,
@@ -1254,10 +1253,8 @@ actor KnowledgeStorage {
             }
         }
 
-        for (pageID, score) in pageScores {
-            if score > (bestByPage[pageID] ?? -1) {
-                bestByPage[pageID] = score
-            }
+        for (pageID, score) in pageScores where score > (bestByPage[pageID] ?? -1) {
+            bestByPage[pageID] = score
         }
 
         let topResults =
@@ -1601,8 +1598,7 @@ actor KnowledgeStorage {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
         if trimmed.contains("\"") || trimmed.contains("*")
-            || trimmed.range(of: #"\b(AND|OR|NOT|NEAR)\b"#, options: .regularExpression) != nil
-        {
+            || trimmed.range(of: #"\b(AND|OR|NOT|NEAR)\b"#, options: .regularExpression) != nil {
             let tokens =
                 trimmed
                 .components(separatedBy: CharacterSet.alphanumerics.inverted)
@@ -1756,8 +1752,7 @@ actor KnowledgeStorage {
         }
         sqlite3_bind_text(currentStatement, 1, websiteID, -1, SQLITE_TRANSIENT)
         if sqlite3_step(currentStatement) == SQLITE_ROW,
-            let raw = sqlite3_column_text(currentStatement, 0)
-        {
+            let raw = sqlite3_column_text(currentStatement, 0) {
             currentTopicID = String(cString: raw)
         }
 
@@ -1820,7 +1815,7 @@ actor KnowledgeStorage {
             "DELETE FROM page_embeddings WHERE page_id IN (SELECT p.id FROM pages p JOIN websites w ON p.website_id = w.id WHERE w.topic_id = ?)",
             "DELETE FROM pages WHERE website_id IN (SELECT id FROM websites WHERE topic_id = ?)",
             "DELETE FROM websites WHERE topic_id = ?",
-            "DELETE FROM topics WHERE id = ?",
+            "DELETE FROM topics WHERE id = ?"
         ]
 
         let idCString = (id as NSString).utf8String
@@ -1881,73 +1876,72 @@ actor KnowledgeStorage {
             try createWebsite(website: site)
         }
 
-        typealias SeedEntry = (website: Website, title: String, content: String)
-        let entries: [SeedEntry] = [
-            (
-                apple,
-                "Apple Intelligence: On-Device AI in iOS 18",
-                "Apple Intelligence is Apple's personal AI system deeply integrated into iOS 18, iPadOS 18, and macOS Sequoia. It processes most tasks entirely on-device using a 3-billion parameter language model, ensuring user data never leaves the device. Key capabilities include Writing Tools for rewriting and summarising text across all apps, Image Playground for generating images from text descriptions, and an upgraded Siri with richer context awareness. Apple partnered with OpenAI to offer optional ChatGPT integration for queries the on-device model cannot handle, with explicit user consent required each time. The on-device model runs on the Neural Engine inside A17 Pro and M-series chips. Private Cloud Compute routes more complex requests to Apple silicon servers where data is not retained. This architecture is Apple's answer to balancing AI capability with privacy."
+        let entries: [SeedPage] = [
+            SeedPage(
+                website: apple,
+                title: "Apple Intelligence: On-Device AI in iOS 18",
+                content: "Apple Intelligence is Apple's personal AI system deeply integrated into iOS 18, iPadOS 18, and macOS Sequoia. It processes most tasks entirely on-device using a 3-billion parameter language model, ensuring user data never leaves the device. Key capabilities include Writing Tools for rewriting and summarising text across all apps, Image Playground for generating images from text descriptions, and an upgraded Siri with richer context awareness. Apple partnered with OpenAI to offer optional ChatGPT integration for queries the on-device model cannot handle, with explicit user consent required each time. The on-device model runs on the Neural Engine inside A17 Pro and M-series chips. Private Cloud Compute routes more complex requests to Apple silicon servers where data is not retained. This architecture is Apple's answer to balancing AI capability with privacy."
             ),
 
-            (
-                apple,
-                "WWDC 2025: Swift 6 and SwiftUI Advances",
-                "WWDC 2025 introduced Swift 6 with complete concurrency safety enforced at compile time, eliminating data races by default. SwiftUI gained a new observation framework using the @Observable macro, replacing ObservableObject for most patterns. The conference also unveiled visionOS 3 with hand-tracking improvements and a new spatial canvas API. Xcode 17 ships with a native AI code-completion engine powered by Apple Intelligence, offering context-aware suggestions across the entire project. The new Swift Testing library replaces XCTest for most unit testing scenarios with a macro-based syntax. Developers gained new APIs for Live Activities on the Dynamic Island and expanded WidgetKit support for interactive widgets with real-time server push."
+            SeedPage(
+                website: apple,
+                title: "WWDC 2025: Swift 6 and SwiftUI Advances",
+                content: "WWDC 2025 introduced Swift 6 with complete concurrency safety enforced at compile time, eliminating data races by default. SwiftUI gained a new observation framework using the @Observable macro, replacing ObservableObject for most patterns. The conference also unveiled visionOS 3 with hand-tracking improvements and a new spatial canvas API. Xcode 17 ships with a native AI code-completion engine powered by Apple Intelligence, offering context-aware suggestions across the entire project. The new Swift Testing library replaces XCTest for most unit testing scenarios with a macro-based syntax. Developers gained new APIs for Live Activities on the Dynamic Island and expanded WidgetKit support for interactive widgets with real-time server push."
             ),
 
-            (
-                verge,
-                "The State of AI Browsers in 2025",
-                "AI-integrated browsers have moved from novelty to mainstream in 2025. Arc Browser by The Browser Company pioneered sidebar AI with Claude integration, letting users ask questions about the current page. Opera introduced Aria, a built-in AI assistant with real-time web search. Brave added a local on-device LLM option using Llama models so queries never leave the computer. Microsoft Edge's Copilot evolved into a full agentic assistant capable of filling forms, summarising PDFs, and composing emails from within the browser. Apple's Safari 18 gained Intelligent Search, distilling long articles into bullet-point summaries using on-device Apple Intelligence. The key differentiator across all these products is privacy: local inference wins for sensitive queries while cloud models remain superior for complex reasoning tasks."
+            SeedPage(
+                website: verge,
+                title: "The State of AI Browsers in 2025",
+                content: "AI-integrated browsers have moved from novelty to mainstream in 2025. Arc Browser by The Browser Company pioneered sidebar AI with Claude integration, letting users ask questions about the current page. Opera introduced Aria, a built-in AI assistant with real-time web search. Brave added a local on-device LLM option using Llama models so queries never leave the computer. Microsoft Edge's Copilot evolved into a full agentic assistant capable of filling forms, summarising PDFs, and composing emails from within the browser. Apple's Safari 18 gained Intelligent Search, distilling long articles into bullet-point summaries using on-device Apple Intelligence. The key differentiator across all these products is privacy: local inference wins for sensitive queries while cloud models remain superior for complex reasoning tasks."
             ),
 
-            (
-                verge,
-                "Why On-Device AI Matters for Privacy",
-                "Running AI models locally on a device rather than in the cloud has profound privacy implications. When a user's queries and documents never leave their phone or laptop, they cannot be logged, analysed, or monetised by a server operator. On-device models like Apple's 3B model and Llama 3.2 3B make this practical on modern hardware. The tradeoff is capability: cloud models like GPT-4o and Claude 3.5 Sonnet have orders of magnitude more parameters and broader knowledge. Hybrid approaches are emerging where a small local model handles routine tasks and routes sensitive or complex queries to the cloud only with explicit user permission. For a personal browser with a knowledge base of reading history, on-device inference is the only reasonable privacy choice."
+            SeedPage(
+                website: verge,
+                title: "Why On-Device AI Matters for Privacy",
+                content: "Running AI models locally on a device rather than in the cloud has profound privacy implications. When a user's queries and documents never leave their phone or laptop, they cannot be logged, analysed, or monetised by a server operator. On-device models like Apple's 3B model and Llama 3.2 3B make this practical on modern hardware. The tradeoff is capability: cloud models like GPT-4o and Claude 3.5 Sonnet have orders of magnitude more parameters and broader knowledge. Hybrid approaches are emerging where a small local model handles routine tasks and routes sensitive or complex queries to the cloud only with explicit user permission. For a personal browser with a knowledge base of reading history, on-device inference is the only reasonable privacy choice."
             ),
 
-            (
-                github,
-                "GitHub Copilot Workspace: AI-Native Development",
-                "GitHub Copilot Workspace is a new agentic coding environment that starts from a GitHub issue and produces a fully implemented pull request. The user describes a task in natural language; Copilot plans the required file changes, writes the code across multiple files, runs tests, and submits a PR. It uses GPT-4o under the hood with a specialised code-execution sandbox. Workspace maintains full conversation context across the planning and implementation phases, allowing developers to redirect the agent mid-task. Early benchmarks show it completes simple bug-fix issues end-to-end in under five minutes. The product is positioned as an AI pair programmer rather than a code autocomplete tool, handling whole-feature implementation rather than line-level suggestions."
+            SeedPage(
+                website: github,
+                title: "GitHub Copilot Workspace: AI-Native Development",
+                content: "GitHub Copilot Workspace is a new agentic coding environment that starts from a GitHub issue and produces a fully implemented pull request. The user describes a task in natural language; Copilot plans the required file changes, writes the code across multiple files, runs tests, and submits a PR. It uses GPT-4o under the hood with a specialised code-execution sandbox. Workspace maintains full conversation context across the planning and implementation phases, allowing developers to redirect the agent mid-task. Early benchmarks show it completes simple bug-fix issues end-to-end in under five minutes. The product is positioned as an AI pair programmer rather than a code autocomplete tool, handling whole-feature implementation rather than line-level suggestions."
             ),
 
-            (
-                github,
-                "GitHub Actions 2025: Faster CI/CD",
-                "GitHub Actions received major performance and security upgrades in 2025. New arm64 Linux runners are 40% faster and 50% cheaper than the previous x64 equivalents, driven by custom Ampere Altra hardware in GitHub's data centres. The cache action now supports cross-workflow cache sharing within the same repository, cutting cold-start times on monorepos dramatically. Secrets management was overhauled: organisation-level OIDC token binding means third-party cloud credentials are scoped to specific workflows and auto-rotate. The new Deployments API gives fine-grained control over multi-environment promotion with approval gates built into the workflow YAML. GitHub also launched a built-in code-scanning feature that runs Copilot-powered security analysis on every pull request."
+            SeedPage(
+                website: github,
+                title: "GitHub Actions 2025: Faster CI/CD",
+                content: "GitHub Actions received major performance and security upgrades in 2025. New arm64 Linux runners are 40% faster and 50% cheaper than the previous x64 equivalents, driven by custom Ampere Altra hardware in GitHub's data centres. The cache action now supports cross-workflow cache sharing within the same repository, cutting cold-start times on monorepos dramatically. Secrets management was overhauled: organisation-level OIDC token binding means third-party cloud credentials are scoped to specific workflows and auto-rotate. The new Deployments API gives fine-grained control over multi-environment promotion with approval gates built into the workflow YAML. GitHub also launched a built-in code-scanning feature that runs Copilot-powered security analysis on every pull request."
             ),
 
-            (
-                nature,
-                "Large Language Models Show Signs of Compositional Reasoning",
-                "A study published in Nature Machine Intelligence found that frontier large language models demonstrate a limited but measurable capacity for compositional reasoning — the ability to combine learned concepts in novel ways not seen during training. Researchers at DeepMind tested GPT-4, Claude 3, and Gemini Ultra on a benchmark of 10,000 novel symbol-manipulation tasks. All three models exceeded random baselines and generalised to unseen compositions, though accuracy dropped sharply with task depth beyond five compositional steps. The authors argue this suggests emergent systematic generalisation rather than pure memorisation, challenging earlier claims that transformers fundamentally cannot reason. The finding has implications for AI safety: models that can compose concepts may also be able to reason about their own constraints."
+            SeedPage(
+                website: nature,
+                title: "Large Language Models Show Signs of Compositional Reasoning",
+                content: "A study published in Nature Machine Intelligence found that frontier large language models demonstrate a limited but measurable capacity for compositional reasoning — the ability to combine learned concepts in novel ways not seen during training. Researchers at DeepMind tested GPT-4, Claude 3, and Gemini Ultra on a benchmark of 10,000 novel symbol-manipulation tasks. All three models exceeded random baselines and generalised to unseen compositions, though accuracy dropped sharply with task depth beyond five compositional steps. The authors argue this suggests emergent systematic generalisation rather than pure memorisation, challenging earlier claims that transformers fundamentally cannot reason. The finding has implications for AI safety: models that can compose concepts may also be able to reason about their own constraints."
             ),
 
-            (
-                arxiv,
-                "Retrieval-Augmented Generation: A Survey",
-                "Retrieval-Augmented Generation (RAG) enhances language model responses by first retrieving relevant documents from a corpus and then conditioning generation on those documents. This approach grounds the model's output in verifiable source material, reducing hallucination and extending the effective knowledge cutoff beyond training data. The survey covers three retrieval paradigms: sparse retrieval using BM25 keyword matching, dense retrieval using bi-encoder embeddings, and hybrid approaches combining both. Key challenges include retrieval latency, context window limits when many documents are retrieved, and faithfulness — ensuring the model cites sources it actually used. Advanced techniques like HyDE (Hypothetical Document Embeddings) generate a synthetic answer first, then retrieve documents similar to the hypothesis, improving recall on complex queries. RAG is now standard practice for enterprise AI deployments requiring factual accuracy."
+            SeedPage(
+                website: arxiv,
+                title: "Retrieval-Augmented Generation: A Survey",
+                content: "Retrieval-Augmented Generation (RAG) enhances language model responses by first retrieving relevant documents from a corpus and then conditioning generation on those documents. This approach grounds the model's output in verifiable source material, reducing hallucination and extending the effective knowledge cutoff beyond training data. The survey covers three retrieval paradigms: sparse retrieval using BM25 keyword matching, dense retrieval using bi-encoder embeddings, and hybrid approaches combining both. Key challenges include retrieval latency, context window limits when many documents are retrieved, and faithfulness — ensuring the model cites sources it actually used. Advanced techniques like HyDE (Hypothetical Document Embeddings) generate a synthetic answer first, then retrieve documents similar to the hypothesis, improving recall on complex queries. RAG is now standard practice for enterprise AI deployments requiring factual accuracy."
             ),
 
-            (
-                arxiv,
-                "Mixture of Experts Scaling in Language Models",
-                "Mixture of Experts (MoE) architecture allows language models to scale parameter count without proportionally increasing compute per token. In an MoE transformer, each token is routed to a small subset of specialised feed-forward networks called experts, typically 2 out of 64 or 128. Mistral's Mixtral 8x7B demonstrated that an MoE model with 46.7B total parameters matches a dense 70B model on most benchmarks while using roughly 12B parameters per forward pass. Google's Gemini 1.5 Pro uses a MoE design to achieve a one-million-token context window at practical serving costs. The key challenge is load balancing: auxiliary losses encourage uniform expert utilisation but can conflict with optimal routing. MoE models are now the dominant architecture for models above 30B effective parameters."
+            SeedPage(
+                website: arxiv,
+                title: "Mixture of Experts Scaling in Language Models",
+                content: "Mixture of Experts (MoE) architecture allows language models to scale parameter count without proportionally increasing compute per token. In an MoE transformer, each token is routed to a small subset of specialised feed-forward networks called experts, typically 2 out of 64 or 128. Mistral's Mixtral 8x7B demonstrated that an MoE model with 46.7B total parameters matches a dense 70B model on most benchmarks while using roughly 12B parameters per forward pass. Google's Gemini 1.5 Pro uses a MoE design to achieve a one-million-token context window at practical serving costs. The key challenge is load balancing: auxiliary losses encourage uniform expert utilisation but can conflict with optimal routing. MoE models are now the dominant architecture for models above 30B effective parameters."
             ),
 
-            (
-                wsj,
-                "Federal Reserve Holds Rates as Inflation Cools",
-                "The Federal Reserve held its benchmark interest rate steady in the 5.25–5.50% range for the third consecutive meeting after inflation data showed the consumer price index declining to 2.4% year-over-year, approaching the Fed's 2% target. Chair Jerome Powell noted that the labour market remains resilient with unemployment at 3.9% but signalled the committee needs several more months of data before cutting rates. Markets priced in a first 25-basis-point cut for September with 70% probability following the announcement. Treasury yields fell across the curve, with the 10-year dropping to 4.2%. Equity markets rallied 1.4% on the day. The Fed's dot plot showed a median projection of two cuts in 2025 and three in 2026, slightly more dovish than the previous quarter's projections."
+            SeedPage(
+                website: wsj,
+                title: "Federal Reserve Holds Rates as Inflation Cools",
+                content: "The Federal Reserve held its benchmark interest rate steady in the 5.25–5.50% range for the third consecutive meeting after inflation data showed the consumer price index declining to 2.4% year-over-year, approaching the Fed's 2% target. Chair Jerome Powell noted that the labour market remains resilient with unemployment at 3.9% but signalled the committee needs several more months of data before cutting rates. Markets priced in a first 25-basis-point cut for September with 70% probability following the announcement. Treasury yields fell across the curve, with the 10-year dropping to 4.2%. Equity markets rallied 1.4% on the day. The Fed's dot plot showed a median projection of two cuts in 2025 and three in 2026, slightly more dovish than the previous quarter's projections."
             ),
 
-            (
-                wsj,
-                "AI Chip Demand Reshapes Semiconductor Industry",
-                "Demand for AI accelerator chips has fundamentally restructured the global semiconductor supply chain. NVIDIA's H100 and H200 GPUs command lead times of 12 months or more, with spot-market prices reaching four times the list price. AMD's MI300X is gaining data centre traction as an alternative, offering higher memory bandwidth for inference workloads. Intel's Gaudi 3 is targeting the mid-tier training market. Meanwhile, hyperscalers including Google (TPU v5), Amazon (Trainium 2), and Microsoft (Maia 100) are deploying custom silicon to reduce dependence on NVIDIA and lower cost-per-token for inference. The IEA estimates AI data centres will consume 1,000 TWh of electricity annually by 2026, driving co-location demand near hydroelectric and nuclear power sources. TSMC's 3nm node is fully allocated to AI chips through 2025."
-            ),
+            SeedPage(
+                website: wsj,
+                title: "AI Chip Demand Reshapes Semiconductor Industry",
+                content: "Demand for AI accelerator chips has fundamentally restructured the global semiconductor supply chain. NVIDIA's H100 and H200 GPUs command lead times of 12 months or more, with spot-market prices reaching four times the list price. AMD's MI300X is gaining data centre traction as an alternative, offering higher memory bandwidth for inference workloads. Intel's Gaudi 3 is targeting the mid-tier training market. Meanwhile, hyperscalers including Google (TPU v5), Amazon (Trainium 2), and Microsoft (Maia 100) are deploying custom silicon to reduce dependence on NVIDIA and lower cost-per-token for inference. The IEA estimates AI data centres will consume 1,000 TWh of electricity annually by 2026, driving co-location demand near hydroelectric and nuclear power sources. TSMC's 3nm node is fully allocated to AI chips through 2025."
+            )
         ]
 
         var offset: TimeInterval = 0
@@ -2164,7 +2158,7 @@ actor KnowledgeStorage {
 
     func nukeDatabase() throws {
         if let db = db {
-            let _ = sqlite3_close_v2(db)
+            _ = sqlite3_close_v2(db)
             self.db = nil
         }
 
@@ -2321,8 +2315,7 @@ actor KnowledgeStorage {
 
                 cursor = tail
                 while let ptr = cursor, ptr.pointee != 0,
-                    ptr.pointee == 0x20 || ptr.pointee == 0x09 || ptr.pointee == 0x0A || ptr.pointee == 0x0D
-                {
+                    ptr.pointee == 0x20 || ptr.pointee == 0x09 || ptr.pointee == 0x0A || ptr.pointee == 0x0D {
                     cursor = ptr.advanced(by: 1)
                 }
             }
@@ -2489,6 +2482,12 @@ actor KnowledgeStorage {
         if let db = db {
             sqlite3_close(db)
         }
+    }
+
+    struct SeedPage {
+        let website: Website
+        let title: String
+        let content: String
     }
 
     struct SeedHighlight {

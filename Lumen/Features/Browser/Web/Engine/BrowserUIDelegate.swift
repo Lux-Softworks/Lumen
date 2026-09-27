@@ -14,8 +14,7 @@ final class BrowserUIDelegate: NSObject, WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if let handler = onRequestNewWebView,
-            let popupWebView = handler(configuration, navigationAction)
-        {
+            let popupWebView = handler(configuration, navigationAction) {
             return popupWebView
         }
 

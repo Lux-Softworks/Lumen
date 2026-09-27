@@ -10,16 +10,16 @@ struct BottomBarView: View {
 
     var searchSuggestions: [SearchSuggestion] = []
     var themeColor: UIColor?
-    var currentURL: URL? = nil
+    var currentURL: URL?
 
     var tabCount: Int = 1
     var isTabOverlayVisible: Bool = false
     var onTabsPressed: () -> Void
-    var onTabsLongPress: (() -> Void)? = nil
+    var onTabsLongPress: (() -> Void)?
     var onSettingsPressed: () -> Void
     var onSubmit: () -> Void
     var onHistoryTap: (String) -> Void
-    var onSearchPressedInTabOverlay: (() -> Void)? = nil
+    var onSearchPressedInTabOverlay: (() -> Void)?
 
     var onCopyUrl: () -> Void
     var onReload: () -> Void
@@ -32,19 +32,19 @@ struct BottomBarView: View {
     var trackerCount: Int = 0
     var initialZoom: Int = 100
     var initialDesktopMode: Bool = false
-    var onFindOnPage: (() -> Void)? = nil
-    var onShare: (() -> Void)? = nil
-    var onZoomChanged: ((Int) -> Void)? = nil
-    var onRequestDesktopSite: ((Bool) -> Void)? = nil
-    var onReloadPage: (() -> Void)? = nil
-    var onNavigate: ((String) -> Void)? = nil
-    var onNewIncognitoTab: (() -> Void)? = nil
+    var onFindOnPage: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onZoomChanged: ((Int) -> Void)?
+    var onRequestDesktopSite: ((Bool) -> Void)?
+    var onReloadPage: (() -> Void)?
+    var onNavigate: ((String) -> Void)?
+    var onNewIncognitoTab: (() -> Void)?
     var isIncognitoActive: Bool = false
     var backdropOpacity: CGFloat = 1
     var sheetInstantCollapse: Bool = false
-    var onTabsEmpty: (() -> Void)? = nil
-    var editingSuggestion: Binding<Bool>? = nil
-    var onUserTyped: ((String) -> Void)? = nil
+    var onTabsEmpty: (() -> Void)?
+    var editingSuggestion: Binding<Bool>?
+    var onUserTyped: ((String) -> Void)?
 
     @ObservedObject private var historyStore = HistoryStore.shared
     @ObservedObject private var searchHistoryStore = SearchHistoryStore.shared
@@ -52,7 +52,7 @@ struct BottomBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    var ambientTint: Color? = nil
+    var ambientTint: Color?
 
     @Namespace private var animation
 
@@ -325,8 +325,7 @@ struct BottomBarView: View {
         }
         .onChange(of: searchSuggestions) { _, newSuggestions in
             if let active = activeRowId, active != "_typed",
-                !newSuggestions.contains(where: { $0.id == active })
-            {
+                !newSuggestions.contains(where: { $0.id == active }) {
                 withTransaction(Transaction(animation: nil)) {
                     activeRowId = "_typed"
                 }
@@ -581,7 +580,7 @@ struct BottomBarView: View {
                     .allowsHitTesting(state == .siteSettings)
                     .accessibilityLabel("Reload page")
 
-                    Button(action: { text = "" }) {
+                    Button { text = "" } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(palette.text.opacity(0.6))
                             .frame(width: 44, height: 44)
@@ -594,10 +593,10 @@ struct BottomBarView: View {
                     width: state == .siteSettings || (state == .search && !text.isEmpty) ? 44 : 0,
                     height: 44)
 
-                Button(action: {
+                Button {
                     Haptics.fire(.rigid)
                     onNewIncognitoTab?()
-                }) {
+                } label: {
                     ZStack(alignment: .trailing) {
                         HStack(spacing: 6) {
                             if isIncognitoActive {
@@ -727,8 +726,7 @@ struct BottomBarView: View {
                 editingSuggestion?.wrappedValue = isEditing
             }
             if let newId, newId != "_typed",
-                let suggestion = searchSuggestions.first(where: { $0.id == newId })
-            {
+                let suggestion = searchSuggestions.first(where: { $0.id == newId }) {
                 withTransaction(Transaction(animation: nil)) {
                     text = suggestion.text
                 }
@@ -926,14 +924,14 @@ struct BottomBarView: View {
 
             Spacer()
 
-            Button(action: {
+            Button {
                 if isTabOverlayVisible, let handler = onSearchPressedInTabOverlay {
                     handler()
                 } else {
                     text = ""
                     state = .search
                 }
-            }) {
+            } label: {
                 ZStack {
                     Color.clear
                         .frame(width: magGlassSize, height: magGlassSize)
@@ -943,7 +941,7 @@ struct BottomBarView: View {
 
                     Image(systemName: "arrow.clockwise")
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .scaledToFit()
                         .font(.system(size: urlFontSize, weight: .bold))
                         .foregroundStyle(palette.text)
                         .frame(width: smallIcon, height: smallIcon)

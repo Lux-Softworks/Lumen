@@ -111,7 +111,7 @@ final class ThreatDetector {
     private static let suspiciousQueryKeys: Set<String> = [
         "uid", "userid", "user_id", "device_id", "deviceid", "idfa", "gaid",
         "aaid", "email", "mail", "phone", "lat", "lon", "latitude", "longitude",
-        "fingerprint", "fp", "uuid", "advertising_id", "android_id", "idfv",
+        "fingerprint", "fp", "uuid", "advertising_id", "android_id", "idfv"
     ]
 
     private static let fingerprintAPIs: Set<String> = [
@@ -120,18 +120,18 @@ final class ThreatDetector {
         "AudioContext", "OfflineAudioContext", "createOscillator",
         "navigator.plugins", "navigator.mimeTypes", "navigator.hardwareConcurrency",
         "screen.colorDepth", "screen.pixelDepth",
-        "getBattery", "getGamepads", "mediaDevices.enumerateDevices",
+        "getBattery", "getGamepads", "mediaDevices.enumerateDevices"
     ]
 
     private static let knownCryptominerDomains: Set<String> = [
         "coinhive.com", "coin-hive.com", "gus.host", "cnhv.co",
         "crypto-loot.com", "cryptoloot.pro", "minero.cc",
-        "authedmine.com", "jsecoin.com", "mineralt.io",
+        "authedmine.com", "jsecoin.com", "mineralt.io"
     ]
 
     private static let knownFingerprintingScriptPatterns: Set<String> = [
         "fingerprintjs", "fingerprint2", "clientjs",
-        "evercookie", "supercookie", "panopticlick",
+        "evercookie", "supercookie", "panopticlick"
     ]
 
     init() {
@@ -196,7 +196,7 @@ final class ThreatDetector {
         "com.br", "net.br", "org.br", "gov.br", "edu.br",
         "com.mx", "org.mx", "gob.mx", "edu.mx", "net.mx",
         "co.in", "net.in", "org.in", "gov.in", "ac.in",
-        "com.sg", "net.sg", "org.sg", "gov.sg", "edu.sg",
+        "com.sg", "net.sg", "org.sg", "gov.sg", "edu.sg"
     ]
 
     func extractRegistrableDomain(from host: String) -> String {
@@ -301,7 +301,7 @@ final class ThreatDetector {
 
         let severity: ThreatSeverity = isKnownTracker ? .critical : .medium
 
-        var entity: ThreatEntity? = nil
+        var entity: ThreatEntity?
         if let tracker = trackerInfo {
             entity = ThreatEntity(
                 name: tracker.entityName,
@@ -388,7 +388,7 @@ final class ThreatDetector {
 
             let keys = Set(queryItems.map { $0.name.lowercased() })
             let syncKeys: Set<String> = [
-                "partner", "partner_id", "sync", "sync_id", "cookie_id", "match", "cm", "csync",
+                "partner", "partner_id", "sync", "sync_id", "cookie_id", "match", "cm", "csync"
             ]
 
             return !keys.isDisjoint(with: syncKeys)

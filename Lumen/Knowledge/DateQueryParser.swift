@@ -88,14 +88,12 @@ enum DateQueryParser {
             of: #"\b(?:past|last|previous)\s+(\d{1,3})\s+(?:days?|weeks?|months?|years?)\b"#,
             options: .regularExpression
         ),
-            let interval = relativeNUnitInterval(phrase: String(text[r]), now: now, calendar: calendar)
-        {
+            let interval = relativeNUnitInterval(phrase: String(text[r]), now: now, calendar: calendar) {
             return (String(text[r]), interval)
         }
 
         if let r = text.range(
-            of: #"\b(?:in\s+)?q([1-4])(?:\s+(\d{4}))?\b"#, options: [.regularExpression, .caseInsensitive])
-        {
+            of: #"\b(?:in\s+)?q([1-4])(?:\s+(\d{4}))?\b"#, options: [.regularExpression, .caseInsensitive]) {
             let phrase = String(text[r])
             if let interval = quarterInterval(phrase: phrase, now: now, calendar: calendar) {
                 return (phrase, interval)
@@ -129,50 +127,34 @@ enum DateQueryParser {
         }
 
         let candidates: [(pattern: String, build: () -> DateInterval?)] = [
-            (
-                #"\byesterday\b"#,
-                {
-                    guard let y = calendar.date(byAdding: .day, value: -1, to: now) else { return nil }
-                    return calendar.dateInterval(of: .day, for: y)
-                }
-            ),
+            (#"\byesterday\b"#, {
+                guard let y = calendar.date(byAdding: .day, value: -1, to: now) else { return nil }
+                return calendar.dateInterval(of: .day, for: y)
+            }),
             (#"\btoday\b"#, { calendar.dateInterval(of: .day, for: now) }),
             (#"\b(?:this|current)\s+week\b"#, { calendar.dateInterval(of: .weekOfYear, for: now) }),
-            (
-                #"\b(?:last|past|previous)\s+week\b"#,
-                {
-                    guard let p = calendar.date(byAdding: .weekOfYear, value: -1, to: now) else { return nil }
-                    return calendar.dateInterval(of: .weekOfYear, for: p)
-                }
-            ),
+            (#"\b(?:last|past|previous)\s+week\b"#, {
+                guard let p = calendar.date(byAdding: .weekOfYear, value: -1, to: now) else { return nil }
+                return calendar.dateInterval(of: .weekOfYear, for: p)
+            }),
             (#"\b(?:this|current)\s+month\b"#, { calendar.dateInterval(of: .month, for: now) }),
-            (
-                #"\b(?:last|past|previous)\s+month\b"#,
-                {
-                    guard let p = calendar.date(byAdding: .month, value: -1, to: now) else { return nil }
-                    return calendar.dateInterval(of: .month, for: p)
-                }
-            ),
+            (#"\b(?:last|past|previous)\s+month\b"#, {
+                guard let p = calendar.date(byAdding: .month, value: -1, to: now) else { return nil }
+                return calendar.dateInterval(of: .month, for: p)
+            }),
             (#"\b(?:this|current)\s+year\b"#, { calendar.dateInterval(of: .year, for: now) }),
-            (
-                #"\b(?:last|past|previous)\s+year\b"#,
-                {
-                    guard let p = calendar.date(byAdding: .year, value: -1, to: now) else { return nil }
-                    return calendar.dateInterval(of: .year, for: p)
-                }
-            ),
-            (
-                #"\brecently\b"#,
-                {
-                    guard let s = calendar.date(byAdding: .day, value: -7, to: now) else { return nil }
-                    return DateInterval(start: s, end: now)
-                }
-            ),
+            (#"\b(?:last|past|previous)\s+year\b"#, {
+                guard let p = calendar.date(byAdding: .year, value: -1, to: now) else { return nil }
+                return calendar.dateInterval(of: .year, for: p)
+            }),
+            (#"\brecently\b"#, {
+                guard let s = calendar.date(byAdding: .day, value: -7, to: now) else { return nil }
+                return DateInterval(start: s, end: now)
+            })
         ]
         for (pattern, build) in candidates {
             if let r = text.range(of: pattern, options: .regularExpression),
-                let interval = build()
-            {
+                let interval = build() {
                 return (String(text[r]), interval)
             }
         }
@@ -209,7 +191,7 @@ enum DateQueryParser {
         "september": 9, "sept": 9, "sep": 9,
         "october": 10, "oct": 10,
         "november": 11, "nov": 11,
-        "december": 12, "dec": 12,
+        "december": 12, "dec": 12
     ]
 
     private static let weekdayMap: [String: Int] = [
@@ -219,7 +201,7 @@ enum DateQueryParser {
         "wednesday": 4, "wed": 4,
         "thursday": 5, "thurs": 5, "thu": 5,
         "friday": 6, "fri": 6,
-        "saturday": 7, "sat": 7,
+        "saturday": 7, "sat": 7
     ]
 
     private static func relativeNUnitInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
@@ -261,8 +243,7 @@ enum DateQueryParser {
         var year = curYear
         if match.numberOfRanges >= 3,
             let yR = Range(match.range(at: 2), in: phrase),
-            let y = Int(phrase[yR])
-        {
+            let y = Int(phrase[yR]) {
             year = y
         }
 
@@ -288,11 +269,10 @@ enum DateQueryParser {
     private static func monthInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
         let lowerPhrase = phrase.lowercased()
         var matchedMonth: Int?
-        for (name, num) in monthMap.sorted(by: { $0.key.count > $1.key.count }) {
-            if lowerPhrase.range(of: #"\b\#(name)\b"#, options: .regularExpression) != nil {
-                matchedMonth = num
-                break
-            }
+        for (name, num) in monthMap.sorted(by: { $0.key.count > $1.key.count })
+        where lowerPhrase.range(of: #"\b\#(name)\b"#, options: .regularExpression) != nil {
+            matchedMonth = num
+            break
         }
 
         guard let monthNum = matchedMonth else { return nil }
@@ -301,8 +281,7 @@ enum DateQueryParser {
         let curMonth = calendar.component(.month, from: now)
         var year = curMonth >= monthNum ? curYear : curYear - 1
         if let yR = lowerPhrase.range(of: #"\b(?:19\d{2}|20\d{2}|21\d{2})\b"#, options: .regularExpression),
-            let y = Int(lowerPhrase[yR])
-        {
+            let y = Int(lowerPhrase[yR]) {
             year = y
         }
 
@@ -337,11 +316,10 @@ enum DateQueryParser {
     private static func weekdayInterval(phrase: String, now: Date, calendar: Calendar) -> DateInterval? {
         let lowerPhrase = phrase.lowercased()
         var matched: Int?
-        for (name, num) in weekdayMap.sorted(by: { $0.key.count > $1.key.count }) {
-            if lowerPhrase.range(of: #"\b\#(name)\b"#, options: .regularExpression) != nil {
-                matched = num
-                break
-            }
+        for (name, num) in weekdayMap.sorted(by: { $0.key.count > $1.key.count })
+        where lowerPhrase.range(of: #"\b\#(name)\b"#, options: .regularExpression) != nil {
+            matched = num
+            break
         }
 
         guard let target = matched else { return nil }

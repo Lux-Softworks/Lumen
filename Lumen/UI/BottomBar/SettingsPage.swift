@@ -28,12 +28,12 @@ struct SettingsPage: View {
     var trackerCount: Int = 0
     var initialZoom: Int = 100
     var initialDesktopMode: Bool = false
-    var onFindOnPage: (() -> Void)? = nil
-    var onShare: (() -> Void)? = nil
-    var onZoomChanged: ((Int) -> Void)? = nil
-    var onRequestDesktopSite: ((Bool) -> Void)? = nil
-    var onReloadPage: (() -> Void)? = nil
-    var onNavigate: ((String) -> Void)? = nil
+    var onFindOnPage: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onZoomChanged: ((Int) -> Void)?
+    var onRequestDesktopSite: ((Bool) -> Void)?
+    var onReloadPage: (() -> Void)?
+    var onNavigate: ((String) -> Void)?
 
     @ObservedObject private var settings = BrowserSettings.shared
     @Environment(\.palette) private var palette
@@ -743,8 +743,7 @@ struct SettingsPage: View {
 
             Button {
                 if #available(iOS 18.3, *),
-                    let url = URL(string: UIApplication.openDefaultApplicationsSettingsURLString)
-                {
+                    let url = URL(string: UIApplication.openDefaultApplicationsSettingsURLString) {
                     UIApplication.shared.open(url)
                 } else if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -938,7 +937,7 @@ struct SettingsPage: View {
             WKWebsiteDataTypeLocalStorage,
             WKWebsiteDataTypeSessionStorage,
             WKWebsiteDataTypeIndexedDBDatabases,
-            WKWebsiteDataTypeWebSQLDatabases,
+            WKWebsiteDataTypeWebSQLDatabases
         ]
 
         WKWebsiteDataStore.default().removeData(

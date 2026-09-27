@@ -31,7 +31,7 @@ final class DownloadHandler: NSObject, WKDownloadDelegate {
         let key = ObjectIdentifier(download)
         guard let url = destinationsByDownload.removeValue(forKey: key) else { return }
 
-        logger.info("download finished: \(url.lastPathComponent, privacy: .public)")
+        logger.info("download finished: \(url.lastPathComponent, privacy: .private)")
 
         Task { @MainActor in
             Self.onDownloadComplete?(url)
@@ -39,7 +39,7 @@ final class DownloadHandler: NSObject, WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {
-        logger.error("download failed: \(String(describing: error), privacy: .public)")
+        logger.error("download failed: \(String(describing: error), privacy: .private)")
         destinationsByDownload.removeValue(forKey: ObjectIdentifier(download))
     }
 
@@ -92,7 +92,7 @@ final class DownloadHandler: NSObject, WKDownloadDelegate {
             "text/html", "text/css", "text/javascript", "application/javascript",
             "application/x-javascript", "application/json", "application/xml",
             "image/", "audio/", "video/", "font/", "application/font",
-            "application/xhtml+xml", "text/plain", "text/xml",
+            "application/xhtml+xml", "text/plain", "text/xml"
         ]
         if inlineTypes.contains(where: { contentType.hasPrefix($0) || contentType.contains($0) }) {
             return false
@@ -101,7 +101,7 @@ final class DownloadHandler: NSObject, WKDownloadDelegate {
         let downloadableTypes = [
             "application/pdf", "application/zip", "application/x-",
             "application/octet-stream", "application/vnd.",
-            "application/msword", "application/x-tar", "application/gzip",
+            "application/msword", "application/x-tar", "application/gzip"
         ]
         return downloadableTypes.contains(where: { contentType.hasPrefix($0) })
     }

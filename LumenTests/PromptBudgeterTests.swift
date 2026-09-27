@@ -68,7 +68,7 @@ struct PromptBudgeterTests {
         let history: [(role: String, text: String)] = [
             ("user", "first question about Swift"),
             ("assistant", "some answer"),
-            ("user", "second question about concurrency"),
+            ("user", "second question about concurrency")
         ]
         let blocks = PromptBudgeter.build(
             query: "follow up",

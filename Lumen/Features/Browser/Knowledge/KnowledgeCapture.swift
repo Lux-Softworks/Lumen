@@ -66,7 +66,7 @@ final class KnowledgeCaptureService: ObservableObject {
             html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
         } catch {
             KnowledgeLogger.capture.error(
-                "outerHTML failed: \(String(describing: error), privacy: .public)"
+                "outerHTML failed: \(String(describing: error), privacy: .private)"
             )
             return
         }
@@ -85,14 +85,7 @@ final class KnowledgeCaptureService: ObservableObject {
         let domain = PageContent.extractDomain(from: extractedContent.url)
         let wordCount = PageContent.countWords(in: extractedContent.content)
 
-        let quality = CaptureQuality.evaluate(
-            url: payload.url,
-            domain: domain,
-            wordCount: wordCount,
-            readingTime: payload.readingTime,
-            scrollDepth: payload.scrollDepth,
-            hasArticleMetadata: extractedContent.title?.isEmpty == false
-        )
+        let quality = CaptureQuality.evaluate(url: payload.url, domain: domain)
 
         guard quality.shouldCapturePage else { return }
         guard webView.window != nil else { return }
@@ -103,7 +96,7 @@ final class KnowledgeCaptureService: ObservableObject {
         )
         guard webView.window != nil else { return }
 
-        var resolvedTopicID: String? = nil
+        var resolvedTopicID: String?
         if let topicName = classification.best {
             do {
                 if let existingTopic = try await KnowledgeStorage.shared.fetchTopic(name: topicName) {
@@ -116,13 +109,13 @@ final class KnowledgeCaptureService: ObservableObject {
                 }
             } catch {
                 KnowledgeLogger.capture.error(
-                    "topic resolve failed: \(String(describing: error), privacy: .public)"
+                    "topic resolve failed: \(String(describing: error), privacy: .private)"
                 )
             }
         }
 
         do {
-            var newlyCreatedWebsiteID: String? = nil
+            var newlyCreatedWebsiteID: String?
 
             if var website = try await KnowledgeStorage.shared.fetchWebsite(domain: domain) {
                 website.lastVisit = Date()
@@ -130,8 +123,7 @@ final class KnowledgeCaptureService: ObservableObject {
                 website.totalWords += wordCount
 
                 if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
-                    !meta.isEmpty
-                {
+                    !meta.isEmpty {
                     website.displayName = meta
                 } else if website.displayName.isEmpty || website.displayName == domain {
                     website.displayName = DomainNameFormatter.format(host: domain)
@@ -205,7 +197,7 @@ final class KnowledgeCaptureService: ObservableObject {
             }
         } catch {
             KnowledgeLogger.capture.error(
-                "capture failed: \(String(describing: error), privacy: .public)"
+                "capture failed: \(String(describing: error), privacy: .private)"
             )
         }
     }
@@ -316,7 +308,7 @@ final class KnowledgeCaptureService: ObservableObject {
             try await KnowledgeStorage.shared.recomputeWebsiteTopic(forPageID: pageID)
         } catch {
             KnowledgeLogger.capture.error(
-                "topic refine failed: \(String(describing: error), privacy: .public)"
+                "topic refine failed: \(String(describing: error), privacy: .private)"
             )
         }
     }
@@ -348,8 +340,7 @@ final class KnowledgeCaptureService: ObservableObject {
 
     private static func resolveSiteName(extracted: ExtractedContent, domain: String) -> String? {
         if let meta = extracted.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !meta.isEmpty
-        {
+            !meta.isEmpty {
             return meta
         }
 
@@ -368,7 +359,7 @@ final class KnowledgeCaptureService: ObservableObject {
             )
         } catch {
             KnowledgeLogger.capture.error(
-                "engagement update failed: \(String(describing: error), privacy: .public)"
+                "engagement update failed: \(String(describing: error), privacy: .private)"
             )
         }
     }

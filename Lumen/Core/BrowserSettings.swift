@@ -86,8 +86,7 @@ final class BrowserSettings: ObservableObject {
         self.nativeAppsPolicy = NativeAppsPolicy(rawValue: savedPolicy) ?? .ask
         self.collectKnowledge = defaults.object(forKey: "collectKnowledge") as? Bool ?? true
         if let savedHaptics = defaults.string(forKey: "hapticsMode"),
-            let mode = HapticsMode(rawValue: savedHaptics)
-        {
+            let mode = HapticsMode(rawValue: savedHaptics) {
             self.hapticsMode = mode
         } else {
             self.hapticsMode = UIAccessibility.isReduceMotionEnabled ? .subtle : .full
