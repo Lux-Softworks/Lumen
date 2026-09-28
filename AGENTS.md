@@ -2,12 +2,12 @@
 
 On-device, no-backend iOS browser (SwiftUI + WKWebView). It reads along as the user browses, files pages they engage with into a local knowledge base, and answers questions about it with an on-device LLM. Inference, embeddings, search, and storage are all local.
 
-This file is the map. Depth lives in [`docs/`](docs/index.md).
+This file is the map. Depth lives in the public docs at [lumen-browser.app/docs](https://www.lumen-browser.app/docs), whose source is the separate [fishnos/docs](https://github.com/fishnos/docs) repository.
 
 ## Golden rules
 
 1. **No comments in Swift code.** None: not explanatory, not banner, not `// why`. Use clear names and small functions instead.
-2. **Verify with `scripts/test.sh`; the human runs the app.** Agents may build and run tests from the terminal only through that script. Launching or driving the app is done by the human in Xcode (⌘R). See [docs/testing.md](docs/testing.md).
+2. **Verify with `scripts/test.sh`; the human runs the app.** Agents may build and run tests from the terminal only through that script. Launching or driving the app is done by the human in Xcode (⌘R). See [Contributing → Test](https://www.lumen-browser.app/docs/contributing#test).
 3. **`swiftlint --strict` must pass.** CI runs it before anything else. No `print()`: use `KnowledgeLogger` or `Logger`, and give every logger interpolation a `privacy:` level.
 4. **The LLM never runs in the Simulator.** Every `LocalKnowledgeProvider` entry point returns canned stubs under `#if targetEnvironment(simulator)`. Anything touching AI answers, summaries, or topic picks must be confirmed on a physical device.
 5. **Prompt text lives only in `KnowledgePrompts`.** Tune the model's behavior there, not by swapping the model. It is tiny: constrain it with clean context, low temperature, and short positive prompts rather than long instructions.
@@ -37,13 +37,13 @@ scripts/test.sh        build + run tests on a Simulator
 
 ## Where to look
 
-| Question                                                                    | Read                                                 |
-| --------------------------------------------------------------------------- | ---------------------------------------------------- |
-| How capture and asking work end to end                                      | [docs/architecture.md](docs/architecture.md)         |
-| How to run tests, write new ones, and what can't be tested in the Simulator | [docs/testing.md](docs/testing.md)                   |
-| Product overview, privacy promises, manual build steps                      | [README.md](README.md)                               |
-| Lint rules                                                                  | [.swiftlint.yml](.swiftlint.yml)                     |
-| What CI checks                                                              | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
+| Question                                                                    | Read                                                                        |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| How capture and asking work end to end                                      | [Architecture](https://www.lumen-browser.app/docs/architecture)             |
+| How to run tests, write new ones, and what can't be tested in the Simulator | [Contributing → Test](https://www.lumen-browser.app/docs/contributing#test) |
+| Product overview, privacy promises, manual build steps                      | [README.md](README.md)                                                      |
+| Lint rules                                                                  | [.swiftlint.yml](.swiftlint.yml)                                            |
+| What CI checks                                                              | [.github/workflows/ci.yml](.github/workflows/ci.yml)                        |
 
 ## Gotchas
 

@@ -183,7 +183,7 @@ open Lumen.xcodeproj
 2. Swift Package Manager will resolve the MLX Swift dependencies automatically on first open.
 3. Pick a destination (iOS 18+ iPhone or iOS 18+ simulator on Apple Silicon) and hit **⌘R**.
 
-To run the tests from the terminal, use `scripts/test.sh` (see [docs/testing.md](docs/testing.md)).
+To run the tests from the terminal, use `scripts/test.sh` (see [Contributing → Test](https://www.lumen-browser.app/docs/contributing#test)).
 
 ### First launch
 
@@ -210,7 +210,7 @@ The exception (added as additional permission under GNU AGPL version 3 section 7
 Want to help? Awesome — here's the process:
 
 1. **Fork** the repository and create a feature branch off `main` (`git checkout -b your-feature`).
-2. **Match the conventions** — this codebase contains self-explanatory code (meaning no comments), and `swiftlint --strict` must pass, the same check CI runs. Build with ⌘R in Xcode; run tests with ⌘U or `scripts/test.sh`. [AGENTS.md](AGENTS.md) and [docs/](docs/index.md) map the codebase.
+2. **Match the conventions** — this codebase contains self-explanatory code (meaning no comments), and `swiftlint --strict` must pass, the same check CI runs. Build with ⌘R in Xcode; run tests with ⌘U or `scripts/test.sh`. [AGENTS.md](AGENTS.md) and the [docs](https://www.lumen-browser.app/docs) map the codebase.
 3. **Test on a physical device** for anything AI-related. The on-device LLM does not run in the Simulator.
 4. **Open a pull request** against `main` with a clear description of what changed and why.
 
