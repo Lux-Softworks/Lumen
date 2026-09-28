@@ -119,8 +119,6 @@ final class KnowledgeCaptureService: ObservableObject {
 
             if var website = try await KnowledgeStorage.shared.fetchWebsite(domain: domain) {
                 website.lastVisit = Date()
-                website.pageCount += 1
-                website.totalWords += wordCount
 
                 if let meta = extractedContent.siteName?.trimmingCharacters(in: .whitespacesAndNewlines),
                     !meta.isEmpty {
@@ -202,26 +200,26 @@ final class KnowledgeCaptureService: ObservableObject {
         }
     }
 
-    private static func runEnrichment(
+    static func runEnrichment(
         pageID: String,
         extracted: ExtractedContent,
         newlyCreatedWebsiteID: String?,
         topicCandidates: [String],
         provisionalTopicName: String?
     ) async {
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         await savePageEmbedding(pageID: pageID, content: extracted.content)
 
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         await saveEntities(pageID: pageID, content: extracted.content)
 
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         await saveChunks(pageID: pageID, content: extracted.content)
 
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         let summary = await summarizePage(pageID: pageID, extracted: extracted)
 
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         await refineTopic(
             pageID: pageID,
             summary: summary,
@@ -229,11 +227,12 @@ final class KnowledgeCaptureService: ObservableObject {
             provisionalTopicName: provisionalTopicName
         )
 
-        await yieldIfActive()
+        guard await isStillActiveAfterYield() else { return }
         if let siteID = newlyCreatedWebsiteID {
             await summarizeWebsite(siteID: siteID, extracted: extracted)
         }
 
+        guard !Task.isCancelled else { return }
         await MainActor.run {
             NotificationCenter.default.post(
                 name: .knowledgeCaptured,
@@ -243,9 +242,9 @@ final class KnowledgeCaptureService: ObservableObject {
         }
     }
 
-    private static func yieldIfActive() async {
-        if Task.isCancelled { return }
+    private static func isStillActiveAfterYield() async -> Bool {
         await Task.yield()
+        return !Task.isCancelled
     }
 
     private static func savePageEmbedding(pageID: String, content: String) async {

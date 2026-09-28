@@ -42,4 +42,4 @@ The on-device LLM is stubbed out in the Simulator (`#if targetEnvironment(simula
 - New unit tests use Swift Testing, to match the existing 24 files.
 - Name the test after the behavior, so a failure explains itself (`identicalVectorsYieldOne`).
 - Before trusting a new test, watch it fail: break the code, run just that test with `-only-testing:`, confirm it fails for the right reason, then restore the code.
-- `KnowledgeStorage` cannot yet be tested directly. It is a singleton with a private `init()` and a fixed file path (`knowledge.sqlite` in Application Support). Existing tests work around this by running its SQL against an in-memory SQLite database (`RootSlashMigrationTests`), or by testing the pure functions it calls (`TopicVote`, `VectorMath`). Giving it an initializer that takes a database path would open up the storage layer to tests.
+- To test `KnowledgeStorage`, create one with `KnowledgeStorage(databasePath:)` pointing at a file in a fresh temporary directory, and remove that directory when the test ends (`KnowledgeStorageWebsiteStatsTests`). Never use `KnowledgeStorage.shared` in a test: it is the app's real library.

@@ -225,10 +225,13 @@ actor KnowledgeStorage {
     private init() {
         let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
         let appSupportDirectory = paths[0].appendingPathComponent("Lumen", isDirectory: true)
+        self.init(databasePath: appSupportDirectory.appendingPathComponent("knowledge.sqlite").path)
+    }
 
-        try? FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
-
-        self.dbPath = appSupportDirectory.appendingPathComponent("knowledge.sqlite").path
+    init(databasePath: String) {
+        let directory = URL(fileURLWithPath: databasePath).deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        self.dbPath = databasePath
     }
 
     func initialize() throws {
